@@ -84,7 +84,6 @@ app.use('/api/menu', menuRoutes);
 app.use('/api/staff', staffRoutes);
 
 // General Settings API Routes
-import Settings from './models/Settings.js';
 app.get('/api/settings', async (req, res) => {
   try {
     let settings = await Settings.findOne({});
