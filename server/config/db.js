@@ -7,7 +7,10 @@ const connectDB = async () => {
     return;
   }
   try {
-    const conn = await mongoose.connect(process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/kinetic_kitchen');
+    const conn = await mongoose.connect(process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/kinetic_kitchen', {
+      serverSelectionTimeoutMS: 2500,
+      connectTimeoutMS: 2500
+    });
     console.log(`MongoDB Connected: ${conn.connection.host}`);
     isConnected = true;
   } catch (error) {
