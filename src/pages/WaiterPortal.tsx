@@ -14,7 +14,7 @@ const WaiterPortal: React.FC = () => {
   const { 
     currentUser, logout, language, changeLanguage, tables, menuItems, 
     addOrder, attendance, markAttendance, clockOut, leaves, submitLeave,
-    payroll, orders, generateBill, updateOrder
+    payroll, orders, generateBill, updateOrder, systemStatus
   } = useApp();
   const navigate = useNavigate();
   const t = translations[language];
@@ -207,6 +207,13 @@ const WaiterPortal: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* System Status Indicators */}
+          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200/80 px-2 py-1 rounded-lg text-[8px] font-bold select-none h-7">
+            <span className={`w-1.5 h-1.5 rounded-full ${systemStatus.server === 'online' ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
+            <span className={`w-1.5 h-1.5 rounded-full ${systemStatus.database === 'connected' ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
+            <span className="text-slate-450 uppercase tracking-wider">POS Status</span>
+          </div>
+
           {/* Lang Toggle */}
           <button 
             onClick={() => changeLanguage(language === 'en' ? 'mr' : 'en')}

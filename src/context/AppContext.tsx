@@ -99,6 +99,7 @@ interface AppContextType {
   resetAllOrders: () => Promise<void>;
   settings: any;
   updateSettings: (updates: any) => Promise<void>;
+  systemStatus: { server: 'online' | 'offline'; database: 'connected' | 'disconnected' };
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -243,6 +244,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [mergedGroups, setMergedGroups] = useState<number[][]>([]);
   const [zones, setZones] = useState<string[]>(['A', 'B', 'C']);
   const [settings, setSettings] = useState<any>(null);
+  const [systemStatus, setSystemStatus] = useState<{ server: 'online' | 'offline'; database: 'connected' | 'disconnected' }>({
+    server: 'offline',
+    database: 'disconnected'
+  });
 
   const socketRef = useRef<any>(null);
 
@@ -356,6 +361,31 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       console.error('Error fetching database collections:', e);
     }
   };
+
+  // Periodically check server and database status
+  useEffect(() => {
+    const checkStatus = () => {
+      fetch(`${API_BASE}/status`)
+        .then(r => r.json())
+        .then(res => {
+          if (res.success) {
+            setSystemStatus({
+              server: 'online',
+              database: res.database
+            });
+          } else {
+            setSystemStatus({ server: 'online', database: 'disconnected' });
+          }
+        })
+        .catch(() => {
+          setSystemStatus({ server: 'offline', database: 'disconnected' });
+        });
+    };
+
+    checkStatus();
+    const interval = setInterval(checkStatus, 8000); // Check every 8s
+    return () => clearInterval(interval);
+  }, []);
 
   // Attempt backend connection on startup
   useEffect(() => {
@@ -1695,7 +1725,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       rejectCancellation, addEmployee, updateEmployee, changeLanguage, addMenuItem,
       updateMenuItem, clearNotification, clearAllNotifications, addAuditLog, setTableStatus,
       assignWaiter, deleteEmployee, saveAttendance, addTable, removeTable, updateTableLayout,
-      addZone, removeZone, unmergeTables, resetAllOrders, settings, updateSettings
+      addZone, removeZone, unmergeTables, resetAllOrders, settings, updateSettings, systemStatus
     }}>
       {children}
     </AppContext.Provider>

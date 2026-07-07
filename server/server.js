@@ -56,6 +56,15 @@ const limiter = rateLimit({
 
 app.use(express.json());
 
+// Server and Database status API (bypasses DB block to return clean connection status)
+app.get('/api/status', (req, res) => {
+  res.json({
+    success: true,
+    server: 'online',
+    database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
+  });
+});
+
 // Database connection validation & auto-reconnect middleware
 app.use(async (req, res, next) => {
   if (mongoose.connection.readyState !== 1) {

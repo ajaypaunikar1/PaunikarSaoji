@@ -125,7 +125,7 @@ const NotificationCenter: React.FC = () => {
 
 // Layout Component: Main Desktop Dashboard (Admin/Manager/Cashier)
 const DashboardLayout: React.FC = () => {
-  const { currentUser, logout, language, changeLanguage } = useApp();
+  const { currentUser, logout, language, changeLanguage, systemStatus } = useApp();
   const navigate = useNavigate();
   const location = useLocation();
   const t = translations[language];
@@ -308,6 +308,14 @@ const DashboardLayout: React.FC = () => {
             <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 tracking-wide uppercase">
               {currentUser.role}
             </span>
+            {/* System Status Indicators */}
+            <div className="hidden md:flex items-center gap-2 ml-4 bg-slate-50 border border-slate-200/80 px-2.5 py-1 rounded-xl text-[9px] font-bold select-none h-6">
+              <span className={`w-1.5 h-1.5 rounded-full ${systemStatus.server === 'online' ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
+              <span className="text-slate-500">Server: {systemStatus.server === 'online' ? 'Online' : 'Offline'}</span>
+              <span className="w-px h-2.5 bg-slate-200" />
+              <span className={`w-1.5 h-1.5 rounded-full ${systemStatus.database === 'connected' ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
+              <span className="text-slate-500">DB: {systemStatus.database === 'connected' ? 'Connected' : 'Offline'}</span>
+            </div>
           </div>
 
           {/* Top Actions */}

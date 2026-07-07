@@ -5,7 +5,7 @@ import { UtensilsCrossed, ArrowRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 const Login: React.FC = () => {
-  const { login, currentUser, language, changeLanguage } = useApp();
+  const { login, currentUser, language, changeLanguage, systemStatus } = useApp();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const navigate = useNavigate();
@@ -47,22 +47,20 @@ const Login: React.FC = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="w-full max-w-sm p-8 rounded-3xl bg-white border border-slate-200 shadow-xl relative overflow-hidden"
+          className="w-full max-w-sm bg-white/80 backdrop-blur-xl border border-slate-200/60 rounded-3xl p-8 shadow-xl shadow-slate-900/5 relative"
         >
           {/* Logo & Brand Header */}
-          <div className="flex flex-col items-center mb-8 text-center">
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center shadow-lg shadow-emerald-500/10 mb-4">
-              <UtensilsCrossed size={24} className="text-white" />
+          <div className="text-center mb-6">
+            <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-600 font-black text-xl mx-auto mb-3 shadow-inner">
+              <UtensilsCrossed size={20} />
             </div>
-            <h1 className="text-xl font-black tracking-tight text-slate-900 m-0">Paunikar Saoji</h1>
-            <p className="text-[10px] text-slate-500 font-bold tracking-wider mt-1 uppercase">Restaurant Management System</p>
+            <h3 className="font-extrabold text-slate-800 text-base tracking-tight">{language === 'en' ? 'Paunikar Saoji POS' : 'पौणीकर सावजी POS'}</h3>
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Management Portal</p>
           </div>
 
           <form onSubmit={handleLoginSubmit} className="space-y-4">
-            <div>
-              <label className="block text-[9px] font-black uppercase tracking-wider text-slate-500 mb-1.5">
-                Username / वापरकर्ता नाव
-              </label>
+            <div className="space-y-1">
+              <label className="text-[9px] uppercase font-extrabold text-slate-500 tracking-wider">Username</label>
               <input
                 type="text"
                 value={username}
@@ -73,10 +71,8 @@ const Login: React.FC = () => {
               />
             </div>
 
-            <div>
-              <label className="block text-[9px] font-black uppercase tracking-wider text-slate-500 mb-1.5">
-                Password / पासवर्ड
-              </label>
+            <div className="space-y-1">
+              <label className="text-[9px] uppercase font-extrabold text-slate-500 tracking-wider">Password</label>
               <input
                 type="password"
                 value={password}
@@ -98,9 +94,22 @@ const Login: React.FC = () => {
         </motion.div>
       </main>
 
-      {/* Footer */}
-      <footer className="text-center text-[9px] text-slate-400 font-bold tracking-wide z-10">
-        &copy; {new Date().getFullYear()} Paunikar Saoji. All rights reserved. POS Engine.
+      {/* Footer & Status */}
+      <footer className="flex flex-col items-center gap-3 z-10">
+        <div className="flex items-center gap-3 bg-white/70 backdrop-blur-md border border-slate-200/50 px-3.5 py-1.5 rounded-2xl shadow-sm text-[9px] font-bold select-none">
+          <div className="flex items-center gap-1.5">
+            <span className={`w-2 h-2 rounded-full ${systemStatus.server === 'online' ? 'bg-emerald-500 shadow-sm shadow-emerald-500/50 animate-pulse' : 'bg-rose-500'}`} />
+            <span className="text-slate-600">Server: {systemStatus.server === 'online' ? 'Online' : 'Offline'}</span>
+          </div>
+          <div className="w-px h-3 bg-slate-200" />
+          <div className="flex items-center gap-1.5">
+            <span className={`w-2 h-2 rounded-full ${systemStatus.database === 'connected' ? 'bg-emerald-500 shadow-sm shadow-emerald-500/50 animate-pulse' : 'bg-rose-500'}`} />
+            <span className="text-slate-600">MongoDB: {systemStatus.database === 'connected' ? 'Connected' : 'Offline'}</span>
+          </div>
+        </div>
+        <p className="text-center text-[9px] text-slate-400 font-bold tracking-wide">
+          &copy; {new Date().getFullYear()} Paunikar Saoji. All rights reserved. POS Engine.
+        </p>
       </footer>
     </div>
   );
