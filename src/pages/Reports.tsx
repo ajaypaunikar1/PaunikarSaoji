@@ -407,10 +407,10 @@ const Reports: React.FC = () => {
                                 <select
                                   value="Pending"
                                   onChange={async (e) => {
-                                    const method = e.target.value as PaymentMethod;
-                                    if (method !== 'Pending') {
+                                    const val = e.target.value;
+                                    if (val !== 'Pending') {
                                       try {
-                                        await payBill(bill.id || (bill as any)._id, method);
+                                        await payBill(bill.id || (bill as any)._id, val as PaymentMethod);
                                         toast.success(`Payment updated for Order #${ord.id.substring(0, 8)}`);
                                       } catch (err: any) {
                                         toast.error(err.message || "Failed to update payment");
