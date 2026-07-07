@@ -56,6 +56,25 @@ const limiter = rateLimit({
 
 app.use(express.json());
 
+// Database connection validation & auto-reconnect middleware
+app.use(async (req, res, next) => {
+  if (mongoose.connection.readyState !== 1) {
+    try {
+      await connectDB();
+    } catch (err) {
+      console.error('Database reconnect failed:', err.message);
+    }
+  }
+
+  if (mongoose.connection.readyState !== 1) {
+    return res.status(503).json({
+      success: false,
+      message: 'Database is currently offline. Please ensure MONGO_URI is set in Vercel environment variables and 0.0.0.0/0 is whitelisted in MongoDB Atlas Network Access.'
+    });
+  }
+  next();
+});
+
 // Mount API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/tables', tableRoutes);
