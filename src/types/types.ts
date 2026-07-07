@@ -34,6 +34,7 @@ export interface User {
   salary: number;
   performance: number; // rating 1 to 5
   overtimeHours: number;
+  password?: string;
 }
 
 export interface Table {

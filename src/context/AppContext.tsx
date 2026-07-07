@@ -60,7 +60,7 @@ interface AppContextType {
   language: 'en' | 'mr';
   mergedGroups: number[][];
   zones: string[];
-  login: (username: string, role?: UserRole) => boolean;
+  login: (username: string, password?: string, role?: UserRole) => boolean;
   logout: () => void;
   addOrder: (tableId: number, items: Omit<Order['items'][0], 'id'>[], notes?: string) => Order;
   updateOrder: (orderId: string, updates: Partial<Order>) => void;
@@ -471,9 +471,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               (currUser as any)._id === data.id ||
               (data.user && currUser.username.toLowerCase() === data.user.username.toLowerCase())
             )) {
-              const updatedUser = { ...currUser, status: data.status, ...data.user, id: data.id };
-              setCurrentUser(updatedUser);
-              localStorage.setItem('rms_user', JSON.stringify(updatedUser));
+              if (data.user) {
+                const updatedUser = { ...currUser, ...data.user, id: data.id } as User;
+                setCurrentUser(updatedUser);
+                localStorage.setItem('rms_user', JSON.stringify(updatedUser));
+              }
               if (data.status === 'Disabled') {
                 toast.warning('Your account has been turned off by administrator.');
               } else {
@@ -589,7 +591,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
-  const login = (username: string, password?: string): boolean => {
+  const login = (username: string, password?: string, role?: UserRole): boolean => {
     if (isBackendMode) {
       const tryLogin = async () => {
         try {
@@ -1658,7 +1660,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         toast.error(err.message || 'Failed to update settings');
       }
     } else {
-      setSettings(prev => ({ ...prev, ...updates }));
+      setSettings((prev: any) => ({ ...prev, ...updates }));
       toast.success(language === 'en' ? 'Settings updated successfully!' : 'सेटिंग्ज यशस्वीरित्या जतन केल्या!');
     }
   };

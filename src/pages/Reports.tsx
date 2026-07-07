@@ -6,6 +6,7 @@ import {
   IndianRupee, ClipboardList, Clock, Users, ArrowUpRight
 } from 'lucide-react';
 import { toast } from 'sonner';
+import type { PaymentMethod } from '../types/types';
 
 const Reports: React.FC = () => {
   const { 

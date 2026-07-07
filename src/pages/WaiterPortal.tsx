@@ -180,7 +180,7 @@ const WaiterPortal: React.FC = () => {
 
   const waiterPayroll = payroll.filter(p => p.employeeId === currentUser?.id);
   const waiterStats = useMemo(() => {
-    const waiterOrders = orders.filter(o => o.waiterId === currentUser?.id || (o as any).waiterId === currentUser?._id);
+    const waiterOrders = orders.filter(o => o.waiterId === currentUser?.id || (o as any).waiterId === (currentUser as any)?._id);
     const totalOrdersCount = waiterOrders.length;
     const totalRevenueGenerated = waiterOrders.reduce((sum, o) => sum + o.grandTotal, 0);
     return { totalOrdersCount, totalRevenueGenerated };

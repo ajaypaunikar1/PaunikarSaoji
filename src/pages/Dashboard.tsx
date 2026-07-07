@@ -73,11 +73,11 @@ const Dashboard: React.FC = () => {
     ];
 
     const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
-    const paidToday = bills.filter(b => b.paymentStatus === 'Paid' && b.createdAt?.startsWith(todayStr));
+    const paidToday = bills.filter(b => b.paymentStatus === 'Paid' && (b as any).createdAt?.startsWith(todayStr));
     
     paidToday.forEach(bill => {
-      if (!bill.createdAt) return;
-      const billDate = new Date(bill.createdAt);
+      if (!(bill as any).createdAt) return;
+      const billDate = new Date((bill as any).createdAt);
       let hourNum = billDate.getHours();
       let ampm = hourNum >= 12 ? 'PM' : 'AM';
       let displayHour = hourNum % 12;
