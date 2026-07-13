@@ -1,6 +1,10 @@
 import express from 'express';
 import http from 'http';
 import { Server } from 'socket.io';
+import dns from 'dns';
+
+// Fallback DNS to resolve MongoDB Atlas Srv records
+dns.setServers(['8.8.8.8', '1.1.1.1']);
 import mongoose from 'mongoose';
 import cors from 'cors';
 import dotenv from 'dotenv';
