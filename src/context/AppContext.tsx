@@ -216,19 +216,23 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [isBackendMode, setIsBackendMode] = useState<boolean>(true);
 
   // States
-  const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    const saved = localStorage.getItem('rms_user');
-    try {
-      return saved ? JSON.parse(saved) : null;
-    } catch {
-      return null;
-    }
-  });
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   
-  const currentUserRef = useRef<User | null>(currentUser);
+  const currentUserRef = useRef<User | null>(null);
   useEffect(() => {
     currentUserRef.current = currentUser;
   }, [currentUser]);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('rms_user');
+    if (saved) {
+      try {
+        setCurrentUser(JSON.parse(saved));
+      } catch {
+        // ignore
+      }
+    }
+  }, []);
   const [users, setUsers] = useState<User[]>(INITIAL_USERS);
   const [tables, setTables] = useState<Table[]>(INITIAL_TABLES);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -413,7 +417,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           if (isAborted) return;
 
           // Connect Socket.IO
-          const socket = io();
+          const socketUrl = typeof window !== 'undefined' && window.location.hostname === 'localhost' 
+            ? 'http://localhost:5000' 
+            : undefined;
+          const socket = io(socketUrl);
           localSocket = socket;
           socketRef.current = socket;
 

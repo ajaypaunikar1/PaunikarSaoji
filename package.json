@@ -4,12 +4,13 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "lint": "oxlint",
-    "preview": "vite preview"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "oxlint"
   },
   "dependencies": {
+    "@tailwindcss/postcss": "^4.3.2",
     "@tailwindcss/vite": "^4.3.2",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
@@ -22,6 +23,8 @@
     "lucide-react": "^1.23.0",
     "mongoose": "^8.9.2",
     "morgan": "^1.10.0",
+    "next": "^16.2.10",
+    "postcss": "^8.5.19",
     "qrcode.react": "^4.2.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",

@@ -421,10 +421,10 @@ const EmployeeManagement: React.FC = () => {
           <>
             <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-45" onClick={() => setIsAddModalOpen(false)} />
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 15 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 15 }}
-              className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md z-50 p-6 rounded-3xl bg-white border border-slate-200 shadow-2xl text-slate-800"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md z-50 px-6 pt-6 pb-0 rounded-3xl bg-white border border-slate-200 shadow-2xl text-slate-800"
             >
               <div className="flex justify-between items-center pb-3 border-b border-slate-100 mb-4">
                 <span className="text-sm font-extrabold uppercase text-slate-900 flex items-center gap-1.5">
@@ -435,7 +435,7 @@ const EmployeeManagement: React.FC = () => {
                 </button>
               </div>
 
-              <form onSubmit={handleCreateEmployee} className="space-y-4">
+              <form onSubmit={handleCreateEmployee} className="space-y-4 pb-6">
                 
                 {/* Full name */}
                 <div>
@@ -539,10 +539,10 @@ const EmployeeManagement: React.FC = () => {
           <>
             <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-45" onClick={() => setIsResetModalOpen(false)} />
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 15 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 15 }}
-              className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-sm z-50 p-6 rounded-3xl bg-white border border-slate-200 shadow-2xl text-slate-800"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-sm z-50 px-6 pt-6 pb-0 rounded-3xl bg-white border border-slate-200 shadow-2xl text-slate-800"
             >
               <div className="flex justify-between items-center pb-3 border-b border-slate-100 mb-4">
                 <span className="text-xs font-bold uppercase text-slate-900">Reset Account Password</span>
@@ -551,7 +551,7 @@ const EmployeeManagement: React.FC = () => {
                 </button>
               </div>
 
-              <form onSubmit={handleResetPassword} className="space-y-4">
+              <form onSubmit={handleResetPassword} className="space-y-4 pb-6">
                 <p className="text-xs text-slate-500">Resetting credentials for <span className="text-emerald-605 font-bold">{selectedUser.name}</span>.</p>
                 <div>
                   <label className="block text-[9px] font-bold uppercase text-slate-450 mb-1">New Password</label>

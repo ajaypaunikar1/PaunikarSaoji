@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/navigation';
 import { UtensilsCrossed, ArrowRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 
@@ -8,16 +8,16 @@ const Login: React.FC = () => {
   const { login, currentUser, language, changeLanguage, systemStatus } = useApp();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const navigate = useNavigate();
+  const router = useRouter();
 
   // Watch currentUser state for dynamic asynchronous redirection
   useEffect(() => {
     if (currentUser) {
-      if (currentUser.role === 'Chef') navigate('/admin/kds');
-      else if (currentUser.role === 'Waiter') navigate('/waiter');
-      else navigate('/admin/dashboard');
+      if (currentUser.role === 'Chef') router.push('/admin/kds');
+      else if (currentUser.role === 'Waiter') router.push('/waiter');
+      else router.push('/admin/dashboard');
     }
-  }, [currentUser, navigate]);
+  }, [currentUser, router]);
 
   const handleLoginSubmit = (e: React.FormEvent) => {
     e.preventDefault();

@@ -139,8 +139,8 @@ const Dashboard: React.FC = () => {
       {/* Welcome Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-xl font-extrabold text-slate-800 m-0 tracking-tight">{t.dashboard}</h2>
-          <p className="text-xs text-slate-505 font-medium mt-1 font-sans">Real-time restaurant operational analytics and trends.</p>
+          <h2 className="text-xl font-bold text-gray-900 m-0">{t.dashboard}</h2>
+          <p className="text-xs text-gray-400 font-medium mt-1">Real-time restaurant operational analytics and trends.</p>
         </div>
         <div className="flex items-center gap-2">
           
@@ -178,70 +178,70 @@ const Dashboard: React.FC = () => {
         {/* Revenue */}
         <motion.div 
           variants={cardVariants} initial="hidden" animate="visible"
-          className="p-5 rounded-2xl bg-white border border-slate-200 flex items-center gap-4 hover:border-emerald-500/50 shadow-sm hover:shadow-md transition duration-300 group"
+          className="p-5 rounded-2xl bg-white border border-gray-200 flex items-center gap-4 hover:border-indigo-300 shadow-sm hover:shadow-md transition duration-300 group"
         >
-          <div className="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600 group-hover:scale-110 transition duration-300">
+          <div className="w-12 h-12 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 group-hover:scale-110 transition duration-300">
             <IndianRupee size={20} />
           </div>
           <div>
-            <span className="text-[10px] uppercase font-bold text-slate-450 block mb-1">{t.revenue}</span>
-            <span className="text-lg font-black text-slate-800 tracking-tight">₹{metrics.totalRevenue}</span>
+            <span className="text-[10px] uppercase font-bold text-gray-400 block mb-1">{t.revenue}</span>
+            <span className="text-lg font-black text-gray-900 tracking-tight">₹{metrics.totalRevenue}</span>
           </div>
         </motion.div>
 
         {/* Occupancy */}
         <motion.div 
           variants={cardVariants} initial="hidden" animate="visible"
-          className="p-5 rounded-2xl bg-white border border-slate-200 flex items-center gap-4 hover:border-emerald-500/50 shadow-sm hover:shadow-md transition duration-300 group"
+          className="p-5 rounded-2xl bg-white border border-gray-200 flex items-center gap-4 hover:border-emerald-300 shadow-sm hover:shadow-md transition duration-300 group"
         >
-          <div className="w-12 h-12 rounded-xl bg-emerald-550/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600 group-hover:scale-110 transition duration-300">
+          <div className="w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 group-hover:scale-110 transition duration-300">
             <Percent size={18} />
           </div>
           <div>
-            <span className="text-[10px] uppercase font-bold text-slate-450 block mb-1">{t.occupancy}</span>
-            <span className="text-lg font-black text-slate-800 tracking-tight">{metrics.occupancyRate}%</span>
+            <span className="text-[10px] uppercase font-bold text-gray-400 block mb-1">{t.occupancy}</span>
+            <span className="text-lg font-black text-gray-900 tracking-tight">{metrics.occupancyRate}%</span>
           </div>
         </motion.div>
 
         {/* Avg Wait Time */}
         <motion.div 
           variants={cardVariants} initial="hidden" animate="visible"
-          className="p-5 rounded-2xl bg-white border border-slate-200 flex items-center gap-4 hover:border-amber-500/50 shadow-sm hover:shadow-md transition duration-300 group"
+          className="p-5 rounded-2xl bg-white border border-gray-200 flex items-center gap-4 hover:border-amber-300 shadow-sm hover:shadow-md transition duration-300 group"
         >
-          <div className="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-600 group-hover:scale-110 transition duration-300">
+          <div className="w-12 h-12 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 group-hover:scale-110 transition duration-300">
             <Clock size={18} />
           </div>
           <div>
-            <span className="text-[10px] uppercase font-bold text-slate-450 block mb-1">{t.avgWaitTime}</span>
-            <span className="text-lg font-black text-slate-800 tracking-tight">{metrics.avgWaitTime} {t.mins}</span>
+            <span className="text-[10px] uppercase font-bold text-gray-400 block mb-1">{t.avgWaitTime}</span>
+            <span className="text-lg font-black text-gray-900 tracking-tight">{metrics.avgWaitTime} {t.mins}</span>
           </div>
         </motion.div>
 
         {/* Staff Present */}
         <motion.div 
           variants={cardVariants} initial="hidden" animate="visible"
-          className="p-5 rounded-2xl bg-white border border-slate-200 flex items-center gap-4 hover:border-emerald-500/50 shadow-sm hover:shadow-md transition duration-300 group"
+          className="p-5 rounded-2xl bg-white border border-gray-200 flex items-center gap-4 hover:border-blue-300 shadow-sm hover:shadow-md transition duration-300 group"
         >
-          <div className="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600 group-hover:scale-110 transition duration-300">
+          <div className="w-12 h-12 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 group-hover:scale-110 transition duration-300">
             <Users size={18} />
           </div>
           <div>
-            <span className="text-[10px] uppercase font-bold text-slate-450 block mb-1">{t.staffPresent}</span>
-            <span className="text-lg font-black text-slate-800 tracking-tight">{metrics.presentStaff}</span>
+            <span className="text-[10px] uppercase font-bold text-gray-400 block mb-1">{t.staffPresent}</span>
+            <span className="text-lg font-black text-gray-900 tracking-tight">{metrics.presentStaff}</span>
           </div>
         </motion.div>
 
         {/* Live Orders */}
         <motion.div 
           variants={cardVariants} initial="hidden" animate="visible"
-          className="p-5 rounded-2xl bg-white border border-slate-200 flex items-center gap-4 hover:border-emerald-500/50 shadow-sm hover:shadow-md transition duration-300 group"
+          className="p-5 rounded-2xl bg-white border border-gray-200 flex items-center gap-4 hover:border-rose-300 shadow-sm hover:shadow-md transition duration-300 group"
         >
-          <div className="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600 group-hover:scale-110 transition duration-300">
+          <div className="w-12 h-12 rounded-xl bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600 group-hover:scale-110 transition duration-300">
             <Activity size={18} />
           </div>
           <div>
-            <span className="text-[10px] uppercase font-bold text-slate-450 block mb-1">{t.liveOrders}</span>
-            <span className="text-lg font-black text-slate-800 tracking-tight">{metrics.liveOrdersCount}</span>
+            <span className="text-[10px] uppercase font-bold text-gray-400 block mb-1">{t.liveOrders}</span>
+            <span className="text-lg font-black text-gray-900 tracking-tight">{metrics.liveOrdersCount}</span>
           </div>
         </motion.div>
 
@@ -251,14 +251,14 @@ const Dashboard: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
         {/* Left 2 cols: Sales Trend chart */}
-        <div className="lg:col-span-2 bg-white border border-slate-200 rounded-3xl p-6 shadow-sm">
+        <div className="lg:col-span-2 bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
           <div className="flex justify-between items-center mb-6">
             <div>
-              <h3 className="text-xs font-black uppercase text-slate-800 tracking-wider flex items-center gap-2">
-                <TrendingUp size={16} className="text-emerald-500" />
+              <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                <TrendingUp size={16} className="text-indigo-600" />
                 {t.salesTrend}
               </h3>
-              <p className="text-[10px] text-slate-400 mt-1 uppercase font-bold tracking-wider">Hourly sales data collected across zones.</p>
+              <p className="text-xs text-gray-400 mt-1">Hourly sales data collected across zones.</p>
             </div>
           </div>
 
@@ -267,27 +267,27 @@ const Dashboard: React.FC = () => {
               <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.2}/>
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="#6366f1" stopOpacity={0.2}/>
+                    <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="hour" stroke="#94a3b8" fontSize={9} tickLine={false} axisLine={false} />
                 <YAxis stroke="#94a3b8" fontSize={9} tickLine={false} axisLine={false} tickFormatter={(v) => `₹${v / 1000}k`} />
                 <Tooltip 
-                  contentStyle={{ background: '#ffffff', borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '11px', fontFamily: 'monospace' }}
+                  contentStyle={{ background: '#ffffff', borderRadius: '12px', border: '1px solid #e5e7eb', fontSize: '11px', fontFamily: 'monospace' }}
                   formatter={(value: any) => [`₹${value}`, 'Sales']}
                 />
-                <Area type="monotone" dataKey="sales" stroke="#10b981" strokeWidth={2.5} fillOpacity={1} fill="url(#colorSales)" />
+                <Area type="monotone" dataKey="sales" stroke="#6366f1" strokeWidth={2.5} fillOpacity={1} fill="url(#colorSales)" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>
 
         {/* Right 1 col: Top Selling Menu Items */}
-        <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm flex flex-col justify-between">
+        <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm flex flex-col justify-between">
           <div>
-            <h3 className="text-xs font-black uppercase text-slate-800 tracking-wider flex items-center gap-2 mb-6">
+            <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2 mb-6">
               <Award size={16} className="text-amber-500" />
               {t.topSellingItems}
             </h3>

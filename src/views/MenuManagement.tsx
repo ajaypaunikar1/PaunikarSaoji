@@ -269,10 +269,10 @@ const MenuManagement: React.FC = () => {
 
             {/* Modal Body */}
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 15 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 15 }}
-              className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg z-50 p-6 rounded-3xl bg-white border border-slate-200 shadow-2xl overflow-y-auto max-h-[90vh] text-slate-800"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg z-50 px-6 pt-6 pb-0 rounded-3xl bg-white border border-slate-200 shadow-2xl overflow-y-auto max-h-[90vh] text-slate-800"
             >
               <div className="flex justify-between items-center pb-4 border-b border-slate-100 mb-4">
                 <h3 className="text-sm font-extrabold uppercase text-slate-900 flex items-center gap-2">
@@ -284,7 +284,7 @@ const MenuManagement: React.FC = () => {
                 </button>
               </div>
 
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <form onSubmit={handleSubmit} className="space-y-4 pb-6">
                 
                 {/* Name */}
                 <div>

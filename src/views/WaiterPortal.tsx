@@ -8,7 +8,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Table, PortionType } from '../types/types';
 import { toast } from 'sonner';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/navigation';
 
 const WaiterPortal: React.FC = () => {
   const { 
@@ -16,7 +16,7 @@ const WaiterPortal: React.FC = () => {
     addOrder, attendance, markAttendance, clockOut, leaves, submitLeave,
     payroll, orders, generateBill, updateOrder, systemStatus
   } = useApp();
-  const navigate = useNavigate();
+  const router = useRouter();
   const t = translations[language];
 
   // Navigation tab
@@ -225,7 +225,7 @@ const WaiterPortal: React.FC = () => {
           <button 
             onClick={() => {
               logout();
-              navigate('/login');
+              router.push('/login');
             }}
             className="p-1 rounded bg-rose-50 border border-rose-200 text-rose-600 cursor-pointer hover:bg-rose-100"
           >
