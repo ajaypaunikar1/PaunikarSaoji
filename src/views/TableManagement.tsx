@@ -482,12 +482,17 @@ const TableManagement: React.FC = () => {
                 {/* Merge UI */}
                 {activeAction === 'merge' && (
                   <div className="space-y-4">
-                    <h4 className="text-xs font-bold text-gray-550 uppercase tracking-wider">Select tables to merge</h4>
+                    <h4 className="text-xs font-bold text-gray-550 uppercase tracking-wider">Select tables to merge with T-{selectedTable.id}</h4>
                     <div className="grid grid-cols-4 gap-2">
-                      {tables.filter(tbl => tbl.id !== selectedTable.id && tbl.status !== 'Available').map(tbl => (
+                      {tables.filter(tbl => tbl.id !== selectedTable.id).map(tbl => (
                         <button key={tbl.id} onClick={() => setMergeSources(prev => prev.includes(tbl.id) ? prev.filter(id => id !== tbl.id) : [...prev, tbl.id])}
-                          className={`p-3 rounded-xl border text-xs font-bold transition font-mono ${mergeSources.includes(tbl.id) ? 'bg-amber-500 text-white border-amber-500' : 'bg-gray-50 border-gray-200'}`}>
+                          className={`p-3 rounded-xl border text-xs font-bold transition font-mono flex flex-col items-center gap-0.5 ${
+                            mergeSources.includes(tbl.id) ? 'bg-amber-500 text-white border-amber-500' : 'bg-gray-50 border-gray-200'
+                          }`}>
                           T-{tbl.id}
+                          <span className={`text-[8px] font-semibold ${mergeSources.includes(tbl.id) ? 'text-amber-100' : 'text-gray-400'}`}>
+                            {tbl.status === 'Occupied' ? '●' : tbl.status === 'Available' ? '○' : '◐'}
+                          </span>
                         </button>
                       ))}
                     </div>

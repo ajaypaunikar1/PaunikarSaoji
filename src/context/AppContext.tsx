@@ -489,7 +489,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           socket.on('bill_paid', (data: { billId: string; method: PaymentMethod; tableId: number }) => {
             if (isAborted) return;
             setBills(prev => prev.map(b => b.id === data.billId ? { ...b, paymentStatus: 'Paid', paymentMethod: data.method } : b));
-            toast.success(`Table ${data.tableId} checkout paid via ${data.method}.`);
+            // Immediately set table to Available so UI refreshes instantly
+            setTables(prev => prev.map(t => t.id === data.tableId ? { ...t, status: 'Available', orderId: null, waiterId: null, guests: 0 } : t));
+            toast.success(`Table ${data.tableId} checkout complete! Table is now available.`);
           });
           socket.on('notification_received', (data: Notification) => {
             if (isAborted) return;
