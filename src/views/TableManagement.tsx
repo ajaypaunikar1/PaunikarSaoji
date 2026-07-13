@@ -46,18 +46,19 @@ const TableManagement: React.FC = () => {
   // Active order for selected table
   const activeOrder = selectedTable?.orderId ? orders.find(o => o.id === selectedTable.orderId) : undefined;
 
-  // Auto-sync order items from the live activeOrder when it updates (socket events)
+  // Auto-sync selected table whenever tables/orders update (from socket or fast poll)
   useEffect(() => {
-    if (activeOrder && activeAction === 'addItems') {
-      // Keep the add-items draft, don't overwrite
-      return;
-    }
-    // Sync the selected table with the latest version from global tables
-    if (selectedTable) {
-      const freshTable = tables.find(t => t.id === selectedTable.id);
-      if (freshTable) setSelectedTable(freshTable);
-    }
-  }, [orders, tables]);
+    if (!selectedTable) return;
+    const freshTable = tables.find(t => t.id === selectedTable.id);
+    if (!freshTable) return;
+    // Only update if something actually changed
+    const changed = 
+      freshTable.status !== selectedTable.status ||
+      freshTable.orderId !== selectedTable.orderId ||
+      freshTable.guests !== selectedTable.guests ||
+      freshTable.waiterId !== selectedTable.waiterId;
+    if (changed) setSelectedTable(freshTable);
+  }, [tables, orders]);
 
   // Zone tables
   const zoneTables = tables.filter(t => t.zone === activeZone);

@@ -391,6 +391,28 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return () => clearInterval(interval);
   }, []);
 
+  // Fast poll: refresh tables + orders every 2 seconds for real-time table management
+  useEffect(() => {
+    const fastRefresh = async () => {
+      try {
+        const hdrs = getHeaders();
+        const resTables = await apiFetch(`${API_BASE}/tables`, { headers: hdrs });
+        if (resTables.success) {
+          setTables(resTables.data.map((t: any) => ({ ...t, id: t.id || t._id })));
+        }
+        const resOrders = await apiFetch(`${API_BASE}/orders`, { headers: hdrs });
+        if (resOrders.success) {
+          setOrders(resOrders.data.map((o: any) => ({ ...o, id: o.id || o._id })));
+        }
+      } catch {
+        // silent — socket will handle it anyway
+      }
+    };
+    const fastInterval = setInterval(fastRefresh, 2000);
+    return () => clearInterval(fastInterval);
+  }, []);
+
+
   // Attempt backend connection on startup
   useEffect(() => {
     let isAborted = false;
