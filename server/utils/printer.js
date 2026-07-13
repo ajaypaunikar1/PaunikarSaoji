@@ -1,5 +1,5 @@
 import net from 'net';
-import Settings from '../models/Settings.js';
+import prisma from '../config/db.js';
 
 // ESC/POS Command Constants
 const CHARS = {
@@ -46,7 +46,7 @@ async function sendToPrinter(ip, dataBuffer) {
 
 export async function printKOT(order) {
   try {
-    const settings = await Settings.findOne({});
+    const settings = await prisma.settings.findFirst({});
     const ip = settings ? settings.kitchenPrinterIp : '127.0.0.1';
 
     let kot = '';
@@ -84,7 +84,7 @@ export async function printKOT(order) {
 
 export async function printBillReceipt(bill, order) {
   try {
-    const settings = await Settings.findOne({});
+    const settings = await prisma.settings.findFirst({});
     const ip = settings ? settings.billingPrinterIp : '127.0.0.1';
     const restName = settings ? settings.restaurantName : 'Paunikar Saoji Family Restaurant';
     const address = settings ? settings.address : 'Nagpur, Maharashtra';
