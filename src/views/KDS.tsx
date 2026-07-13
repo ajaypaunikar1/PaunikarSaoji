@@ -146,7 +146,7 @@ const KDS: React.FC = () => {
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.95 }}
                   layout
-                  className={`rounded-2xl bg-white border border-slate-200 overflow-hidden shadow-sm flex flex-col justify-between h-[340px] ${getCardHeaderColor(order.status)}`}
+                  className={`rounded-2xl bg-white border border-slate-200 overflow-hidden shadow-sm flex flex-col ${getCardHeaderColor(order.status)}`}
                 >
                   
                   {/* Card Header */}
@@ -164,7 +164,7 @@ const KDS: React.FC = () => {
                   </div>
 
                   {/* KOT Items List */}
-                  <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                  <div className="flex-1 p-4 space-y-2">
                     {order.items.map((item, idx) => (
                       <div key={idx} className="flex justify-between items-start text-xs border-b border-slate-100 pb-1.5 last:border-0 last:pb-0">
                         <div>

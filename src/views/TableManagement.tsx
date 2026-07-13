@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { translations } from '../translations/translations';
 import { 
@@ -45,6 +45,19 @@ const TableManagement: React.FC = () => {
 
   // Active order for selected table
   const activeOrder = selectedTable?.orderId ? orders.find(o => o.id === selectedTable.orderId) : undefined;
+
+  // Auto-sync order items from the live activeOrder when it updates (socket events)
+  useEffect(() => {
+    if (activeOrder && activeAction === 'addItems') {
+      // Keep the add-items draft, don't overwrite
+      return;
+    }
+    // Sync the selected table with the latest version from global tables
+    if (selectedTable) {
+      const freshTable = tables.find(t => t.id === selectedTable.id);
+      if (freshTable) setSelectedTable(freshTable);
+    }
+  }, [orders, tables]);
 
   // Zone tables
   const zoneTables = tables.filter(t => t.zone === activeZone);

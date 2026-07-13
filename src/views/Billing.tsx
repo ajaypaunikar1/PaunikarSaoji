@@ -75,17 +75,17 @@ const Billing: React.FC = () => {
 
   // Submit payment
   const handleProcessPayment = async () => {
-    if (!selectedTableId || !selectedOrder || !paymentMethod) {
-      toast.error('Select a payment method to checkout');
+    if (!selectedTableId || !selectedOrder) {
+      toast.error('Select an active table to checkout');
       return;
     }
 
     try {
       const finalBill = await generateBill(selectedTableId, discountAmt);
-      await payBill(finalBill.id, paymentMethod);
+      await payBill(finalBill.id, 'Cash');
       
       setPrintBillData({
-        bill: { ...finalBill, paymentMethod },
+        bill: { ...finalBill, paymentMethod: 'Cash' },
         orderItems: selectedOrder.items,
         waiterName: users.find(u => u.id === selectedOrder.waiterId)?.name || 'Staff'
       });
@@ -298,82 +298,11 @@ const Billing: React.FC = () => {
 
                 </div>
 
-                {/* Section B: Payments Selection & QR generation */}
-                <div className="space-y-4 border-t md:border-t-0 md:border-l border-slate-100 pt-4 md:pt-0 md:pl-6 flex flex-col justify-between">
-                  <div className="space-y-4">
-                    <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Select Payment Method</h4>
-                    
-                    <div className="grid grid-cols-3 gap-2">
-                      {/* Cash */}
-                      <button
-                        onClick={() => setPaymentMethod('Cash')}
-                        className={`p-3 rounded-xl border flex flex-col items-center gap-1.5 transition text-xs font-bold cursor-pointer ${
-                          paymentMethod === 'Cash' 
-                            ? 'bg-emerald-50 border-emerald-500 text-emerald-700' 
-                            : 'bg-slate-50 border-slate-200 hover:border-slate-350 text-slate-700'
-                        }`}
-                      >
-                        <Wallet size={16} />
-                        <span>Cash</span>
-                      </button>
-
-                      {/* Card */}
-                      <button
-                        onClick={() => setPaymentMethod('Card')}
-                        className={`p-3 rounded-xl border flex flex-col items-center gap-1.5 transition text-xs font-bold cursor-pointer ${
-                          paymentMethod === 'Card' 
-                            ? 'bg-emerald-50 border-emerald-500 text-emerald-700' 
-                            : 'bg-slate-50 border-slate-200 hover:border-slate-350 text-slate-700'
-                        }`}
-                      >
-                        <CreditCard size={16} />
-                        <span>Card</span>
-                      </button>
-
-                      {/* UPI */}
-                      <button
-                        onClick={() => setPaymentMethod('UPI')}
-                        className={`p-3 rounded-xl border flex flex-col items-center gap-1.5 transition text-xs font-bold cursor-pointer ${
-                          paymentMethod === 'UPI' 
-                            ? 'bg-emerald-50 border-emerald-500 text-emerald-700' 
-                            : 'bg-slate-50 border-slate-200 hover:border-slate-350 text-slate-700'
-                        }`}
-                      >
-                        <Smartphone size={16} />
-                        <span>UPI</span>
-                      </button>
-                    </div>
-
-                    {/* Dynamic QR Display when UPI selected */}
-                    <AnimatePresence>
-                      {paymentMethod === 'UPI' && (
-                        <motion.div 
-                          initial={{ opacity: 0, scale: 0.95 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          exit={{ opacity: 0, scale: 0.95 }}
-                          className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col items-center text-center text-slate-900"
-                        >
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-2">Scan & Pay (यूपीआय कोड)</span>
-                          
-                          <QRCodeSVG 
-                            value={upiString}
-                            size={120}
-                            bgColor={"#f8fafc"}
-                            fgColor={"#0f172a"}
-                            level={"M"}
-                          />
-                          
-                          <span className="text-[9px] font-bold text-slate-750 mt-2 font-mono">Amount: ₹{activeBill.grandTotal}</span>
-                          <span className="text-[8px] text-slate-400 mt-0.5 font-medium">pa=restaurant@upi</span>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-
+                {/* Section B: Payment & Checkout */}
+                <div className="border-t md:border-t-0 md:border-l border-slate-100 pt-4 md:pt-0 md:pl-6 flex flex-col justify-end">
                   <button
                     onClick={handleProcessPayment}
-                    disabled={!paymentMethod}
-                    className="w-full mt-4 py-3 bg-emerald-500 hover:bg-emerald-450 disabled:opacity-50 text-white font-black text-xs uppercase tracking-wider rounded-xl cursor-pointer transition shadow-lg shadow-emerald-500/10"
+                    className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 text-white font-black text-sm uppercase tracking-wider rounded-xl cursor-pointer transition shadow-lg shadow-emerald-500/10"
                   >
                     {t.payBill}
                   </button>
