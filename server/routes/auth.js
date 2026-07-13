@@ -1,6 +1,7 @@
 import express from 'express';
 import jwt from 'jsonwebtoken';
-import User from '../models/User.js';
+import bcrypt from 'bcryptjs';
+import prisma from '../config/db.js';
 
 const router = express.Router();
 
@@ -10,16 +11,16 @@ router.post('/login', async (req, res) => {
   const { username, password } = req.body;
 
   try {
-    const user = await User.findOne({ username: username.toLowerCase() });
+    const user = await prisma.user.findUnique({
+      where: { username: username.toLowerCase() }
+    });
     
     if (!user) {
       return res.status(400).json({ success: false, message: 'Invalid username' });
     }
 
-
-
     if (password) {
-      const isMatch = await user.matchPassword(password);
+      const isMatch = await bcrypt.compare(password, user.password);
       if (!isMatch) {
         return res.status(400).json({ success: false, message: 'Invalid credentials' });
       }
@@ -28,7 +29,7 @@ router.post('/login', async (req, res) => {
     // Sign JWT token
     const token = jwt.sign(
       { 
-        id: user._id, 
+        id: user.id, 
         name: user.name, 
         username: user.username, 
         role: user.role, 
@@ -42,7 +43,7 @@ router.post('/login', async (req, res) => {
       success: true,
       token,
       user: {
-        id: user._id,
+        id: user.id,
         name: user.name,
         username: user.username,
         role: user.role,

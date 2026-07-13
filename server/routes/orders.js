@@ -1,20 +1,14 @@
 import express from 'express';
-import Order from '../models/Order.js';
-import Table from '../models/Table.js';
-import User from '../models/User.js';
-import Bill from '../models/Bill.js';
-import Notification from '../models/Notification.js';
+import prisma from '../config/db.js';
 import { protect } from '../middleware/auth.js';
 import { printKOT } from '../utils/printer.js';
 
 const router = express.Router();
 
-// A simple promise-based lock/queue to handle concurrent order submissions sequentially
 class RequestQueue {
   constructor() {
     this.queue = Promise.resolve();
   }
-
   enqueue(action) {
     return new Promise((resolve, reject) => {
       this.queue = this.queue.then(async () => {
@@ -35,7 +29,9 @@ const orderQueue = new RequestQueue();
 // @desc    Get all orders (including Served / historical ones)
 router.get('/', protect, async (req, res) => {
   try {
-    const all = await Order.find({}).sort({ _id: -1 });
+    const all = await prisma.order.findMany({
+      orderBy: { createdAt: 'desc' }
+    });
     res.json({ success: true, data: all });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -46,7 +42,11 @@ router.get('/', protect, async (req, res) => {
 // @desc    Get active orders (Pending, Preparing, Ready)
 router.get('/active', async (req, res) => {
   try {
-    const activeOrders = await Order.find({ status: { $ne: 'Served' } });
+    const activeOrders = await prisma.order.findMany({
+      where: {
+        status: { not: 'Served' }
+      }
+    });
     res.json({ success: true, data: activeOrders });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -57,14 +57,21 @@ router.get('/active', async (req, res) => {
 // @desc    Reset all orders, bills, and table statuses (Admin only)
 router.delete('/reset', protect, async (req, res) => {
   try {
-    await Order.deleteMany({});
-    await Bill.deleteMany({});
-    await Table.updateMany({}, { status: 'Available', orderId: undefined, waiterId: undefined, guests: 0 });
+    await prisma.order.deleteMany({});
+    await prisma.bill.deleteMany({});
+    await prisma.table.updateMany({
+      data: {
+        status: 'Available',
+        orderId: null,
+        waiterId: null,
+        guests: 0
+      }
+    });
     
     // Broadcast Socket Events
     const io = req.app.get('io');
     io.emit('orders_sync', []);
-    io.emit('tables_sync', await Table.find({}).sort({ id: 1 }));
+    io.emit('tables_sync', await prisma.table.findMany({ orderBy: { id: 'asc' } }));
     
     res.json({ success: true, message: 'All orders, bills and tables have been reset successfully.' });
   } catch (error) {
@@ -79,12 +86,12 @@ router.post('/', protect, async (req, res) => {
 
   try {
     const result = await orderQueue.enqueue(async () => {
-      const user = await User.findById(req.user.id);
+      const user = await prisma.user.findUnique({ where: { id: req.user.id } });
       if (user && user.status === 'Disabled') {
         throw new Error('Your account is currently disabled. You cannot place new orders.');
       }
 
-      const table = await Table.findOne({ id: tableId });
+      const table = await prisma.table.findUnique({ where: { id: Number(tableId) } });
       if (!table) {
         throw new Error('Table not found');
       }
@@ -99,44 +106,48 @@ router.post('/', protect, async (req, res) => {
       }));
       const grandTotal = orderItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
 
-      const newOrder = new Order({
-        id: orderId,
-        tableId,
-        waiterId: req.user.id,
-        items: orderItems,
-        status: 'Pending',
-        notes,
-        timestamp,
-        grandTotal
+      const newOrder = await prisma.order.create({
+        data: {
+          id: orderId,
+          tableId: Number(tableId),
+          waiterId: req.user.id,
+          items: orderItems,
+          status: 'Pending',
+          notes,
+          timestamp,
+          grandTotal
+        }
       });
-
-      await newOrder.save();
 
       // Print KOT to Kitchen
       printKOT(newOrder);
 
       // Link table
-      table.status = 'Occupied';
-      table.orderId = orderId;
-      table.waiterId = req.user.id;
-      table.guests = table.guests || 2;
-      await table.save();
+      await prisma.table.update({
+        where: { id: Number(tableId) },
+        data: {
+          status: 'Occupied',
+          orderId: orderId,
+          waiterId: req.user.id,
+          guests: table.guests || 2
+        }
+      });
 
       // Create Notification
-      const notif = new Notification({
-        id: `notif-${Date.now()}`,
-        title: `New Order - Table ${tableId}`,
-        message: `${orderItems.length} items ordered by ${req.user.name}`,
-        type: 'Order',
-        timestamp,
-        read: false
+      const notif = await prisma.notification.create({
+        data: {
+          title: `New Order - Table ${tableId}`,
+          message: `${orderItems.length} items ordered by ${req.user.name}`,
+          type: 'Order',
+          timestamp,
+          read: false
+        }
       });
-      await notif.save();
 
       // Broadcast Socket Events
       const io = req.app.get('io');
       io.emit('order_created', newOrder);
-      io.emit('tables_sync', await Table.find({}).sort({ id: 1 }));
+      io.emit('tables_sync', await prisma.table.findMany({ orderBy: { id: 'asc' } }));
       io.emit('notification_received', notif);
 
       return newOrder;
@@ -153,22 +164,26 @@ router.post('/', protect, async (req, res) => {
 router.put('/:id', protect, async (req, res) => {
   try {
     const result = await orderQueue.enqueue(async () => {
-      const user = await User.findById(req.user.id);
+      const user = await prisma.user.findUnique({ where: { id: req.user.id } });
       if (user && user.status === 'Disabled') {
         throw new Error('Your account is currently disabled. You cannot edit orders.');
       }
 
-      const order = await Order.findOne({ id: req.params.id });
+      const order = await prisma.order.findUnique({ where: { id: req.params.id } });
       if (!order) {
         throw new Error('Order not found');
       }
 
       const { items } = req.body;
+      let finalOrder = order;
+
       if (items) {
         // Calculate newly added items for KOT printing
         const newlyAddedItems = [];
+        const orderItems = Array.isArray(order.items) ? order.items : [];
+        
         items.forEach(item => {
-          const existingItem = order.items.find(i => i.name === item.name && i.portion === item.portion);
+          const existingItem = orderItems.find(i => i.name === item.name && i.portion === item.portion);
           if (!existingItem) {
             newlyAddedItems.push(item);
           } else if (item.quantity > existingItem.quantity) {
@@ -179,26 +194,33 @@ router.put('/:id', protect, async (req, res) => {
           }
         });
 
-        order.items = items;
-        order.grandTotal = items.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+        const grandTotal = items.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+
+        finalOrder = await prisma.order.update({
+          where: { id: req.params.id },
+          data: {
+            items,
+            grandTotal,
+            status: req.body.status || undefined
+          }
+        });
 
         if (newlyAddedItems.length > 0) {
-          printKOT({ ...order.toObject(), items: newlyAddedItems });
+          printKOT({ ...finalOrder, items: newlyAddedItems });
         }
+      } else if (req.body.status) {
+        finalOrder = await prisma.order.update({
+          where: { id: req.params.id },
+          data: { status: req.body.status }
+        });
       }
-
-      if (req.body.status) {
-        order.status = req.body.status;
-      }
-
-      await order.save();
 
       // Broadcast Socket Events
       const io = req.app.get('io');
-      io.emit('order_updated', order);
-      io.emit('orders_sync', await Order.find({}));
+      io.emit('order_updated', finalOrder);
+      io.emit('orders_sync', await prisma.order.findMany({}));
 
-      return order;
+      return finalOrder;
     });
 
     res.json({ success: true, data: result });
@@ -213,29 +235,26 @@ router.put('/:id/status', protect, async (req, res) => {
   const { status } = req.body;
 
   try {
-    const order = await Order.findOne({ id: req.params.id });
-    if (!order) {
-      return res.status(404).json({ success: false, message: 'Order not found' });
-    }
-
-    order.status = status;
-    await order.save();
+    const order = await prisma.order.update({
+      where: { id: req.params.id },
+      data: { status }
+    });
 
     // Create Notification
-    const notif = new Notification({
-      id: `notif-${Date.now()}`,
-      title: `Order ${status} - Table ${order.tableId}`,
-      message: `Order #${order.id.substring(4, 8)} status advanced to ${status}`,
-      type: 'Kitchen',
-      timestamp: new Date().toLocaleTimeString(),
-      read: false
+    const notif = await prisma.notification.create({
+      data: {
+        title: `Order ${status} - Table ${order.tableId}`,
+        message: `Order #${order.id.substring(4, 8)} status advanced to ${status}`,
+        type: 'Kitchen',
+        timestamp: new Date().toLocaleTimeString(),
+        read: false
+      }
     });
-    await notif.save();
 
     // Broadcast Socket Events
     const io = req.app.get('io');
     io.emit('order_status_updated', { id: order.id, status: order.status });
-    io.emit('orders_sync', await Order.find({}));
+    io.emit('orders_sync', await prisma.order.findMany({}));
     io.emit('notification_received', notif);
 
     res.json({ success: true, data: order });

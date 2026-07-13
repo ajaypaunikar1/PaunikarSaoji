@@ -1,22 +1,19 @@
-import mongoose from 'mongoose';
+import 'dotenv/config';
+import pkg from '@prisma/client';
+const { PrismaClient } = pkg;
 
-let isConnected = false;
+import { PrismaPg } from '@prisma/adapter-pg';
+import pg from 'pg';
+const { Pool } = pg;
 
-const connectDB = async () => {
-  if (isConnected || mongoose.connection.readyState === 1) {
-    return;
-  }
-  try {
-    const conn = await mongoose.connect(process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/kinetic_kitchen', {
-      serverSelectionTimeoutMS: 2500,
-      connectTimeoutMS: 2500
-    });
-    console.log(`MongoDB Connected: ${conn.connection.host}`);
-    isConnected = true;
-  } catch (error) {
-    console.error(`MongoDB Connection Error: ${error.message}`);
-    // Do not call process.exit(1) on serverless environments to prevent crashes
-  }
-};
+const connectionString = process.env.DATABASE_URL;
+const pool = new Pool({ connectionString });
+const adapter = new PrismaPg(pool);
 
-export default connectDB;
+// Single global PrismaClient instance configured for Prisma Postgres with driver adapter
+const prisma = new PrismaClient({
+  adapter,
+  log: ['error', 'warn'],
+});
+
+export default prisma;

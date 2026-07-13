@@ -10,6 +10,8 @@
     "lint": "oxlint"
   },
   "dependencies": {
+    "@prisma/adapter-pg": "^7.8.0",
+    "@prisma/client": "^7.8.0",
     "@tailwindcss/postcss": "^4.3.2",
     "@tailwindcss/vite": "^4.3.2",
     "bcryptjs": "^2.4.3",
@@ -24,6 +26,7 @@
     "mongoose": "^8.9.2",
     "morgan": "^1.10.0",
     "next": "^16.2.10",
+    "pg": "^8.22.0",
     "postcss": "^8.5.19",
     "qrcode.react": "^4.2.0",
     "react": "^19.2.7",
@@ -44,6 +47,7 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.3",
     "oxlint": "^1.71.0",
+    "prisma": "^7.8.0",
     "typescript": "~6.0.2",
     "vite": "^8.1.1"
   }

@@ -1,17 +1,12 @@
 import express from 'express';
 import http from 'http';
 import { Server } from 'socket.io';
-import dns from 'dns';
-
-// Fallback DNS to resolve MongoDB Atlas Srv records
-dns.setServers(['8.8.8.8', '1.1.1.1']);
-import mongoose from 'mongoose';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import morgan from 'morgan';
-import connectDB from './config/db.js';
+import prisma from './config/db.js';
 
 // Route imports
 import authRoutes from './routes/auth.js';
@@ -20,15 +15,6 @@ import orderRoutes from './routes/orders.js';
 import billingRoutes from './routes/billing.js';
 import menuRoutes from './routes/menu.js';
 import staffRoutes from './routes/staff.js';
-
-// Models for seeding
-import User from './models/User.js';
-import Table from './models/Table.js';
-import MenuItem from './models/MenuItem.js';
-import Attendance from './models/Attendance.js';
-import LeaveRequest from './models/LeaveRequest.js';
-import Payroll from './models/Payroll.js';
-import Settings from './models/Settings.js';
 
 dotenv.config();
 
@@ -48,44 +34,22 @@ app.set('io', io);
 app.use(cors());
 app.use(helmet());
 app.use(morgan('dev'));
-
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 20000, // High limit for local development and real-time dashboard sync
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { success: false, message: 'Too many requests from this IP, please try again after 15 minutes' }
-});
-// app.use('/api', limiter);
-
 app.use(express.json());
 
 // Server and Database status API (bypasses DB block to return clean connection status)
-app.get('/api/status', (req, res) => {
+app.get('/api/status', async (req, res) => {
+  let dbStatus = 'disconnected';
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    dbStatus = 'connected';
+  } catch (err) {
+    console.error('Database connection test failed:', err.message);
+  }
   res.json({
     success: true,
     server: 'online',
-    database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
+    database: dbStatus
   });
-});
-
-// Database connection validation & auto-reconnect middleware
-app.use(async (req, res, next) => {
-  if (mongoose.connection.readyState !== 1) {
-    try {
-      await connectDB();
-    } catch (err) {
-      console.error('Database reconnect failed:', err.message);
-    }
-  }
-
-  if (mongoose.connection.readyState !== 1) {
-    return res.status(503).json({
-      success: false,
-      message: 'Database is currently offline. Please ensure MONGO_URI is set in Vercel environment variables and 0.0.0.0/0 is whitelisted in MongoDB Atlas Network Access.'
-    });
-  }
-  next();
 });
 
 // Mount API Routes
@@ -99,18 +63,22 @@ app.use('/api/staff', staffRoutes);
 // General Settings API Routes
 app.get('/api/settings', async (req, res) => {
   try {
-    let settings = await Settings.findOne({});
+    let settings = await prisma.settings.findUnique({
+      where: { id: 'settings-main' }
+    });
     if (!settings) {
-      settings = await Settings.create({
-        id: 'settings-main',
-        restaurantName: 'Paunikar Saoji Family Restaurant',
-        address: 'Nagpur, Maharashtra',
-        gstNumber: '27AAAAA1111A1Z1',
-        upiId: 'restaurant@upi',
-        zones: ['A', 'B', 'C'],
-        mergedGroups: [],
-        kitchenPrinterIp: '127.0.0.1',
-        billingPrinterIp: '127.0.0.1'
+      settings = await prisma.settings.create({
+        data: {
+          id: 'settings-main',
+          restaurantName: 'Paunikar Saoji Family Restaurant',
+          address: 'Nagpur, Maharashtra',
+          gstNumber: '27AAAAA1111A1Z1',
+          upiId: 'restaurant@upi',
+          zones: ['A', 'B', 'C'],
+          mergedGroups: [],
+          kitchenPrinterIp: '127.0.0.1',
+          billingPrinterIp: '127.0.0.1'
+        }
       });
     }
     res.json({ success: true, data: settings });
@@ -122,13 +90,21 @@ app.get('/api/settings', async (req, res) => {
 app.put('/api/settings', async (req, res) => {
   try {
     const updates = req.body;
-    let settings = await Settings.findOne({});
-    if (!settings) {
-      settings = new Settings({ id: 'settings-main', ...updates });
-    } else {
-      Object.assign(settings, updates);
-    }
-    await settings.save();
+    const settings = await prisma.settings.upsert({
+      where: { id: 'settings-main' },
+      update: updates,
+      create: {
+        id: 'settings-main',
+        restaurantName: updates.restaurantName || 'Paunikar Saoji Family Restaurant',
+        address: updates.address || 'Nagpur, Maharashtra',
+        gstNumber: updates.gstNumber || '27AAAAA1111A1Z1',
+        upiId: updates.upiId || 'restaurant@upi',
+        zones: updates.zones || ['A', 'B', 'C'],
+        mergedGroups: updates.mergedGroups || [],
+        kitchenPrinterIp: updates.kitchenPrinterIp || '127.0.0.1',
+        billingPrinterIp: updates.billingPrinterIp || '127.0.0.1'
+      }
+    });
     res.json({ success: true, data: settings });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -148,23 +124,30 @@ io.on('connection', (socket) => {
 const seedDatabase = async () => {
   try {
     // 1. Seed Admin User if missing
-    const adminUser = await User.findOne({ username: 'admin' });
+    const adminUser = await prisma.user.findUnique({
+      where: { username: 'admin' }
+    });
     if (!adminUser) {
       console.log('Seeding initial database admin user...');
-      await User.create({
-        name: 'Aditya Patil',
-        username: 'admin',
-        password: 'password', // Pre-save schema hook automatically hashes password
-        role: 'SuperAdmin',
-        status: 'Active',
-        zone: 'All',
-        salary: 75000
+      const bcrypt = await import('bcryptjs');
+      const salt = await bcrypt.default.genSalt(10);
+      const hashedPassword = await bcrypt.default.hash('password', salt);
+      await prisma.user.create({
+        data: {
+          name: 'Aditya Patil',
+          username: 'admin',
+          password: hashedPassword,
+          role: 'SuperAdmin',
+          status: 'Active',
+          zone: 'All',
+          salary: 75000
+        }
       });
       console.log('Admin user seeded successfully!');
     }
 
     // 2. Seed Seating Tables
-    const tableCount = await Table.countDocuments({});
+    const tableCount = await prisma.table.count();
     if (tableCount === 0) {
       console.log('Seeding restaurant tables (1 to 24)...');
       const tablesToSeed = Array.from({ length: 24 }, (_, i) => {
@@ -172,7 +155,6 @@ const seedDatabase = async () => {
         let zone = 'A';
         if (id > 8 && id <= 16) zone = 'B';
         if (id > 16) zone = 'C';
-
         return {
           id,
           guests: 0,
@@ -181,17 +163,20 @@ const seedDatabase = async () => {
         };
       });
 
-      await Table.insertMany(tablesToSeed);
+      await prisma.table.createMany({
+        data: tablesToSeed
+      });
       console.log('Tables seeded successfully!');
     }
 
     // 3. Seed Menu Items
-    const menuCount = await MenuItem.countDocuments({});
-    const hasSaojiMenu = await MenuItem.findOne({ id: 'm_veg_1' });
-    const hasOldCategories = await MenuItem.findOne({ category: 'Main Course' });
-    if (menuCount === 0 || !hasSaojiMenu || hasOldCategories) {
+    const menuCount = await prisma.menuItem.count();
+    const hasSaojiMenu = await prisma.menuItem.findFirst({
+      where: { id: 'm_veg_1' }
+    });
+    if (menuCount === 0 || !hasSaojiMenu) {
       console.log('Clearing old menu selections and seeding Paunikar Saoji Family Restaurant menu...');
-      await MenuItem.deleteMany({});
+      await prisma.menuItem.deleteMany({});
 
       const menuToSeed = [
         // 1. वेज (Vegetarian Curries)
@@ -278,24 +263,26 @@ const seedDatabase = async () => {
         { id: 'm_handi_8', name: 'सुखा कातीचा कोंबडा हांडी (Sukha Katicha Kombda Handi)', category: 'Handi Dishes', portionMode: 'Variant', price: 0, variants: [{ name: 'Half', price: 850, prepTime: 25 }, { name: 'Full', price: 1600, prepTime: 40 }], prepTime: 35, isAvailable: true }
       ];
 
-      await MenuItem.insertMany(menuToSeed);
+      await prisma.menuItem.createMany({
+        data: menuToSeed
+      });
       console.log('Paunikar Saoji menu items seeded successfully!');
     }
 
-
-
-    // 5. Seed Settings
-    const settingsCount = await Settings.countDocuments({});
+    // 4. Seed Settings
+    const settingsCount = await prisma.settings.count();
     if (settingsCount === 0) {
       console.log('Seeding initial settings...');
-      await Settings.create({
-        id: 'settings-main',
-        restaurantName: 'Paunikar Saoji Family Restaurant',
-        address: 'Nagpur, Maharashtra',
-        gstNumber: '27AAAAA1111A1Z1',
-        upiId: 'restaurant@upi',
-        zones: ['A', 'B', 'C'],
-        mergedGroups: []
+      await prisma.settings.create({
+        data: {
+          id: 'settings-main',
+          restaurantName: 'Paunikar Saoji Family Restaurant',
+          address: 'Nagpur, Maharashtra',
+          gstNumber: '27AAAAA1111A1Z1',
+          upiId: 'restaurant@upi',
+          zones: ['A', 'B', 'C'],
+          mergedGroups: []
+        }
       });
       console.log('Settings seeded successfully!');
     }
@@ -307,10 +294,8 @@ const seedDatabase = async () => {
 // Start Server & Connect Database
 const PORT = process.env.PORT || 5000;
 
-connectDB().then(async () => {
-  // Seed DB after successful connection
-  await seedDatabase();
-
+// Initialize seeding
+seedDatabase().then(() => {
   if (!process.env.VERCEL) {
     server.listen(PORT, () => {
       console.log(`Express Server booted on port ${PORT}`);

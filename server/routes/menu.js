@@ -1,6 +1,5 @@
 import express from 'express';
-import mongoose from 'mongoose';
-import MenuItem from '../models/MenuItem.js';
+import prisma from '../config/db.js';
 import { protect, authorize } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -9,7 +8,7 @@ const router = express.Router();
 // @desc    Get all menu items
 router.get('/', async (req, res) => {
   try {
-    const menu = await MenuItem.find({});
+    const menu = await prisma.menuItem.findMany({});
     res.json({ success: true, data: menu });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -22,18 +21,18 @@ router.post('/', protect, authorize('SuperAdmin', 'Manager'), async (req, res) =
   const { name, category, portionMode, price, variants, prepTime, isAvailable } = req.body;
 
   try {
-    const newItem = new MenuItem({
-      id: `m-${Date.now()}`,
-      name,
-      category,
-      portionMode,
-      price,
-      variants,
-      prepTime,
-      isAvailable
+    const newItem = await prisma.menuItem.create({
+      data: {
+        id: `m-${Date.now()}`,
+        name,
+        category,
+        portionMode,
+        price: Number(price) || 0,
+        variants: variants || [],
+        prepTime: Number(prepTime) || 10,
+        isAvailable: isAvailable !== undefined ? isAvailable : true
+      }
     });
-
-    await newItem.save();
 
     const io = req.app.get('io');
     io.emit('menu_changed', newItem);
@@ -48,29 +47,33 @@ router.post('/', protect, authorize('SuperAdmin', 'Manager'), async (req, res) =
 // @desc    Update menu item (Admin/Manager)
 router.put('/:id', protect, authorize('SuperAdmin', 'Manager'), async (req, res) => {
   try {
-    let item = await MenuItem.findOne({ id: req.params.id });
-    if (!item && mongoose.isValidObjectId(req.params.id)) {
-      item = await MenuItem.findById(req.params.id);
-    }
+    const item = await prisma.menuItem.findUnique({
+      where: { id: req.params.id }
+    });
     if (!item) {
       return res.status(404).json({ success: false, message: 'Item not found' });
     }
 
     const { name, category, portionMode, price, variants, prepTime, isAvailable } = req.body;
-    if (name) item.name = name;
-    if (category) item.category = category;
-    if (portionMode) item.portionMode = portionMode;
-    if (price !== undefined) item.price = price;
-    if (variants) item.variants = variants;
-    if (prepTime !== undefined) item.prepTime = prepTime;
-    if (isAvailable !== undefined) item.isAvailable = isAvailable;
 
-    await item.save();
+    const data = {};
+    if (name) data.name = name;
+    if (category) data.category = category;
+    if (portionMode) data.portionMode = portionMode;
+    if (price !== undefined) data.price = Number(price);
+    if (variants) data.variants = variants;
+    if (prepTime !== undefined) data.prepTime = Number(prepTime);
+    if (isAvailable !== undefined) data.isAvailable = isAvailable;
+
+    const updated = await prisma.menuItem.update({
+      where: { id: req.params.id },
+      data
+    });
 
     const io = req.app.get('io');
-    io.emit('menu_changed', item);
+    io.emit('menu_changed', updated);
 
-    res.json({ success: true, data: item });
+    res.json({ success: true, data: updated });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

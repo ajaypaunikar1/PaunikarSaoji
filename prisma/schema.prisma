@@ -1,0 +1,173 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id             String   @id @default(uuid())
+  name           String
+  username       String   @unique
+  password       String
+  role           String
+  status         String   @default("Active")
+  zone           String   @default("All")
+  salary         Float
+  performance    Float    @default(5)
+  overtimeHours  Float    @default(0)
+  branchId       String   @default("branch-main")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model Table {
+  id        Int      @id
+  guests    Int      @default(0)
+  waiterId  String?
+  orderId   String?
+  status    String   @default("Available")
+  zone      String
+  x         Float    @default(0)
+  y         Float    @default(0)
+  branchId  String   @default("branch-main")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model MenuItem {
+  id          String   @id
+  name        String
+  category    String
+  portionMode String   @default("Single")
+  price       Float    @default(0)
+  variants    Json     @default("[]")
+  prepTime    Float    @default(10)
+  isAvailable Boolean  @default(true)
+  branchId    String   @default("branch-main")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Order {
+  id         String   @id
+  tableId    Int
+  waiterId   String
+  items      Json     @default("[]")
+  status     String   @default("Pending")
+  notes      String?
+  timestamp  String?
+  grandTotal Float
+  branchId   String   @default("branch-main")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Attendance {
+  id         String   @id @default(uuid())
+  employeeId String
+  date       String
+  clockIn    String
+  clockOut   String?
+  status     String
+  branchId   String   @default("branch-main")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model LeaveRequest {
+  id         String   @id @default(uuid())
+  employeeId String
+  startDate  String
+  endDate    String
+  reason     String
+  status     String   @default("Pending")
+  branchId   String   @default("branch-main")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Payroll {
+  id          String   @id @default(uuid())
+  employeeId  String
+  month       String
+  baseSalary  Float
+  overtimePay Float
+  deductions  Float
+  netSalary   Float
+  status      String   @default("Unpaid")
+  branchId    String   @default("branch-main")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  title     String
+  message   String
+  type      String
+  timestamp String
+  read      Boolean  @default(false)
+  branchId  String   @default("branch-main")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Bill {
+  id            String   @id
+  orderId       String
+  tableId       Int
+  subtotal      Float
+  gst           Float
+  discount      Float    @default(0)
+  grandTotal    Float
+  paymentMethod String?
+  paymentStatus String   @default("Pending")
+  timestamp     String
+  branchId      String   @default("branch-main")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model CancellationRequest {
+  id          String   @id @default(uuid())
+  orderId     String
+  itemText    String
+  reason      String
+  requestedBy String
+  status      String   @default("Pending")
+  timestamp   String
+  branchId    String   @default("branch-main")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String
+  userName  String
+  action    String
+  timestamp String
+  branchId  String   @default("branch-main")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Settings {
+  id               String   @id
+  restaurantName   String
+  address          String
+  gstNumber        String
+  upiId            String   @default("restaurant@upi")
+  zones            Json     @default("[\"A\", \"B\", \"C\"]")
+  mergedGroups     Json     @default("[]")
+  branchId         String   @default("branch-main")
+  kitchenPrinterIp String   @default("127.0.0.1")
+  billingPrinterIp String   @default("127.0.0.1")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
