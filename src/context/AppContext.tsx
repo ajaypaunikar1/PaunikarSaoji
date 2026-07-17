@@ -394,14 +394,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // Fast poll: refresh tables + orders every 2 seconds for real-time table management
   useEffect(() => {
     const fastRefresh = async () => {
+      const token = localStorage.getItem('rms_token');
+      if (!token || !isBackendMode) return; // Do not fetch if not authenticated
+      
       try {
         const hdrs = getHeaders();
         const resTables = await apiFetch(`${API_BASE}/tables`, { headers: hdrs });
-        if (resTables.success) {
+        if (resTables && resTables.success) {
           setTables(resTables.data.map((t: any) => ({ ...t, id: t.id || t._id })));
         }
         const resOrders = await apiFetch(`${API_BASE}/orders`, { headers: hdrs });
-        if (resOrders.success) {
+        if (resOrders && resOrders.success) {
           setOrders(resOrders.data.map((o: any) => ({ ...o, id: o.id || o._id })));
         }
       } catch {
@@ -410,7 +413,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     };
     const fastInterval = setInterval(fastRefresh, 2000);
     return () => clearInterval(fastInterval);
-  }, []);
+  }, [isBackendMode]);
 
 
   // Attempt backend connection on startup
