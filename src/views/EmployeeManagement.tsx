@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { translations } from '../translations/translations';
 import { 
@@ -38,6 +38,27 @@ const EmployeeManagement: React.FC = () => {
   const [newPassword, setNewPassword] = useState('');
 
   const selectedUser = users.find(u => u.id === selectedUserId);
+
+  // Edit Employee State
+  const [editName, setEditName] = useState('');
+  const [editSalary, setEditSalary] = useState(0);
+
+  useEffect(() => {
+    if (selectedUser) {
+      setEditName(selectedUser.name);
+      setEditSalary(selectedUser.salary || 0);
+    }
+  }, [selectedUser?.id]);
+
+  const handleSaveEdits = () => {
+    if (selectedUser) {
+      updateEmployee(selectedUser.id, { 
+        name: editName,
+        salary: editSalary 
+      });
+      toast.success('Employee details saved successfully');
+    }
+  };
 
   const handleCreateEmployee = (e: React.FormEvent) => {
     e.preventDefault();
@@ -214,10 +235,8 @@ const EmployeeManagement: React.FC = () => {
                      <div className="flex flex-col gap-1">
                        <input
                          type="text"
-                         value={selectedUser.name}
-                         onChange={e => {
-                           updateEmployee(selectedUser.id, { name: e.target.value });
-                         }}
+                         value={editName}
+                         onChange={e => setEditName(e.target.value)}
                          className="text-sm font-extrabold text-slate-850 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1 focus:outline-none focus:ring-1 focus:ring-emerald-500 w-48 font-sans"
                          title="Click to edit name"
                        />
@@ -227,6 +246,12 @@ const EmployeeManagement: React.FC = () => {
 
                   {/* Actions buttons */}
                   <div className="flex gap-2">
+                    <button
+                      onClick={handleSaveEdits}
+                      className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-sm cursor-pointer"
+                    >
+                      Save
+                    </button>
                     <button
                       onClick={() => setIsResetModalOpen(true)}
                       className="p-2 rounded bg-white border border-slate-200 hover:border-slate-350 text-slate-500 hover:text-slate-800 cursor-pointer transition shadow-xs"
@@ -285,11 +310,8 @@ const EmployeeManagement: React.FC = () => {
                         <span className="text-slate-500 text-[10px] block mb-1">Base Salary (₹)</span>
                         <input
                           type="number"
-                          value={selectedUser.salary}
-                          onChange={e => {
-                            const val = parseInt(e.target.value) || 0;
-                            updateEmployee(selectedUser.id, { salary: val });
-                          }}
+                          value={editSalary}
+                          onChange={e => setEditSalary(parseInt(e.target.value) || 0)}
                           className="font-bold text-slate-800 font-mono bg-transparent focus:outline-none focus:ring-1 focus:ring-emerald-500 px-1 py-0.5 rounded w-full border border-slate-200"
                         />
                       </div>
