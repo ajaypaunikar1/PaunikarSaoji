@@ -71,7 +71,7 @@ const NotificationCenter: React.FC = () => {
 };
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const { currentUser, logout, language, changeLanguage, systemStatus } = useApp();
+  const { currentUser, logout, language, changeLanguage, systemStatus, settings } = useApp();
   const router = useRouter();
   const pathname = usePathname();
   const t = translations[language];
