@@ -233,7 +233,20 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       }
     }
   }, []);
+
   const [users, setUsers] = useState<User[]>(INITIAL_USERS);
+
+  // Keep currentUser synced if their underlying user object is modified
+  useEffect(() => {
+    if (currentUser && users && users.length > 0) {
+      const freshMe = users.find(u => u.id === currentUser.id);
+      if (freshMe && JSON.stringify(freshMe) !== JSON.stringify(currentUser)) {
+        setCurrentUser(freshMe);
+        localStorage.setItem('rms_user', JSON.stringify(freshMe));
+      }
+    }
+  }, [users, currentUser]);
+
   const [tables, setTables] = useState<Table[]>(INITIAL_TABLES);
   const [orders, setOrders] = useState<Order[]>([]);
   const [menuItems, setMenuItems] = useState<MenuItem[]>(INITIAL_MENU);
