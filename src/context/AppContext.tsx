@@ -745,6 +745,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const setTableStatus = async (tableId: number, status: TableStatus) => {
+    // Optimistically update the local state immediately
+    setTables(prev => prev.map(t => t.id === tableId ? { ...t, status } : t));
+
     if (isBackendMode) {
       try {
         await fetch(`${API_BASE}/tables/${tableId}/status`, {
@@ -755,12 +758,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       } catch (e) {
         console.error(e);
       }
-    } else {
-      setTables(prev => prev.map(t => t.id === tableId ? { ...t, status } : t));
     }
   };
 
   const assignWaiter = async (tableId: number, waiterId: string | null) => {
+    // Optimistically update local state immediately
+    setTables(prev => prev.map(t => t.id === tableId ? { ...t, waiterId: waiterId || undefined } : t));
+
     if (isBackendMode) {
       try {
         await fetch(`${API_BASE}/tables/${tableId}/waiter`, {
@@ -771,8 +775,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       } catch (e) {
         console.error(e);
       }
-    } else {
-      setTables(prev => prev.map(t => t.id === tableId ? { ...t, waiterId: waiterId || undefined } : t));
     }
   };
 
@@ -1218,6 +1220,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         body: JSON.stringify({ paymentMethod: method })
       }).then(r => r.json());
       if (res.success) {
+        // Optimistically update the UI to avoid lag
+        const bill = bills.find(b => b.id === billId) || res.data;
+        if (bill && bill.tableId) {
+          setTables(prev => prev.map(t => t.id === bill.tableId ? {
+            ...t, status: 'Available', orderId: undefined, waiterId: undefined, guests: 0
+          } : t));
+          toast.success(`Table ${bill.tableId} checkout complete! Table is now available.`);
+        }
         loadDatabaseData();
       } else {
         throw new Error(res.message || "Failed to process payment");
