@@ -48,7 +48,6 @@ const Dashboard: React.FC = () => {
       : 0;
 
     // Staff present
-    const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
     const presentStaff = attendance.filter(a => a.date === todayStr && !a.clockOut).length;
 
     // Live Orders

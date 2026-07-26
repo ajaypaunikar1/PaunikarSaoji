@@ -493,7 +493,7 @@ const Reports: React.FC = () => {
             </div>
           </div>
         </div>
-      ) : (
+      ) : activeTab === 'attendance' ? (
         <div className="space-y-6">
           {/* Attendance Metrics Grid */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
