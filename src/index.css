@@ -72,23 +72,33 @@
   body {
     background: white !important;
     color: black !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
-  
-  /* Hide everything except print-area */
-  body > *:not(.print-area),
-  #root > *:not(.print-area),
-  main > *:not(.print-area),
-  div:not(.print-area) {
+
+  /* Hide all elements that DO NOT contain the print area, 
+     ARE NOT the print area, and ARE NOT inside the print area */
+  body *:not(:has(.print-area)):not(.print-area):not(.print-area *) {
     display: none !important;
+  }
+
+  /* Reset layout for ancestors so they don't offset the receipt */
+  body *:has(.print-area) {
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    position: static !important;
+    transform: none !important;
   }
 
   .print-area {
     display: block !important;
-    position: absolute !important;
-    left: 0 !important;
-    top: 0 !important;
-    width: 72mm !important;
-    padding: 2mm !important;
+    visibility: visible !important;
+    width: 80mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
     font-family: 'JetBrains Mono', monospace !important;
     font-size: 11px !important;
     line-height: 1.4 !important;
@@ -103,35 +113,11 @@
     box-shadow: none !important;
     border-color: black !important;
     font-family: 'JetBrains Mono', monospace !important;
+    visibility: visible !important;
   }
 
   @page {
     size: auto;
     margin: 0mm;
-  }
-}
-
-/* Ensure container fits properly */
-#root {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-}
-
-@media print {
-  body * {
-    visibility: hidden;
-  }
-  .print-area, .print-area * {
-    visibility: visible;
-  }
-  .print-area {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 80mm;
-    margin: 0;
-    padding: 0;
-    display: block !important;
   }
 }
