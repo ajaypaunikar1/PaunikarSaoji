@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { Shield, Settings as SettingsIcon, Save, Key, User } from 'lucide-react';
 import { toast } from 'sonner';
@@ -20,7 +20,13 @@ const Profile: React.FC = () => {
     Chef: ['kds', 'attendance']
   };
   
-  const [rbacConfig, setRbacConfig] = useState<Record<string, string[]>>(settings?.rbac || defaultRbac);
+  const [rbacConfig, setRbacConfig] = useState<Record<string, string[]>>(settings?.rbac && Object.keys(settings.rbac).length > 0 ? settings.rbac : defaultRbac);
+  
+  useEffect(() => {
+    if (settings?.rbac && Object.keys(settings.rbac).length > 0) {
+      setRbacConfig(settings.rbac);
+    }
+  }, [settings?.rbac]);
 
   const roles = ['SuperAdmin', 'Admin', 'Manager', 'Cashier', 'Waiter', 'Chef'];
   const allFeatures = [

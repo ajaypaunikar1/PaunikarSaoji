@@ -88,7 +88,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   if (!currentUser) return null;
 
-  const userFeatures = (settings?.rbac || defaultRbac)[currentUser.role] || [];
+  const rbacObj = settings?.rbac && Object.keys(settings.rbac).length > 0 ? settings.rbac : defaultRbac;
+  const userFeatures = rbacObj[currentUser.role] || [];
 
   const navLinks = [
     { path: '/admin/dashboard', id: 'dashboard', icon: LayoutDashboard, label: t.dashboard },
