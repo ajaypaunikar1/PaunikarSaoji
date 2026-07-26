@@ -77,19 +77,31 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const t = translations[language];
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  const defaultRbac: Record<string, string[]> = {
+    SuperAdmin: ['dashboard', 'tables', 'billing', 'menu', 'employees', 'attendance', 'orders', 'reports', 'kds', 'profile'],
+    Admin: ['dashboard', 'tables', 'billing', 'menu', 'employees', 'attendance', 'orders', 'reports', 'kds', 'profile'],
+    Manager: ['dashboard', 'tables', 'billing', 'menu', 'employees', 'attendance', 'orders', 'reports', 'kds'],
+    Cashier: ['dashboard', 'tables', 'billing', 'orders'],
+    Waiter: ['tables', 'attendance'],
+    Chef: ['kds', 'attendance']
+  };
+
   if (!currentUser) return null;
 
+  const userFeatures = (settings?.rbac || defaultRbac)[currentUser.role] || [];
+
   const navLinks = [
-    { path: '/admin/dashboard', icon: LayoutDashboard, label: t.dashboard, roles: ['SuperAdmin', 'Manager', 'Cashier'] },
-    { path: '/admin/tables', icon: UtensilsCrossed, label: t.tables, roles: ['SuperAdmin', 'Manager', 'Cashier'] },
-    { path: '/admin/billing', icon: Receipt, label: t.billing, roles: ['SuperAdmin', 'Manager', 'Cashier'] },
-    { path: '/admin/menu', icon: MenuSquare, label: t.menu, roles: ['SuperAdmin', 'Manager'] },
-    { path: '/admin/employees', icon: Users, label: t.employees, roles: ['SuperAdmin', 'Manager'] },
-    { path: '/admin/attendance', icon: UserCheck, label: 'Attendance', roles: ['SuperAdmin', 'Manager'] },
-    { path: '/admin/orders', icon: ClipboardList, label: 'Orders', roles: ['SuperAdmin', 'Manager', 'Cashier'] },
-    { path: '/admin/reports', icon: TrendingUp, label: 'Reports', roles: ['SuperAdmin', 'Manager'] },
-    { path: '/admin/kds', icon: ChefHat, label: 'Kitchen', roles: ['SuperAdmin', 'Manager', 'Chef'] },
-  ].filter(l => l.roles.includes(currentUser.role));
+    { path: '/admin/dashboard', id: 'dashboard', icon: LayoutDashboard, label: t.dashboard },
+    { path: '/admin/tables', id: 'tables', icon: UtensilsCrossed, label: t.tables },
+    { path: '/admin/billing', id: 'billing', icon: Receipt, label: t.billing },
+    { path: '/admin/menu', id: 'menu', icon: MenuSquare, label: t.menu },
+    { path: '/admin/employees', id: 'employees', icon: Users, label: t.employees },
+    { path: '/admin/attendance', id: 'attendance', icon: UserCheck, label: 'Attendance' },
+    { path: '/admin/orders', id: 'orders', icon: ClipboardList, label: 'Orders' },
+    { path: '/admin/reports', id: 'reports', icon: TrendingUp, label: 'Reports' },
+    { path: '/admin/kds', id: 'kds', icon: ChefHat, label: 'Kitchen' },
+    { path: '/admin/profile', id: 'profile', icon: Settings, label: 'Profile' },
+  ].filter(l => userFeatures.includes(l.id));
 
   return (
     <div className="flex h-screen bg-[#F7F7F8] overflow-hidden font-sans pb-16 lg:pb-0">

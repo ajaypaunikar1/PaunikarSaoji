@@ -40,7 +40,7 @@ const TableManagement: React.FC = () => {
   const [mergeSources, setMergeSources] = useState<number[]>([]);
   const [splitTarget, setSplitTarget] = useState<number | null>(null);
   const [splitItemsCheck, setSplitItemsCheck] = useState<{ id: string; portion: PortionType; price: number; name: string; quantity: number }[]>([]);
-  const [orderItemsList, setOrderItemsList] = useState<{ id: string; name: string; portion: PortionType; price: number; quantity: number; specialNotes: string }[]>([]);
+  const [orderItemsList, setOrderItemsList] = useState<{ id: string; name: string; portion: PortionType; price: number; quantity: number; specialNotes: string; isParcel?: boolean }[]>([]);
   const [guestCount, setGuestCount] = useState<number>(2);
 
   // Active order for selected table
@@ -140,6 +140,15 @@ const TableManagement: React.FC = () => {
     });
   };
 
+  const handleToggleParcel = (index: number) => {
+    setOrderItemsList(prev => prev.map((item, idx) => {
+      if (idx === index) {
+        return { ...item, isParcel: !item.isParcel };
+      }
+      return item;
+    }));
+  };
+
   const handleUpdateItemQty = (index: number, amt: number) => {
     setOrderItemsList(prev => prev.map((item, idx) => {
       if (idx === index) {
@@ -179,18 +188,20 @@ const TableManagement: React.FC = () => {
     if (activeOrder) {
       const currentItems = [...activeOrder.items];
       orderItemsList.forEach(newItem => {
-        const exist = currentItems.find(c => c.id === newItem.id && c.portion === newItem.portion);
+        const exist = currentItems.find(c => c.id === newItem.id && c.portion === newItem.portion && c.isParcel === newItem.isParcel);
         if (exist) {
           exist.quantity += newItem.quantity;
+          exist.status = 'Pending';
         } else {
           currentItems.push({
             id: `${activeOrder.id}-item-${Date.now()}-${Math.floor(Math.random()*100)}`,
             name: newItem.name, quantity: newItem.quantity,
-            portion: newItem.portion, price: newItem.price, specialNotes: newItem.specialNotes
+            portion: newItem.portion, price: newItem.price, specialNotes: newItem.specialNotes,
+            status: 'Pending', isParcel: newItem.isParcel
           });
         }
       });
-      updateOrder(activeOrder.id, { items: currentItems });
+      updateOrder(activeOrder.id, { items: currentItems, status: 'Pending' });
       toast.success('Items appended to current order');
     } else {
       addOrder(selectedTable.id, orderItemsList, '');
@@ -497,7 +508,7 @@ const TableManagement: React.FC = () => {
                       ))}
                     </div>
                     <button onClick={executeMerge} disabled={mergeSources.length === 0}
-                      className="w-full py-2.5 bg-amber-550 hover:bg-amber-600 text-white font-bold text-xs rounded-xl disabled:opacity-50">
+                      className="w-full py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs rounded-xl disabled:opacity-50">
                       Confirm Merge
                     </button>
                   </div>
@@ -578,8 +589,13 @@ const TableManagement: React.FC = () => {
                               <div>
                                 <span className="font-bold text-gray-800">{item.name}</span>
                                 <span className="ml-1.5 text-[9px] bg-indigo-100 text-indigo-700 font-bold px-1.5 py-0.5 rounded capitalize">{item.portion}</span>
+                                {item.isParcel && <span className="ml-1.5 text-[9px] bg-rose-100 text-rose-700 font-bold px-1.5 py-0.5 rounded capitalize">Parcel</span>}
                               </div>
                               <div className="flex items-center gap-2">
+                                <label className="flex items-center gap-1 cursor-pointer mr-2">
+                                  <input type="checkbox" checked={!!item.isParcel} onChange={() => handleToggleParcel(idx)} className="w-3 h-3 accent-indigo-600" />
+                                  <span className="text-[10px] text-gray-500 font-bold">Parcel</span>
+                                </label>
                                 <button onClick={() => handleUpdateItemQty(idx, -1)} className="w-5 h-5 rounded bg-white border border-gray-200 flex items-center justify-center font-bold cursor-pointer">-</button>
                                 <span className="font-mono font-bold w-4 text-center">{item.quantity}</span>
                                 <button onClick={() => handleUpdateItemQty(idx, 1)} className="w-5 h-5 rounded bg-white border border-gray-200 flex items-center justify-center font-bold cursor-pointer">+</button>

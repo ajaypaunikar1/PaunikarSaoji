@@ -60,7 +60,10 @@ const KDS: React.FC = () => {
   const activeOrders = orders.filter(o => o.status !== 'Served');
 
   const handlePrintKOT = (order: Order) => {
-    setPrintKOTData(order);
+    // Only print items that are not 'Served'
+    const unservedItems = order.items.filter(item => item.status !== 'Served');
+    setPrintKOTData({ ...order, items: unservedItems });
+    setTimeout(() => window.print(), 150);
   };
 
   const getStatusActionLabel = (status: OrderStatus) => {
@@ -165,7 +168,7 @@ const KDS: React.FC = () => {
 
                   {/* KOT Items List */}
                   <div className="flex-1 p-4 space-y-2">
-                    {order.items.map((item, idx) => (
+                    {order.items.filter(item => item.status !== 'Served').map((item, idx) => (
                       <div key={idx} className="flex justify-between items-start text-xs border-b border-slate-100 pb-1.5 last:border-0 last:pb-0">
                         <div>
                           <div className="font-bold text-slate-800 flex items-center gap-1.5">
@@ -177,6 +180,11 @@ const KDS: React.FC = () => {
                             <span className="text-[9px] font-bold bg-slate-100 text-slate-650 px-1.5 py-0.2 rounded border border-slate-150 uppercase tracking-wide">
                               {item.portion}
                             </span>
+                            {item.isParcel && (
+                              <span className="text-[9px] font-bold bg-rose-100 text-rose-700 px-1.5 py-0.2 rounded border border-rose-200 uppercase tracking-wide">
+                                PARCEL
+                              </span>
+                            )}
                             {item.specialNotes && (
                               <span className="text-[9px] text-amber-600 font-semibold italic">
                                 "{item.specialNotes}"
@@ -272,7 +280,7 @@ const KDS: React.FC = () => {
                       {item.quantity}x
                     </td>
                     <td style={{ padding: '4px 0' }}>
-                      <span style={{ fontWeight: 'bold' }}>{item.name}</span>
+                      <span style={{ fontWeight: 'bold' }}>{item.name} {item.isParcel && <span style={{color: '#d946ef'}}>(PARCEL)</span>}</span>
                       <span style={{ fontSize: '9px', display: 'block', textTransform: 'uppercase' }}>
                         Portion: {item.portion}
                       </span>
@@ -348,7 +356,7 @@ const KDS: React.FC = () => {
                     {printKOTData.items.map((item, idx) => (
                       <div key={idx} className="space-y-0.5">
                         <div className="flex justify-between items-start text-[11px]">
-                          <span className="font-bold">{item.name}</span>
+                          <span className="font-bold">{item.name} {item.isParcel && <span className="text-[9px] text-fuchsia-600">(PARCEL)</span>}</span>
                           <span className="font-bold text-slate-600 font-mono">x{item.quantity}</span>
                         </div>
                         <div className="flex items-center gap-1.5 text-[8px] text-slate-450 uppercase font-bold">

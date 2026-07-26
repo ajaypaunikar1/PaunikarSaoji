@@ -765,7 +765,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     const orderItems = items.map((item, idx) => ({
       ...item,
-      id: `${orderId}-item-${idx}`
+      id: `${orderId}-item-${idx}`,
+      status: 'Pending' as const
     }));
 
     const grandTotal = orderItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
@@ -856,7 +857,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               description: 'Please pick up and serve.'
             });
           }
-          return { ...o, status };
+          const updatedItems = o.items.map(i => i.status === 'Served' ? i : { ...i, status });
+          return { ...o, status, items: updatedItems };
         }
         return o;
       }));
@@ -1145,7 +1147,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (!order) throw new Error("Order not found");
 
     const subtotal = order.grandTotal;
-    const gst = Math.round(subtotal * 0.05 * 100) / 100;
+    const gst = settings?.gstEnabled ? Math.round(subtotal * 0.05 * 100) / 100 : 0;
     const grandTotal = Math.round((subtotal + gst - discount) * 100) / 100;
 
     const newBill: Bill = {

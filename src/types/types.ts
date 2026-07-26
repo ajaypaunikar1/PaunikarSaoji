@@ -55,6 +55,8 @@ export interface OrderItem {
   portion: PortionType;
   price: number;
   specialNotes?: string;
+  status?: OrderStatus;
+  isParcel?: boolean;
 }
 
 export interface Order {

@@ -158,16 +158,19 @@ model AuditLog {
 }
 
 model Settings {
-  id               String   @id
-  restaurantName   String
-  address          String
-  gstNumber        String
-  upiId            String   @default("restaurant@upi")
-  zones            Json     @default("[\"A\", \"B\", \"C\"]")
-  mergedGroups     Json     @default("[]")
-  branchId         String   @default("branch-main")
-  kitchenPrinterIp String   @default("127.0.0.1")
-  billingPrinterIp String   @default("127.0.0.1")
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id                                   String   @id
+  restaurantName                       String
+  address                              String
+  gstNumber                            String
+  upiId                                String   @default("restaurant@upi")
+  zones                                Json     @default("[\"A\", \"B\", \"C\"]")
+  mergedGroups                         Json     @default("[]")
+  cancellationApproval                 Boolean  @default(false)
+  gstEnabled                           Boolean  @default(true)
+  rbac                                 Json     @default("{}")
+  branchId                             String   @default("branch-main")
+  kitchenPrinterIp                     String   @default("127.0.0.1")
+  billingPrinterIp                     String   @default("127.0.0.1")
+  createdAt                            DateTime @default(now())
+  updatedAt                            DateTime @updatedAt
 }

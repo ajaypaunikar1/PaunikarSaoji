@@ -15,7 +15,7 @@ const Reports: React.FC = () => {
   } = useApp();
   const t = translations[language];
 
-  const [activeTab, setActiveTab] = useState<'orders' | 'attendance'>('orders');
+  const [activeTab, setActiveTab] = useState<'orders' | 'attendance' | 'products'>('orders');
   
   // Date filter: 'daily' | 'weekly' | 'monthly' | 'custom'
   const [dateFilter, setDateFilter] = useState<'daily' | 'weekly' | 'monthly' | 'custom'>('daily');
@@ -119,6 +119,22 @@ const Reports: React.FC = () => {
     return { totalRevenue, totalGST, totalDiscount, totalOrders, avgOrderValue };
   }, [filteredOrders, bills]);
 
+  // Product Metrics
+  const productMetrics = useMemo(() => {
+    const counts: { [key: string]: { name: string, quantity: number, revenue: number, category: string } } = {};
+    filteredOrders.forEach(ord => {
+      ord.items.forEach(item => {
+        const key = `${item.id}-${item.portion}`;
+        if (!counts[key]) {
+          counts[key] = { name: `${item.name} (${item.portion})`, quantity: 0, revenue: 0, category: item.category };
+        }
+        counts[key].quantity += item.quantity;
+        counts[key].revenue += (item.quantity * item.price);
+      });
+    });
+    return Object.values(counts).sort((a, b) => b.quantity - a.quantity);
+  }, [filteredOrders]);
+
   // Filtered Attendance
   const filteredAttendance = useMemo(() => {
     return attendance.filter(att => isDateInFilter(att.date));
@@ -190,6 +206,21 @@ const Reports: React.FC = () => {
     const link = document.createElement('a');
     link.setAttribute('href', url);
     link.setAttribute('download', `Attendance_Report_${dateFilter}_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleExportProductsCSV = () => {
+    let csv = 'Product Name,Category,Quantity Sold,Revenue\n';
+    productMetrics.forEach(prod => {
+      csv += `"${prod.name}","${prod.category}",${prod.quantity},${prod.revenue}\n`;
+    });
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `Product_Report_${dateFilter}_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -282,6 +313,16 @@ const Reports: React.FC = () => {
           }`}
         >
           {t.attendanceReports}
+        </button>
+        <button
+          onClick={() => setActiveTab('products')}
+          className={`pb-3 text-sm font-extrabold uppercase tracking-wide cursor-pointer transition ${
+            activeTab === 'products' 
+              ? 'text-emerald-600 border-b-2 border-emerald-500' 
+              : 'text-slate-400 hover:text-slate-700'
+          }`}
+        >
+          Product Reports
         </button>
       </div>
 
@@ -559,7 +600,49 @@ const Reports: React.FC = () => {
             </div>
           </div>
         </div>
-      )}
+      ) : activeTab === 'products' ? (
+        <div className="space-y-6">
+          <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
+            <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/40">
+              <h3 className="text-xs font-black uppercase text-slate-800 tracking-wider">Product Performance ({productMetrics.length})</h3>
+              <button
+                onClick={handleExportProductsCSV}
+                className="px-3 py-1.5 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer flex items-center gap-1.5 transition"
+              >
+                <Download size={14} /> {t.exportCSV}
+              </button>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-100 bg-slate-50 text-[10px] font-black uppercase text-slate-550 tracking-wider">
+                    <th className="p-4 pl-6">Product Name (Portion)</th>
+                    <th className="p-4">Category</th>
+                    <th className="p-4 text-center">Quantity Sold</th>
+                    <th className="p-4 text-right pr-6">Total Revenue</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {productMetrics.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="p-8 text-center text-slate-400 font-medium text-xs">No products sold in this date range.</td>
+                    </tr>
+                  ) : (
+                    productMetrics.map((prod, idx) => (
+                      <tr key={idx} className="border-b border-slate-50 hover:bg-slate-50/50 transition text-xs font-medium">
+                        <td className="p-4 pl-6 font-bold text-slate-800">{prod.name}</td>
+                        <td className="p-4 text-slate-600 capitalize">{prod.category}</td>
+                        <td className="p-4 text-center font-bold text-slate-700">{prod.quantity}</td>
+                        <td className="p-4 text-right pr-6 font-mono text-emerald-700 font-bold">₹{prod.revenue}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
     </div>
   );

@@ -19,11 +19,12 @@ const EmployeeManagement: React.FC = () => {
 
   // UI state
   const [selectedUserId, setSelectedUserId] = useState<string>('u5');
-  const [activeRightTab, setActiveRightTab] = useState<'details' | 'approvals'>('details');
+  const [activeRightTab, setActiveRightTab] = useState<'details' | 'approvals' | 'payroll'>('details');
 
   // Modals state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+  const [printPayslipData, setPrintPayslipData] = useState<any>(null);
 
   // Add Employee Form State
   const [name, setName] = useState('');
@@ -183,6 +184,16 @@ const EmployeeManagement: React.FC = () => {
                   {pendingLeaves.length + pendingCancels.length}
                 </span>
               )}
+            </button>
+            <button
+              onClick={() => setActiveRightTab('payroll')}
+              className={`px-5 py-3 text-xs font-extrabold uppercase tracking-wider border-b-2 transition ${
+                activeRightTab === 'payroll' 
+                  ? 'border-emerald-500 text-emerald-600' 
+                  : 'border-transparent text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              Payroll Management
             </button>
           </div>
 
@@ -409,6 +420,56 @@ const EmployeeManagement: React.FC = () => {
               </motion.div>
             )}
 
+            {/* TAB CONTENT: PAYROLL */}
+            {activeRightTab === 'payroll' && selectedUser && (
+              <motion.div
+                key="payroll" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                className="space-y-6"
+              >
+                <div className="bg-white border border-slate-200 p-6 rounded-3xl shadow-sm">
+                  <div className="flex justify-between items-center mb-4 border-b border-slate-100 pb-4">
+                    <div>
+                      <h4 className="text-xs font-black uppercase text-slate-800 tracking-wider">Payroll Processing</h4>
+                      <p className="text-[10px] text-slate-500 mt-1">Generate payslips and track salary payments for {selectedUser.name}</p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setPrintPayslipData({
+                          employeeName: selectedUser.name,
+                          role: selectedUser.role,
+                          salary: selectedUser.salary,
+                          overtime: selectedUser.overtimeHours * 150, // Example OT rate
+                          deductions: 0,
+                          netPay: selectedUser.salary + (selectedUser.overtimeHours * 150),
+                          month: new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(new Date())
+                        });
+                        setTimeout(() => window.print(), 200);
+                      }}
+                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold uppercase tracking-wider rounded-xl cursor-pointer shadow-lg shadow-indigo-500/20"
+                    >
+                      Generate Payslip
+                    </button>
+                  </div>
+
+                  <div className="space-y-2">
+                    {selectedUserPayroll.length === 0 ? (
+                      <p className="text-xs text-slate-400 italic text-center py-4">No previous payroll records</p>
+                    ) : (
+                      selectedUserPayroll.map(p => (
+                        <div key={p.id} className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex justify-between items-center text-xs">
+                          <div>
+                            <span className="font-bold text-slate-800">{p.month}</span>
+                            <span className="ml-2 text-[10px] bg-emerald-100 text-emerald-700 font-black uppercase px-2 py-0.5 rounded border border-emerald-200">{p.status}</span>
+                          </div>
+                          <span className="font-mono font-bold text-slate-800">₹{p.amount}</span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
           </AnimatePresence>
 
         </div>
@@ -514,7 +575,7 @@ const EmployeeManagement: React.FC = () => {
                   <input
                     type="number"
                     value={salary}
-                    onChange={e => setSalary(Math.max(1, parseInt(salary.toString()) || 0))}
+                    onChange={e => setSalary(Math.max(1, parseInt(e.target.value) || 0))}
                     className="w-full p-2 bg-slate-50 border border-slate-200 text-xs rounded-xl focus:outline-none text-slate-800 font-mono"
                     required
                   />
@@ -575,6 +636,63 @@ const EmployeeManagement: React.FC = () => {
 
             </motion.div>
           </>
+        )}
+      </AnimatePresence>
+
+      {/* HIDDEN PRINT AREA FOR PAYSLIP */}
+      <AnimatePresence>
+        {printPayslipData && (
+          <div className="print-area hidden">
+            <div style={{ width: '80mm', padding: '10px', boxSizing: 'border-box', fontFamily: 'monospace' }}>
+              <div style={{ textAlign: 'center', borderBottom: '1px dashed black', paddingBottom: '10px', marginBottom: '10px' }}>
+                <h1 style={{ margin: '0', fontSize: '16px', fontWeight: 'bold' }}>PAUNIKAR SAOJI RESTAURANT</h1>
+                <h3 style={{ margin: '6px 0 0 0', fontSize: '12px', textTransform: 'uppercase' }}>SALARY PAYSLIP</h3>
+                <p style={{ margin: '2px 0 0 0', fontSize: '10px' }}>{printPayslipData.month}</p>
+              </div>
+
+              <table style={{ width: '100%', fontSize: '11px', marginBottom: '10px' }}>
+                <tbody>
+                  <tr>
+                    <td>Employee:</td>
+                    <td style={{ textAlign: 'right', fontWeight: 'bold' }}>{printPayslipData.employeeName}</td>
+                  </tr>
+                  <tr>
+                    <td>Role:</td>
+                    <td style={{ textAlign: 'right' }}>{printPayslipData.role}</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <div style={{ borderBottom: '1px dashed black', marginBottom: '10px' }} />
+
+              <table style={{ width: '100%', fontSize: '11px', marginBottom: '10px' }}>
+                <tbody>
+                  <tr>
+                    <td>Base Salary:</td>
+                    <td style={{ textAlign: 'right' }}>₹{printPayslipData.salary}</td>
+                  </tr>
+                  <tr>
+                    <td>Overtime Pay:</td>
+                    <td style={{ textAlign: 'right' }}>+₹{printPayslipData.overtime}</td>
+                  </tr>
+                  <tr>
+                    <td>Deductions:</td>
+                    <td style={{ textAlign: 'right' }}>-₹{printPayslipData.deductions}</td>
+                  </tr>
+                  <tr style={{ fontSize: '14px', fontWeight: 'bold', borderTop: '1px solid black' }}>
+                    <td style={{ paddingTop: '5px' }}>NET PAY:</td>
+                    <td style={{ textAlign: 'right', paddingTop: '5px' }}>₹{printPayslipData.netPay}</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <div style={{ borderBottom: '1px dashed black', marginBottom: '10px' }} />
+              <div style={{ textAlign: 'center', fontSize: '9px' }}>
+                <p>System Generated Payslip</p>
+                <p style={{ marginTop: '20px', borderTop: '1px dotted black', display: 'inline-block', paddingTop: '5px' }}>Authorized Signatory</p>
+              </div>
+            </div>
+          </div>
         )}
       </AnimatePresence>
 

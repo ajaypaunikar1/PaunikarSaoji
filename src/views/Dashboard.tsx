@@ -28,9 +28,11 @@ const Dashboard: React.FC = () => {
 
   // Calculations
   const metrics = useMemo(() => {
-    // Revenue: sum of paid bills
+    const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+
+    // Revenue: sum of paid bills for today
     const totalRevenue = bills
-      .filter(b => b.paymentStatus === 'Paid')
+      .filter(b => b.paymentStatus === 'Paid' && ((b as any).createdAt?.startsWith(todayStr) || (b as any).timestamp?.includes(new Date().toLocaleDateString())))
       .reduce((sum, b) => sum + b.grandTotal, 0);
 
     // Occupancy
@@ -312,7 +314,10 @@ const Dashboard: React.FC = () => {
 
           <div className="mt-8 pt-4 border-t border-slate-100 flex items-center justify-between text-xs">
             <span className="text-slate-450 font-bold uppercase text-[9px] tracking-wider">Want full product reports?</span>
-            <button className="text-emerald-600 hover:text-emerald-700 font-black tracking-wide uppercase text-[10px] cursor-pointer flex items-center gap-0.5">
+            <button 
+              onClick={() => { window.location.href = '/admin/menu'; }}
+              className="text-emerald-600 hover:text-emerald-700 font-black tracking-wide uppercase text-[10px] cursor-pointer flex items-center gap-0.5"
+            >
               View Menu <ChevronRight size={12} />
             </button>
           </div>

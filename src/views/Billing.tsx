@@ -13,14 +13,13 @@ import { toast } from 'sonner';
 const Billing: React.FC = () => {
   const { 
     tables, orders, generateBill, payBill, bills, language,
-    requestCancellation, users
+    requestCancellation, users, settings, currentUser, updateOrder
   } = useApp();
   const t = translations[language];
 
   // Billing screen state
   const [selectedTableId, setSelectedTableId] = useState<number | null>(null);
   const [discountAmt, setDiscountAmt] = useState<number>(0);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
   const [cancelReason, setCancelReason] = useState<string>('');
   const [activeCancelItemId, setActiveCancelItemId] = useState<string | null>(null);
 
@@ -49,7 +48,7 @@ const Billing: React.FC = () => {
 
     // Else calculate locally for preview
     const subtotal = selectedOrder.grandTotal;
-    const gst = Math.round(subtotal * 0.05 * 100) / 100;
+    const gst = settings?.gstEnabled ? Math.round(subtotal * 0.05 * 100) / 100 : 0;
     const discount = Math.min(discountAmt, subtotal + gst);
     const grandTotal = Math.max(0, Math.round((subtotal + gst - discount) * 100) / 100);
 
@@ -64,7 +63,7 @@ const Billing: React.FC = () => {
       paymentStatus: 'Pending' as const,
       timestamp: new Date().toLocaleTimeString()
     };
-  }, [selectedTableId, selectedOrder, discountAmt, bills]);
+  }, [selectedTableId, selectedOrder, discountAmt, bills, settings?.gstEnabled]);
 
   // UPI payment string generator
   const upiString = useMemo(() => {
@@ -92,7 +91,6 @@ const Billing: React.FC = () => {
 
       setSelectedTableId(null);
       setDiscountAmt(0);
-      setPaymentMethod(null);
     } catch (err: any) {
       toast.error(err.message || 'Payment processing failed');
     }
@@ -110,13 +108,23 @@ const Billing: React.FC = () => {
     }, 200);
   };
 
-  // Submit Cancellation Request to Manager
+  // Submit Cancellation Request to Manager or Cancel Directly
   const triggerCancelRequest = (itemId: string, itemName: string, portion: string) => {
     if (!selectedOrder || !cancelReason.trim()) {
       toast.error('Please enter a cancellation reason');
       return;
     }
-    requestCancellation(selectedOrder.id, `${itemName} (${portion})`, cancelReason);
+
+    const canCancelDirectly = ['SuperAdmin', 'Admin', 'Manager', 'Cashier'].includes(currentUser?.role || '');
+
+    if (canCancelDirectly) {
+      const updatedItems = selectedOrder.items.filter(item => item.id !== itemId);
+      updateOrder(selectedOrder.id, { items: updatedItems });
+      toast.success(`${itemName} removed successfully`);
+    } else {
+      requestCancellation(selectedOrder.id, `${itemName} (${portion})`, cancelReason);
+    }
+
     setCancelReason('');
     setActiveCancelItemId(null);
   };
