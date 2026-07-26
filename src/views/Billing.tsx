@@ -22,6 +22,7 @@ const Billing: React.FC = () => {
   const [discountAmt, setDiscountAmt] = useState<number>(0);
   const [cancelReason, setCancelReason] = useState<string>('');
   const [activeCancelItemId, setActiveCancelItemId] = useState<string | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
 
   // Print layout state
   const [printBillData, setPrintBillData] = useState<{

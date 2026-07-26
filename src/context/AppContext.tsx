@@ -454,11 +454,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
           if (isAborted) return;
 
-          // Connect Socket.IO
-          const socketUrl = typeof window !== 'undefined' && window.location.hostname === 'localhost' 
-            ? 'http://localhost:5000' 
-            : undefined;
-          const socket = io(socketUrl);
+          // Connect Socket.IO (only on localhost to avoid Vercel 404 polling spam)
+          const isLocal = typeof window !== 'undefined' && window.location.hostname === 'localhost';
+          let socket: any;
+          
+          if (isLocal) {
+            socket = io('http://localhost:5000');
+          } else {
+            socket = { on: () => {}, emit: () => {}, disconnect: () => {} };
+          }
+          
           localSocket = socket;
           socketRef.current = socket;
 
