@@ -26,6 +26,10 @@ const EmployeeManagement: React.FC = () => {
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
   const [printPayslipData, setPrintPayslipData] = useState<any>(null);
 
+  // Custom Payroll inputs
+  const [customOvertimePay, setCustomOvertimePay] = useState(0);
+  const [customDeductions, setCustomDeductions] = useState(0);
+
   // Add Employee Form State
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
@@ -47,6 +51,8 @@ const EmployeeManagement: React.FC = () => {
     if (selectedUser) {
       setEditName(selectedUser.name);
       setEditSalary(selectedUser.salary || 0);
+      setCustomOvertimePay(selectedUser.overtimeHours * 150);
+      setCustomDeductions(0);
     }
   }, [selectedUser?.id]);
 
@@ -449,28 +455,49 @@ const EmployeeManagement: React.FC = () => {
                 className="space-y-6"
               >
                 <div className="bg-white border border-slate-200 p-6 rounded-3xl shadow-sm">
-                  <div className="flex justify-between items-center mb-4 border-b border-slate-100 pb-4">
+                  <div className="mb-4 border-b border-slate-100 pb-4 space-y-4">
                     <div>
                       <h4 className="text-xs font-black uppercase text-slate-800 tracking-wider">Payroll Processing</h4>
                       <p className="text-[10px] text-slate-500 mt-1">Generate payslips and track salary payments for {selectedUser.name}</p>
                     </div>
-                    <button
-                      onClick={() => {
-                        setPrintPayslipData({
-                          employeeName: selectedUser.name,
-                          role: selectedUser.role,
-                          salary: selectedUser.salary,
-                          overtime: selectedUser.overtimeHours * 150, // Example OT rate
-                          deductions: 0,
-                          netPay: selectedUser.salary + (selectedUser.overtimeHours * 150),
-                          month: new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(new Date())
-                        });
-                        setTimeout(() => window.print(), 200);
-                      }}
-                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold uppercase tracking-wider rounded-xl cursor-pointer shadow-lg shadow-indigo-500/20"
-                    >
-                      Generate Payslip
-                    </button>
+                    
+                    <div className="flex flex-col sm:flex-row items-end gap-3 bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                      <div className="flex-1 w-full">
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Overtime Pay (₹)</label>
+                        <input
+                          type="number"
+                          value={customOvertimePay}
+                          onChange={(e) => setCustomOvertimePay(Number(e.target.value))}
+                          className="w-full bg-white border border-slate-200 text-xs px-3 py-2 rounded-xl focus:outline-none focus:border-indigo-500 font-mono text-slate-800"
+                        />
+                      </div>
+                      <div className="flex-1 w-full">
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Deductions (₹)</label>
+                        <input
+                          type="number"
+                          value={customDeductions}
+                          onChange={(e) => setCustomDeductions(Number(e.target.value))}
+                          className="w-full bg-white border border-slate-200 text-xs px-3 py-2 rounded-xl focus:outline-none focus:border-indigo-500 font-mono text-slate-800"
+                        />
+                      </div>
+                      <button
+                        onClick={() => {
+                          setPrintPayslipData({
+                            employeeName: selectedUser.name,
+                            role: selectedUser.role,
+                            salary: selectedUser.salary,
+                            overtime: customOvertimePay,
+                            deductions: customDeductions,
+                            netPay: selectedUser.salary + customOvertimePay - customDeductions,
+                            month: new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(new Date())
+                          });
+                          setTimeout(() => window.print(), 200);
+                        }}
+                        className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold uppercase tracking-wider rounded-xl cursor-pointer shadow-lg shadow-indigo-500/20 whitespace-nowrap w-full sm:w-auto"
+                      >
+                        Generate Payslip
+                      </button>
+                    </div>
                   </div>
 
                   <div className="space-y-2">
