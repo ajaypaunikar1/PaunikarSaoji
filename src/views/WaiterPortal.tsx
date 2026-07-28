@@ -187,12 +187,12 @@ const WaiterPortal: React.FC = () => {
   }, [orders, currentUser]);
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col justify-between select-none">
+    <div className="min-h-screen bg-[#F7F7F8] text-slate-800 flex flex-col justify-between select-none">
       
       {/* Mobile Top App Bar */}
       <header className="px-5 py-4 bg-white border-b border-slate-200 flex items-center justify-between sticky top-0 z-30 shadow-xs">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-600 font-black text-sm">
+          <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white font-bold text-xs">
             PS
           </div>
           <div>
@@ -281,9 +281,9 @@ const WaiterPortal: React.FC = () => {
                             currentUser?.status === 'Disabled'
                               ? 'bg-slate-100 border-slate-200 text-slate-400 opacity-60 cursor-not-allowed'
                               : tbl.status === 'Occupied' 
-                                ? 'bg-emerald-50 border-emerald-500/40 text-slate-800' 
+                                ? 'bg-amber-50 border-amber-200 text-amber-900' 
                                 : tbl.status === 'Billing'
-                                  ? 'bg-cyan-50 border-cyan-500/40 text-slate-800'
+                                  ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
                                   : 'bg-white border-slate-200 text-slate-700 hover:border-slate-350'
                           }`}
                         >
@@ -295,10 +295,10 @@ const WaiterPortal: React.FC = () => {
                                 : tbl.status === 'Available' 
                                   ? 'bg-slate-300' 
                                   : tbl.status === 'Occupied' 
-                                    ? 'bg-emerald-500' 
+                                    ? 'bg-amber-500' 
                                     : tbl.status === 'Billing' 
-                                      ? 'bg-cyan-500 animate-pulse'
-                                      : 'bg-amber-550'
+                                      ? 'bg-emerald-500 animate-pulse'
+                                      : 'bg-slate-300'
                             }`} />
                           </div>
                           
@@ -328,7 +328,7 @@ const WaiterPortal: React.FC = () => {
                     <span className="text-xs font-bold text-slate-800 font-mono">Table {orderingTable?.id} Order</span>
                     <button 
                       onClick={saveDraft}
-                      className="px-2.5 py-1 text-[11px] bg-white border border-emerald-300 text-emerald-600 rounded font-bold cursor-pointer hover:bg-emerald-50/50"
+                      className="px-2.5 py-1 text-[11px] bg-white border border-indigo-300 text-indigo-600 rounded font-bold cursor-pointer hover:bg-indigo-50/50"
                     >
                       Save Draft
                     </button>
@@ -346,7 +346,7 @@ const WaiterPortal: React.FC = () => {
                           onClick={() => setSelectedCategory(cat)}
                           className={`px-2.5 py-1 text-[10px] rounded-lg font-bold border transition whitespace-nowrap cursor-pointer ${
                             selectedCategory === cat
-                              ? 'bg-emerald-500 border-emerald-500 text-white'
+                              ? 'bg-indigo-600 border-indigo-600 text-white'
                               : 'bg-white border-slate-200 text-slate-500'
                           }`}
                         >
@@ -370,7 +370,7 @@ const WaiterPortal: React.FC = () => {
                                   <button
                                     key={vIdx}
                                     onClick={() => handleAddToBasket(item, v.name as PortionType)}
-                                    className="w-full py-1 px-1 bg-slate-50 border border-slate-200 rounded text-[9px] font-bold text-emerald-650 cursor-pointer text-center hover:bg-emerald-50 hover:border-emerald-250 transition"
+                                    className="w-full py-1 px-1 bg-slate-50 border border-slate-200 rounded text-[9px] font-bold text-indigo-600 cursor-pointer text-center hover:bg-indigo-50 hover:border-indigo-200 transition"
                                   >
                                     {v.name} (₹{v.price})
                                   </button>
@@ -379,7 +379,7 @@ const WaiterPortal: React.FC = () => {
                             ) : (
                               <button
                                 onClick={() => handleAddToBasket(item, 'Single')}
-                                className="w-full py-1 bg-slate-50 border border-slate-200 rounded text-[10px] font-bold text-emerald-655 cursor-pointer text-center hover:bg-emerald-50 hover:border-emerald-250 transition"
+                                className="w-full py-1 bg-slate-50 border border-slate-200 rounded text-[10px] font-bold text-indigo-600 cursor-pointer text-center hover:bg-indigo-50 hover:border-indigo-200 transition"
                               >
                                 Add (₹{item.price})
                               </button>
@@ -394,10 +394,10 @@ const WaiterPortal: React.FC = () => {
                     const activeOrder = orders.find(o => o.id === orderingTable.orderId);
                     if (!activeOrder) return null;
                     return (
-                      <div className="p-4 rounded-2xl bg-emerald-50/40 border border-emerald-500/20 space-y-2">
-                        <div className="flex justify-between items-center border-b border-emerald-500/10 pb-1.5">
-                          <h4 className="text-[11px] font-black uppercase text-emerald-800 tracking-wider">{t.activeTableOrder}</h4>
-                          <span className="text-[9px] font-bold text-emerald-600 bg-emerald-100/60 px-1.5 py-0.5 rounded">{language === 'en' ? 'Ordered' : 'नोंदवलेले'}</span>
+                      <div className="p-4 rounded-2xl bg-indigo-50/40 border border-indigo-500/20 space-y-2">
+                        <div className="flex justify-between items-center border-b border-indigo-500/10 pb-1.5">
+                          <h4 className="text-[11px] font-black uppercase text-indigo-800 tracking-wider">{t.activeTableOrder}</h4>
+                          <span className="text-[9px] font-bold text-indigo-600 bg-indigo-100/60 px-1.5 py-0.5 rounded">{language === 'en' ? 'Ordered' : 'नोंदवलेले'}</span>
                         </div>
                         <div className="space-y-1.5 max-h-40 overflow-y-auto">
                           {activeOrder.items.map((item, idx) => (
@@ -414,7 +414,7 @@ const WaiterPortal: React.FC = () => {
                                     handleAddToBasket(originalItem, item.portion);
                                     toast.success(language === 'en' ? `Added another ${item.name} to KOT basket` : `KOT टोपलीत आणखी एक ${item.name} जोडले`);
                                   }}
-                                  className="px-1.5 py-0.5 bg-white border border-emerald-250 text-emerald-700 text-[9px] font-extrabold rounded shadow-2xs hover:bg-emerald-50 cursor-pointer"
+                                  className="px-1.5 py-0.5 bg-white border border-indigo-200 text-indigo-700 text-[9px] font-extrabold rounded shadow-2xs hover:bg-indigo-50 cursor-pointer"
                                 >
                                   + {language === 'en' ? 'Repeat' : 'पुन्हा घ्या'}
                                 </button>
@@ -451,7 +451,7 @@ const WaiterPortal: React.FC = () => {
                             <div className="flex justify-between items-center text-xs">
                               <div>
                                 <span className="font-bold text-slate-805">{item.name}</span>
-                                <span className="ml-1 text-[8px] font-black uppercase text-emerald-600 bg-emerald-50 px-1 rounded border border-emerald-100">{item.portion}</span>
+                                <span className="ml-1 text-[8px] font-black uppercase text-indigo-600 bg-indigo-50 px-1 rounded border border-indigo-100">{item.portion}</span>
                               </div>
                               <div className="flex items-center gap-2">
                                 <button 
@@ -486,7 +486,7 @@ const WaiterPortal: React.FC = () => {
                   {basket.length > 0 && (
                     <button
                       onClick={submitOrderToKitchen}
-                      className="w-full py-3 bg-emerald-500 hover:bg-emerald-450 text-white font-bold text-xs uppercase tracking-wider rounded-xl cursor-pointer shadow-lg shadow-emerald-500/10 transition"
+                      className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs uppercase tracking-wider rounded-xl cursor-pointer shadow-lg shadow-indigo-600/20 transition"
                     >
                       {t.newOrder} &bull; Send KOT
                     </button>
@@ -556,7 +556,7 @@ const WaiterPortal: React.FC = () => {
                   <button
                     onClick={() => markAttendance('Present')}
                     disabled={!!attendanceToday}
-                    className="flex-1 py-3 bg-emerald-500 hover:bg-emerald-450 disabled:opacity-50 text-white font-bold text-xs uppercase tracking-wider rounded-xl cursor-pointer flex items-center justify-center gap-1.5"
+                    className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-bold text-xs uppercase tracking-wider rounded-xl cursor-pointer flex items-center justify-center gap-1.5"
                   >
                     <CheckCircle2 size={14} />
                     <span>{t.clockIn}</span>
@@ -635,7 +635,7 @@ const WaiterPortal: React.FC = () => {
                 </div>
                 <button
                   type="submit"
-                  className="w-full py-2.5 bg-emerald-500 hover:bg-emerald-450 text-white font-bold text-xs uppercase tracking-wider rounded-xl cursor-pointer"
+                  className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs uppercase tracking-wider rounded-xl cursor-pointer"
                 >
                   Submit Application
                 </button>
@@ -681,7 +681,7 @@ const WaiterPortal: React.FC = () => {
                   {currentUser?.name.charAt(0)}
                 </div>
                 <h4 className="text-sm font-extrabold text-slate-800 m-0">{currentUser?.name}</h4>
-                <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest mt-1">{currentUser?.role}</p>
+                <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest mt-1">{currentUser?.role}</p>
 
                 {/* Rating / Performance */}
                 <div className="flex gap-1.5 mt-3">
@@ -708,7 +708,7 @@ const WaiterPortal: React.FC = () => {
                   
                   <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
                     <span className="text-slate-500 text-[10px] block mb-0.5">{t.salesGenerated}</span>
-                    <span className="font-bold text-emerald-600 font-mono">₹{waiterStats.totalRevenueGenerated}</span>
+                    <span className="font-bold text-indigo-600 font-mono">₹{waiterStats.totalRevenueGenerated}</span>
                   </div>
                 </div>
               </div>
@@ -748,7 +748,7 @@ const WaiterPortal: React.FC = () => {
       </main>
 
       {/* Bottom Mobile Tab Bar */}
-      <footer className="fixed bottom-0 left-0 right-0 h-16 bg-white border-t border-slate-200 flex items-center justify-around px-2 z-35 shadow-lg">
+      <footer className="fixed bottom-4 left-1/2 -translate-x-1/2 z-35 w-[92%] max-w-md bg-[#1B1B2E]/95 backdrop-blur-md rounded-2xl shadow-xl border border-white/10 flex items-center justify-around px-2 py-2">
         
         {/* Tab 1: Tables */}
         <button 
@@ -756,8 +756,8 @@ const WaiterPortal: React.FC = () => {
             setActiveTab('tables');
             setOrderingTable(null);
           }}
-          className={`flex flex-col items-center gap-1 cursor-pointer transition ${
-            activeTab === 'tables' ? 'text-emerald-600' : 'text-slate-400 hover:text-slate-600'
+          className={`p-2.5 rounded-xl flex flex-col items-center gap-0.5 cursor-pointer transition-all ${
+            activeTab === 'tables' ? 'text-indigo-400 scale-105' : 'text-slate-400 hover:text-white'
           }`}
         >
           <UtensilsCrossed size={18} />
@@ -767,8 +767,8 @@ const WaiterPortal: React.FC = () => {
         {/* Tab 2: Attendance */}
         <button 
           onClick={() => setActiveTab('attendance')}
-          className={`flex flex-col items-center gap-1 cursor-pointer transition ${
-            activeTab === 'attendance' ? 'text-emerald-600' : 'text-slate-400 hover:text-slate-600'
+          className={`p-2.5 rounded-xl flex flex-col items-center gap-0.5 cursor-pointer transition-all ${
+            activeTab === 'attendance' ? 'text-indigo-400 scale-105' : 'text-slate-400 hover:text-white'
           }`}
         >
           <UserCheck size={18} />
@@ -778,8 +778,8 @@ const WaiterPortal: React.FC = () => {
         {/* Tab 3: Leaves */}
         <button 
           onClick={() => setActiveTab('leaves')}
-          className={`flex flex-col items-center gap-1 cursor-pointer transition ${
-            activeTab === 'leaves' ? 'text-emerald-600' : 'text-slate-400 hover:text-slate-600'
+          className={`p-2.5 rounded-xl flex flex-col items-center gap-0.5 cursor-pointer transition-all ${
+            activeTab === 'leaves' ? 'text-indigo-400 scale-105' : 'text-slate-400 hover:text-white'
           }`}
         >
           <CalendarRange size={18} />
@@ -789,8 +789,8 @@ const WaiterPortal: React.FC = () => {
         {/* Tab 4: Profile */}
         <button 
           onClick={() => setActiveTab('profile')}
-          className={`flex flex-col items-center gap-1 cursor-pointer transition ${
-            activeTab === 'profile' ? 'text-emerald-600' : 'text-slate-400 hover:text-slate-600'
+          className={`p-2.5 rounded-xl flex flex-col items-center gap-0.5 cursor-pointer transition-all ${
+            activeTab === 'profile' ? 'text-indigo-400 scale-105' : 'text-slate-400 hover:text-white'
           }`}
         >
           <User size={18} />

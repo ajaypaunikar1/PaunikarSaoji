@@ -8,12 +8,22 @@ import type {
 import { toast } from 'sonner';
 import { io } from 'socket.io-client';
 
+let notificationAudio: HTMLAudioElement | null = null;
+if (typeof window !== 'undefined') {
+  notificationAudio = new Audio('/notification.mpeg');
+}
+
 const playNotificationSound = () => {
   try {
-    const audio = new Audio('/notification.mpeg');
-    audio.play().catch(e => {
-      console.warn("Audio play failed:", e);
-    });
+    if (notificationAudio) {
+      notificationAudio.currentTime = 0;
+      const playPromise = notificationAudio.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(e => {
+          console.warn("Audio play failed:", e);
+        });
+      }
+    }
   } catch (e) {
     console.warn("Audio initialization failed:", e);
   }
