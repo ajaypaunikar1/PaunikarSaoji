@@ -32,7 +32,7 @@ router.get('/pending-bills', async (req, res) => {
 // @route   POST /api/billing/generate
 // @desc    Generate tax invoice bill
 router.post('/generate', protect, async (req, res) => {
-  const { tableId, discount } = req.body;
+  const { tableId, discount, gstPct = 5 } = req.body;
 
   try {
     const table = await prisma.table.findUnique({ where: { id: Number(tableId) } });
@@ -48,22 +48,41 @@ router.post('/generate', protect, async (req, res) => {
     // Calculations
     const discountVal = Number(discount) || 0;
     const subtotal = order.grandTotal;
-    const gst = Math.round(subtotal * 0.05 * 100) / 100;
+    const gst = Math.round(subtotal * (Number(gstPct) / 100) * 100) / 100;
     const grandTotal = Math.round((subtotal + gst - discountVal) * 100) / 100;
 
-    const newBill = await prisma.bill.create({
-      data: {
-        id: `bill-${Date.now()}`,
-        orderId: order.id,
-        tableId: Number(tableId),
-        subtotal,
-        gst,
-        discount: discountVal,
-        grandTotal,
-        paymentStatus: 'Pending',
-        timestamp: new Date().toLocaleTimeString()
-      }
+    // Check for existing pending bill
+    const existing = await prisma.bill.findFirst({
+      where: { orderId: order.id, paymentStatus: 'Pending' }
     });
+
+    let newBill;
+    if (existing) {
+      newBill = await prisma.bill.update({
+        where: { id: existing.id },
+        data: {
+          subtotal,
+          gst,
+          discount: discountVal,
+          grandTotal,
+          timestamp: new Date().toLocaleTimeString()
+        }
+      });
+    } else {
+      newBill = await prisma.bill.create({
+        data: {
+          id: `bill-${Date.now()}`,
+          orderId: order.id,
+          tableId: Number(tableId),
+          subtotal,
+          gst,
+          discount: discountVal,
+          grandTotal,
+          paymentStatus: 'Pending',
+          timestamp: new Date().toLocaleTimeString()
+        }
+      });
+    }
 
     // Print Receipt to Counter Printer
     printBillReceipt(newBill, order);

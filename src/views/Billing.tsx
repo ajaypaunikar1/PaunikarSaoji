@@ -20,6 +20,7 @@ const Billing: React.FC = () => {
   // Billing screen state
   const [selectedTableId, setSelectedTableId] = useState<number | null>(null);
   const [discountAmt, setDiscountAmt] = useState<number>(0);
+  const [customGstPct, setCustomGstPct] = useState<number>(5);
   const [cancelReason, setCancelReason] = useState<string>('');
   const [activeCancelItemId, setActiveCancelItemId] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
@@ -45,26 +46,29 @@ const Billing: React.FC = () => {
     
     // Check if there is already a pending bill for this table
     const existing = bills.find(b => b.orderId === selectedOrder.id && b.paymentStatus === 'Pending');
-    if (existing) return existing;
 
-    // Else calculate locally for preview
+    const baseBill = existing || {
+      id: `preview-${Date.now()}`,
+      orderId: selectedOrder.id,
+      tableId: selectedTableId,
+      paymentStatus: 'Pending' as const,
+      timestamp: new Date().toLocaleTimeString()
+    };
+
+    // Calculate dynamically based on inputs
     const subtotal = selectedOrder.grandTotal;
-    const gst = settings?.gstEnabled ? Math.round(subtotal * 0.05 * 100) / 100 : 0;
+    const gst = settings?.gstEnabled ? Math.round(subtotal * (customGstPct / 100) * 100) / 100 : 0;
     const discount = Math.min(discountAmt, subtotal + gst);
     const grandTotal = Math.max(0, Math.round((subtotal + gst - discount) * 100) / 100);
 
     return {
-      id: `preview-${Date.now()}`,
-      orderId: selectedOrder.id,
-      tableId: selectedTableId,
+      ...baseBill,
       subtotal,
       gst,
       discount,
       grandTotal,
-      paymentStatus: 'Pending' as const,
-      timestamp: new Date().toLocaleTimeString()
     };
-  }, [selectedTableId, selectedOrder, discountAmt, bills, settings?.gstEnabled]);
+  }, [selectedTableId, selectedOrder, discountAmt, customGstPct, bills, settings?.gstEnabled]);
 
   // UPI payment string generator
   const upiString = useMemo(() => {
@@ -81,7 +85,7 @@ const Billing: React.FC = () => {
     }
 
     try {
-      const finalBill = await generateBill(selectedTableId, discountAmt);
+      const finalBill = await generateBill(selectedTableId, discountAmt, customGstPct);
       await payBill(finalBill.id, 'Cash');
       
       setPrintBillData({
@@ -92,6 +96,7 @@ const Billing: React.FC = () => {
 
       setSelectedTableId(null);
       setDiscountAmt(0);
+      setCustomGstPct(5);
     } catch (err: any) {
       toast.error(err.message || 'Payment processing failed');
     }
@@ -206,9 +211,9 @@ const Billing: React.FC = () => {
                 initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 15 }}
-                className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white border border-slate-200 p-6 rounded-3xl shadow-sm"
+                className="flex flex-col gap-6 bg-white border border-slate-200 p-6 rounded-3xl shadow-sm max-w-2xl"
               >
-                {/* Section A: Order Summary & Item list */}
+                {/* Order Summary & Item list */}
                 <div className="space-y-4">
                   <div className="flex justify-between items-center pb-3 border-b border-slate-100">
                     <span className="text-xs font-black text-slate-800 uppercase font-mono">Table {selectedTableId} Summary</span>
@@ -280,35 +285,48 @@ const Billing: React.FC = () => {
                       <span>Subtotal</span>
                       <span className="font-mono text-slate-800">₹{activeBill.subtotal}</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span>GST (5%)</span>
-                      <span className="font-mono text-slate-800">₹{activeBill.gst}</span>
+
+                    {/* Editable GST Input */}
+                    <div className="flex justify-between items-center py-1">
+                      <span className="font-bold text-slate-700">GST (%)</span>
+                      <div className="flex items-center gap-2">
+                        <input 
+                          type="number"
+                          min="0"
+                          value={customGstPct}
+                          onChange={e => setCustomGstPct(Math.max(0, parseFloat(e.target.value) || 0))}
+                          className="w-16 bg-slate-50 border border-slate-200 rounded font-mono text-right text-slate-800 p-1 text-xs focus:outline-none focus:border-emerald-500"
+                        />
+                        <span className="font-mono text-slate-800 w-16 text-right">₹{activeBill.gst}</span>
+                      </div>
                     </div>
 
-                    {/* Discount Input */}
+                    {/* Editable Discount Input */}
                     <div className="flex justify-between items-center py-1">
-                      <span className="flex items-center gap-1 font-bold">
+                      <span className="flex items-center gap-1 font-bold text-slate-700">
                         <Percent size={11} className="text-emerald-500" /> Discount (₹)
                       </span>
-                      <input 
-                        type="number"
-                        min="0"
-                        value={discountAmt || ''}
-                        onChange={e => setDiscountAmt(Math.max(0, parseInt(e.target.value) || 0))}
-                        className="w-20 bg-slate-50 border border-slate-200 rounded font-mono text-right text-slate-800 p-1 text-xs focus:outline-none focus:border-emerald-500"
-                      />
+                      <div className="flex items-center gap-2">
+                        <input 
+                          type="number"
+                          min="0"
+                          value={discountAmt || ''}
+                          onChange={e => setDiscountAmt(Math.max(0, parseInt(e.target.value) || 0))}
+                          className="w-16 bg-slate-50 border border-slate-200 rounded font-mono text-right text-slate-800 p-1 text-xs focus:outline-none focus:border-emerald-500"
+                        />
+                        <span className="font-mono text-slate-800 w-16 text-right">-₹{activeBill.discount}</span>
+                      </div>
                     </div>
                     
-                    <div className="pt-2 border-t border-slate-100 flex justify-between items-center text-sm font-black">
+                    <div className="pt-3 border-t border-slate-100 flex justify-between items-center text-sm font-black">
                       <span className="text-slate-850 uppercase tracking-wider">{t.grandTotal}</span>
                       <span className="text-emerald-600 font-mono">₹{activeBill.grandTotal}</span>
                     </div>
                   </div>
-
                 </div>
 
-                {/* Section B: Payment & Checkout */}
-                <div className="border-t md:border-t-0 md:border-l border-slate-100 pt-4 md:pt-0 md:pl-6 flex flex-col justify-end">
+                {/* Payment & Checkout Button */}
+                <div className="pt-2">
                   <button
                     onClick={handleProcessPayment}
                     className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 text-white font-black text-sm uppercase tracking-wider rounded-xl cursor-pointer transition shadow-lg shadow-emerald-500/10"
@@ -316,7 +334,6 @@ const Billing: React.FC = () => {
                     {t.payBill}
                   </button>
                 </div>
-
               </motion.div>
             ) : (
               <div className="text-center py-20 p-6 rounded-3xl bg-white border border-slate-200 shadow-sm flex flex-col items-center gap-2">

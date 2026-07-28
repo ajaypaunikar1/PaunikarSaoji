@@ -52,7 +52,7 @@ const OrderTimer: React.FC<{ timestamp: string }> = ({ timestamp }) => {
 };
 
 const KDS: React.FC = () => {
-  const { orders, users, updateOrderStatus, language } = useApp();
+  const { orders, users, updateOrderStatus, updateOrder, language } = useApp();
   const t = translations[language];
 
   const [printKOTData, setPrintKOTData] = useState<Order | null>(null);
@@ -60,9 +60,11 @@ const KDS: React.FC = () => {
   const activeOrders = orders.filter(o => o.status !== 'Served');
 
   const handlePrintKOT = (order: Order) => {
-    // Only print items that are not 'Served'
-    const unservedItems = order.items.filter(item => item.status !== 'Served');
-    setPrintKOTData({ ...order, items: unservedItems });
+    const pendingItems = order.items.filter(item => item.status === 'Pending');
+    const itemsToPrint = pendingItems.length > 0 
+      ? pendingItems 
+      : order.items.filter(item => item.status !== 'Served');
+    setPrintKOTData({ ...order, items: itemsToPrint });
     setTimeout(() => window.print(), 150);
   };
 
@@ -93,13 +95,18 @@ const KDS: React.FC = () => {
   };
 
   const executeStatusAdvance = (order: Order) => {
-    if (order.status === 'Pending') {
-      updateOrderStatus(order.id, 'Preparing');
-    } else if (order.status === 'Preparing') {
-      updateOrderStatus(order.id, 'Ready');
-    } else if (order.status === 'Ready') {
-      updateOrderStatus(order.id, 'Served');
-    }
+    let nextStatus: OrderStatus = 'Served';
+    if (order.status === 'Pending') nextStatus = 'Preparing';
+    else if (order.status === 'Preparing') nextStatus = 'Ready';
+    else if (order.status === 'Ready') nextStatus = 'Served';
+
+    const updatedItems = order.items.map(item => ({
+      ...item,
+      status: (item.status === 'Pending' || item.status === order.status) ? nextStatus : item.status
+    }));
+
+    updateOrder(order.id, { items: updatedItems });
+    updateOrderStatus(order.id, nextStatus);
   };
 
   const getCardHeaderColor = (status: OrderStatus) => {
@@ -174,6 +181,11 @@ const KDS: React.FC = () => {
                           <div className="font-bold text-slate-800 flex items-center gap-1.5">
                             <span className="text-emerald-600 font-mono font-extrabold">{item.quantity}x</span>
                             <span>{item.name}</span>
+                            {item.status === 'Pending' && order.items.some(i => i.status !== 'Pending') && (
+                              <span className="text-[9px] font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded border border-amber-200 uppercase tracking-wide">
+                                (New Added)
+                              </span>
+                            )}
                           </div>
                           
                           <div className="flex items-center gap-1.5 mt-0.5">

@@ -10,37 +10,12 @@ import { io } from 'socket.io-client';
 
 const playNotificationSound = () => {
   try {
-    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-    if (!AudioContextClass) return;
-    const ctx = new AudioContextClass();
-    
-    // Primary chime
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(880, ctx.currentTime);
-    gain.gain.setValueAtTime(0.15, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.6);
-
-    // Harmonic second chime
-    setTimeout(() => {
-      const osc2 = ctx.createOscillator();
-      const gain2 = ctx.createGain();
-      osc2.type = 'sine';
-      osc2.frequency.setValueAtTime(1046.50, ctx.currentTime);
-      gain2.gain.setValueAtTime(0.12, ctx.currentTime);
-      gain2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
-      osc2.connect(gain2);
-      gain2.connect(ctx.destination);
-      osc2.start();
-      osc2.stop(ctx.currentTime + 0.5);
-    }, 120);
+    const audio = new Audio('/notification.mpeg');
+    audio.play().catch(e => {
+      console.warn("Audio play failed:", e);
+    });
   } catch (e) {
-    console.warn("AudioContext failed:", e);
+    console.warn("Audio initialization failed:", e);
   }
 };
 
@@ -1159,7 +1134,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     addAuditLog(`Split Table ${sourceId} to Table ${targetId}`);
   };
 
-  const generateBill = async (tableId: number, discount: number): Promise<Bill> => {
+  const generateBill = async (tableId: number, discount: number, gstPct: number = 5): Promise<Bill> => {
     const table = tables.find(t => t.id === tableId);
     if (!table || !table.orderId) throw new Error("Table has no active order");
     
@@ -1167,7 +1142,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (!order) throw new Error("Order not found");
 
     const subtotal = order.grandTotal;
-    const gst = settings?.gstEnabled ? Math.round(subtotal * 0.05 * 100) / 100 : 0;
+    const gst = settings?.gstEnabled ? Math.round(subtotal * (gstPct / 100) * 100) / 100 : 0;
     const grandTotal = Math.round((subtotal + gst - discount) * 100) / 100;
 
     const newBill: Bill = {
@@ -1186,7 +1161,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const res = await fetch(`${API_BASE}/billing/generate`, {
         method: 'POST',
         headers: getHeaders(),
-        body: JSON.stringify({ tableId, discount })
+        body: JSON.stringify({ tableId, discount, gstPct })
       }).then(r => r.json());
       if (res.success) {
         loadDatabaseData();
