@@ -403,7 +403,33 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }
         const resOrders = await apiFetch(`${API_BASE}/orders`, { headers: hdrs });
         if (resOrders && resOrders.success) {
-          setOrders(resOrders.data.map((o: any) => ({ ...o, id: o.id || o._id })));
+          setOrders(prev => {
+            const fetchedOrders = resOrders.data.map((o: any) => ({ ...o, id: o.id || o._id }));
+            
+            // On Vercel sockets are disabled, simulate notifications via polling diff
+            if (prev.length > 0) {
+              const prevIds = new Set(prev.map(p => p.id));
+              const newOrders = fetchedOrders.filter((o: any) => !prevIds.has(o.id));
+              
+              if (newOrders.length > 0) {
+                playNotificationSound();
+                
+                newOrders.forEach((no: any) => {
+                  const notif = {
+                    id: `n_${Date.now()}_${Math.random()}`,
+                    title: `New Order (T-${no.tableId})`,
+                    message: `Order #${no.id.substring(4,8)} received for Table ${no.tableId}`,
+                    timestamp: new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit' }).format(new Date()),
+                    read: false,
+                    type: 'order' as const
+                  };
+                  toast.success(notif.message);
+                  setNotifications(pn => [notif, ...pn]);
+                });
+              }
+            }
+            return fetchedOrders;
+          });
         }
       } catch {
         // silent — socket will handle it anyway
