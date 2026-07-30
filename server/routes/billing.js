@@ -167,6 +167,52 @@ router.post('/:id/pay', protect, async (req, res) => {
   }
 });
 
+// @route   POST /api/billing/:id/print
+// @desc    Manually trigger thermal printing of a bill to network printer
+router.post('/:id/print', protect, async (req, res) => {
+  try {
+    let bill = await prisma.bill.findUnique({ where: { id: req.params.id } });
+    if (!bill) {
+      bill = await prisma.bill.findFirst({ where: { orderId: req.params.id } });
+    }
+    if (!bill) {
+      return res.status(404).json({ success: false, message: 'Bill not found' });
+    }
+    const order = await prisma.order.findUnique({ where: { id: bill.orderId } });
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    printBillReceipt(bill, order);
+    res.json({ success: true, message: 'Receipt sent to network printer' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @route   POST /api/billing/reset-checkout/:tableId
+// @desc    Reset table status from Billing back to Occupied if checkout requested by mistake
+router.post('/reset-checkout/:tableId', protect, async (req, res) => {
+  try {
+    const tableId = Number(req.params.tableId);
+    const table = await prisma.table.findUnique({ where: { id: tableId } });
+    if (!table) return res.status(404).json({ success: false, message: 'Table not found' });
+
+    const newStatus = table.orderId ? 'Occupied' : 'Available';
+    const updatedTable = await prisma.table.update({
+      where: { id: tableId },
+      data: { status: newStatus }
+    });
+
+    const io = req.app.get('io');
+    io.emit('tables_sync', await prisma.table.findMany({ orderBy: { id: 'asc' } }));
+
+    res.json({ success: true, data: updatedTable, message: `Table ${tableId} status reset to ${newStatus}` });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // @route   POST /api/billing/cancel-request
 // @desc    Request item cancellation
 router.post('/cancel-request', protect, async (req, res) => {

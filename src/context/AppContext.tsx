@@ -13,8 +13,21 @@ if (typeof window !== 'undefined') {
   notificationAudio = new Audio('/notification.mpeg');
 }
 
-const playNotificationSound = () => {
+const playNotificationSound = (userRole?: string) => {
   try {
+    // Sound should ONLY play in Admin (SuperAdmin / Admin role), NOT Waiter devices
+    if (userRole === 'Waiter') return;
+
+    if (!userRole && typeof localStorage !== 'undefined') {
+      const saved = localStorage.getItem('rms_user');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (parsed.role === 'Waiter') return;
+        } catch {}
+      }
+    }
+
     if (notificationAudio) {
       notificationAudio.currentTime = 0;
       const playPromise = notificationAudio.play();
@@ -498,6 +511,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           });
           socket.on('order_updated', (data: Order) => {
             if (isAborted) return;
+            playNotificationSound();
             setOrders(prev => prev.map(o => o.id === data.id ? data : o));
           });
           socket.on('order_status_updated', (data: { id: string; status: Order['status'] }) => {

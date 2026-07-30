@@ -146,7 +146,7 @@ const KDS: React.FC = () => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           <AnimatePresence>
-            {activeOrders.map(order => {
+            {activeOrders.map((order, orderIndex) => {
               const waiter = users.find(u => u.id === order.waiterId);
               
               return (
@@ -167,8 +167,10 @@ const KDS: React.FC = () => {
                         Waiter: {waiter?.name || order.waiterId}
                       </p>
                     </div>
-                    <div className="flex flex-col items-end gap-1.5">
-                      <OrderTimer timestamp={order.timestamp} />
+                    <div className="flex flex-col items-end gap-1">
+                      <span className="px-2.5 py-1 rounded-full text-xs font-black font-mono bg-indigo-100 text-indigo-800 border border-indigo-200 shadow-xs">
+                        Queue #{orderIndex + 1}
+                      </span>
                       <span className="text-[9px] text-slate-400 font-mono">#{order.id.substring(4, 8)}</span>
                     </div>
                   </div>

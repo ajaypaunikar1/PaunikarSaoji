@@ -86,19 +86,53 @@ const Billing: React.FC = () => {
 
     try {
       const finalBill = await generateBill(selectedTableId, discountAmt, customGstPct);
-      await payBill(finalBill.id, 'Cash');
+      const waiterName = users.find(u => u.id === selectedOrder.waiterId)?.name || 'Staff';
+
+      // Trigger ESC/POS network printer via backend if available
+      try {
+        const token = localStorage.getItem('rms_token');
+        await fetch(`http://localhost:5000/api/billing/${finalBill.id}/print`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+      } catch {}
+
+      await payBill(finalBill.id, paymentMethod || 'Cash');
       
-      setPrintBillData({
-        bill: { ...finalBill, paymentMethod: 'Cash' },
-        orderItems: selectedOrder.items,
-        waiterName: users.find(u => u.id === selectedOrder.waiterId)?.name || 'Staff'
-      });
+      // Trigger browser print dialog automatically
+      handlePrintReceipt({ ...finalBill, paymentMethod: paymentMethod || 'Cash' }, selectedOrder.items, waiterName);
 
       setSelectedTableId(null);
       setDiscountAmt(0);
       setCustomGstPct(5);
     } catch (err: any) {
       toast.error(err.message || 'Payment processing failed');
+    }
+  };
+
+  // Standalone Printer Trigger (Print Bill without checking out)
+  const handlePrintOnly = async () => {
+    if (!selectedTableId || !selectedOrder || !activeBill) {
+      toast.error('Select an active table to print bill');
+      return;
+    }
+    try {
+      const finalBill = await generateBill(selectedTableId, discountAmt, customGstPct);
+      const waiterName = users.find(u => u.id === selectedOrder.waiterId)?.name || 'Staff';
+
+      // Trigger ESC/POS network printer via backend
+      try {
+        const token = localStorage.getItem('rms_token');
+        await fetch(`http://localhost:5000/api/billing/${finalBill.id}/print`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+      } catch {}
+
+      handlePrintReceipt(finalBill, selectedOrder.items, waiterName);
+      toast.success('Bill print triggered!');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to print bill');
     }
   };
 
@@ -325,13 +359,20 @@ const Billing: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Payment & Checkout Button */}
-                <div className="pt-2">
+                {/* Payment & Checkout Buttons */}
+                <div className="pt-2 grid grid-cols-2 gap-3">
+                  <button
+                    onClick={handlePrintOnly}
+                    className="py-3.5 bg-slate-800 hover:bg-slate-900 text-white font-black text-xs uppercase tracking-wider rounded-xl cursor-pointer transition shadow-md flex items-center justify-center gap-1.5"
+                  >
+                    <Printer size={15} /> Print Bill
+                  </button>
+
                   <button
                     onClick={handleProcessPayment}
-                    className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 text-white font-black text-sm uppercase tracking-wider rounded-xl cursor-pointer transition shadow-lg shadow-emerald-500/10"
+                    className="py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs uppercase tracking-wider rounded-xl cursor-pointer transition shadow-lg shadow-emerald-500/10 flex items-center justify-center gap-1.5"
                   >
-                    {t.payBill}
+                    <Receipt size={15} /> Pay & Checkout & Print
                   </button>
                 </div>
               </motion.div>

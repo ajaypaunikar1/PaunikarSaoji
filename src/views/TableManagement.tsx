@@ -4,7 +4,7 @@ import { translations } from '../translations/translations';
 import { 
   Users, CheckCircle2, ShoppingBag, Plus, Trash2,
   ArrowRightLeft, GitMerge, Columns, PlusCircle, X, Check,
-  Settings, Eye, HelpCircle, LayoutGrid, ChevronDown
+  Settings, Eye, HelpCircle, LayoutGrid, ChevronDown, Printer
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Table, PortionType, TableStatus } from '../types/types';
@@ -445,6 +445,22 @@ const TableManagement: React.FC = () => {
                         className="p-2.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer">
                         <PlusCircle size={14} /> Add Items
                       </button>
+                      {activeOrder && (
+                        <button onClick={async () => {
+                          const bill = await generateBill(selectedTable.id, 0);
+                          try {
+                            const token = localStorage.getItem('rms_token');
+                            await fetch(`http://localhost:5000/api/billing/${bill.id}/print`, {
+                              method: 'POST',
+                              headers: { 'Authorization': `Bearer ${token}` }
+                            });
+                          } catch {}
+                          toast.success('Bill sent to printer! You can also manage payment on Billing tab.');
+                        }}
+                          className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer">
+                          <Printer size={14} /> Print Bill
+                        </button>
+                      )}
                       {activeOrder && (
                         <button onClick={() => { generateBill(selectedTable.id, 0); closeDetails(); toast.success('Bill generated. Please navigate to Billing tab.'); }}
                           className="p-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer">

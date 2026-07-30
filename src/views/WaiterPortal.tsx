@@ -270,7 +270,7 @@ const WaiterPortal: React.FC = () => {
                               toast.error('Account is disabled. Cannot take orders.');
                               return;
                             }
-                            if (tbl.status === 'Available' || tbl.status === 'Occupied') {
+                            if (tbl.status === 'Available' || tbl.status === 'Occupied' || tbl.status === 'Billing') {
                               setOrderingTable(tbl);
                               setBasket([]);
                             } else {
@@ -510,6 +510,36 @@ const WaiterPortal: React.FC = () => {
                     >
                       {t.requestCheckout}
                     </button>
+                  )}
+
+                  {orderingTable.status === 'Billing' && (
+                    <div className="space-y-2 mt-2">
+                      <div className="p-3 bg-cyan-50 border border-cyan-200 rounded-xl text-center">
+                        <span className="text-xs font-bold text-cyan-800 uppercase tracking-wider block">
+                          Checkout Requested
+                        </span>
+                        <span className="text-[10px] text-cyan-600">Bill has been generated & sent to counter.</span>
+                      </div>
+                      <button
+                        onClick={async () => {
+                          try {
+                            const token = localStorage.getItem('rms_token');
+                            await fetch(`http://localhost:5000/api/billing/reset-checkout/${orderingTable.id}`, {
+                              method: 'POST',
+                              headers: { 'Authorization': `Bearer ${token}` }
+                            });
+                            toast.success(`Table ${orderingTable.id} checkout request cancelled.`);
+                            clearDraft();
+                          } catch {
+                            setTableStatus(orderingTable.id, 'Occupied');
+                            clearDraft();
+                          }
+                        }}
+                        className="w-full py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs uppercase tracking-wider rounded-xl cursor-pointer transition"
+                      >
+                        Cancel Checkout Request
+                      </button>
+                    </div>
                   )}
                 </div>
               )}
