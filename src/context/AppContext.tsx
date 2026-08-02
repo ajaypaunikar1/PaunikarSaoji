@@ -1187,7 +1187,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (!order) throw new Error("Order not found");
 
     const subtotal = order.grandTotal;
-    const gst = settings?.gstEnabled ? Math.round(subtotal * (gstPct / 100) * 100) / 100 : 0;
+    const gst = Math.round(subtotal * (gstPct / 100) * 100) / 100;
     const grandTotal = Math.round((subtotal + gst - discount) * 100) / 100;
     const discountPct = subtotal > 0 ? Math.round((discount / subtotal) * 100 * 100) / 100 : 0;
 

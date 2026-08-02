@@ -58,7 +58,7 @@ const Billing: React.FC = () => {
 
     // Calculate dynamically based on inputs
     const subtotal = selectedOrder.grandTotal;
-    const gst = settings?.gstEnabled ? Math.round(subtotal * (customGstPct / 100) * 100) / 100 : 0;
+    const gst = Math.round(subtotal * (customGstPct / 100) * 100) / 100;
     // Discount is now a percentage
     const discountAmt = Math.round(subtotal * (discountPct / 100) * 100) / 100;
     const discount = Math.min(discountAmt, subtotal + gst);
@@ -209,6 +209,7 @@ const Billing: React.FC = () => {
                     onClick={() => {
                       setSelectedTableId(tbl.id);
                       setDiscountPct(0);
+                      setCustomGstPct(settings?.gstEnabled ? 18 : 0);
                       setPaymentMethod(null);
                     }}
                     className={`p-4 rounded-2xl border transition duration-300 flex justify-between items-center cursor-pointer ${
