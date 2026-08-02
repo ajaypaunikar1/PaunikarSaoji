@@ -67,7 +67,7 @@ interface AppContextType {
   splitTables: (sourceId: number, targetId: number, itemsToMove: { id: string; name: string; portion: PortionType; price: number; quantity: number }[]) => void;
   unmergeTables: (tableId: number) => void;
   transferTable: (sourceId: number, destinationId: number) => void;
-  generateBill: (tableId: number, discount: number) => Promise<Bill>;
+  generateBill: (tableId: number, discount: number, gstPct?: number) => Promise<Bill>;
   payBill: (billId: string, method: PaymentMethod) => Promise<void>;
   submitLeave: (startDate: string, endDate: string, reason: string) => void;
   approveLeave: (leaveId: string) => void;
@@ -673,8 +673,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   }, [isBackendMode]);
 
   // Operations
+  const getISTTime = () => new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true });
+  const getISTDate = () => new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: '2-digit', year: 'numeric' });
+
   const addAuditLog = async (action: string) => {
-    const timestamp = new Date().toLocaleTimeString();
+    const timestamp = getISTTime();
     if (isBackendMode && currentUser) {
       try {
         await fetch(`${API_BASE}/staff/audit-logs`, {
@@ -806,7 +809,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const addOrder = (tableId: number, items: Omit<Order['items'][0], 'id'>[], notes?: string): Order => {
     const waiterId = currentUser?.id || 'u5';
     const orderId = `ord-${Date.now()}`;
-    const timestamp = new Date().toLocaleTimeString();
+    const timestamp = getISTTime();
+    const date = getISTDate();
 
     const orderItems = items.map((item, idx) => ({
       ...item,
@@ -824,6 +828,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       status: 'Pending',
       notes,
       timestamp,
+      date,
       grandTotal
     };
 
@@ -1024,7 +1029,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       items: consolidatedItems,
       status: 'Pending',
       notes: mergedNotes.join(' | '),
-      timestamp: new Date().toLocaleTimeString(),
+      timestamp: getISTTime(),
       grandTotal
     };
 
@@ -1150,7 +1155,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         waiterId: sourceOrder.waiterId,
         items: targetOrderItems,
         status: 'Pending',
-        timestamp: new Date().toLocaleTimeString(),
+        timestamp: getISTTime(),
         grandTotal: targetTotal
       };
       const sourceTotal = sourceOrderItems.reduce((acc, i) => acc + (i.price * i.quantity), 0);
@@ -1184,7 +1189,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     addAuditLog(`Split Table ${sourceId} to Table ${targetId}`);
   };
 
-  const generateBill = async (tableId: number, discount: number, gstPct: number = 5): Promise<Bill> => {
+  const generateBill = async (tableId: number, discount: number, gstPct: number = 18): Promise<Bill> => {
     const table = tables.find(t => t.id === tableId);
     if (!table || !table.orderId) throw new Error("Table has no active order");
     
@@ -1194,6 +1199,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const subtotal = order.grandTotal;
     const gst = settings?.gstEnabled ? Math.round(subtotal * (gstPct / 100) * 100) / 100 : 0;
     const grandTotal = Math.round((subtotal + gst - discount) * 100) / 100;
+    const discountPct = subtotal > 0 ? Math.round((discount / subtotal) * 100 * 100) / 100 : 0;
 
     const newBill: Bill = {
       id: `bill-${Date.now()}`,
@@ -1201,10 +1207,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       tableId,
       subtotal,
       gst,
+      gstPct,
       discount,
+      discountPct,
       grandTotal,
       paymentStatus: 'Pending',
-      timestamp: new Date().toLocaleTimeString()
+      timestamp: getISTTime(),
+      date: getISTDate()
     };
 
     if (isBackendMode) {
@@ -1228,7 +1237,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         title: `Bill Generated - Table ${tableId}`,
         message: `Total: ₹${grandTotal} (Subtotal: ₹${subtotal}, GST: ₹${gst})`,
         type: 'Billing',
-        timestamp: new Date().toLocaleTimeString(),
+        timestamp: getISTTime(),
         read: false
       };
       setNotifications(prev => [newNotif, ...prev]);
@@ -1381,7 +1390,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         id: `att-${Date.now()}`,
         employeeId: currentUser.id,
         date: todayStr,
-        clockIn: new Date().toLocaleTimeString(),
+        clockIn: getISTTime(),
         status
       };
       setAttendance(prev => [newAtt, ...prev]);
@@ -1418,7 +1427,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           toast.error('Already clocked out today!');
           return prev;
         }
-        updated[idx] = { ...updated[idx], clockOut: new Date().toLocaleTimeString() };
+        updated[idx] = { ...updated[idx], clockOut: getISTTime() };
         toast.success(`Clocked out at ${updated[idx].clockOut}`);
         addAuditLog(`Clocked out`);
         return updated;
@@ -1439,12 +1448,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     } else {
       const newReq: CancellationRequest = {
         id: `cancel-${Date.now()}`,
-        orderId, itemText, reason, requestedBy: currentUser?.name || 'Waiter', status: 'Pending', timestamp: new Date().toLocaleTimeString()
+        orderId, itemText, reason, requestedBy: currentUser?.name || 'Waiter', status: 'Pending', timestamp: getISTTime()
       };
       setCancellationRequests(prev => [...prev, newReq]);
       const newNotif: Notification = {
         id: `notif-${Date.now()}`, title: `Cancellation Request`, message: `Refund/removal request for "${itemText}" in Order ${orderId.substring(4,8)}. Reason: ${reason}`,
-        type: 'Cancellation', timestamp: new Date().toLocaleTimeString(), read: false
+        type: 'Cancellation', timestamp: getISTTime(), read: false
       };
       setNotifications(prev => [newNotif, ...prev]);
       addAuditLog(`Requested cancellation of ${itemText} for Order ${orderId}`);

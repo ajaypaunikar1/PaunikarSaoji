@@ -67,6 +67,7 @@ export interface Order {
   status: OrderStatus;
   notes?: string;
   timestamp: string;
+  date?: string; // DD/MM/YYYY
   grandTotal: number;
 }
 
@@ -113,12 +114,16 @@ export interface Bill {
   orderId: string;
   tableId: number;
   subtotal: number;
-  gst: number; // 5%
+  gst: number;
+  gstPct?: number; // GST percentage used
   discount: number;
+  discountPct?: number; // discount percentage used
   grandTotal: number;
   paymentMethod?: PaymentMethod;
   paymentStatus: 'Pending' | 'Paid';
   timestamp: string;
+  date?: string;
+  phone?: string;
 }
 
 export interface CancellationRequest {

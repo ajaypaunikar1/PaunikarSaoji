@@ -277,14 +277,16 @@ const WaiterPortal: React.FC = () => {
                               toast.info(`Table status: ${tbl.status}`);
                             }
                           }}
-                          className={`p-4 rounded-2xl border flex flex-col justify-between h-28 cursor-pointer shadow-sm transition duration-200 hover:scale-[1.01] ${
+                        className={`relative p-4 rounded-2xl border flex flex-col justify-between h-28 cursor-pointer shadow-sm transition duration-200 hover:scale-[1.01] ${
                             currentUser?.status === 'Disabled'
                               ? 'bg-slate-100 border-slate-200 text-slate-400 opacity-60 cursor-not-allowed'
-                              : tbl.status === 'Occupied' 
-                                ? 'bg-amber-50 border-amber-200 text-amber-900' 
-                                : tbl.status === 'Billing'
-                                  ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
-                                  : 'bg-white border-slate-200 text-slate-700 hover:border-slate-350'
+                              : ord?.status === 'Ready'
+                                ? 'bg-teal-50 border-teal-300 text-teal-900 ring-2 ring-teal-400/40'
+                                : tbl.status === 'Occupied' 
+                                  ? 'bg-amber-50 border-amber-200 text-amber-900' 
+                                  : tbl.status === 'Billing'
+                                    ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                                    : 'bg-white border-slate-200 text-slate-700 hover:border-slate-350'
                           }`}
                         >
                           <div className="flex justify-between items-center">
@@ -310,6 +312,13 @@ const WaiterPortal: React.FC = () => {
                               <span className="text-xs font-bold text-emerald-600 font-mono">₹{ord.grandTotal}</span>
                             )}
                           </div>
+                          
+                          {/* Order Ready Badge */}
+                          {ord && ord.status === 'Ready' && currentUser?.status !== 'Disabled' && (
+                            <div className="absolute -top-2 -right-2 bg-teal-500 text-white text-[8px] font-black px-2 py-0.5 rounded-full animate-bounce shadow-lg border-2 border-white">
+                              🔔 READY
+                            </div>
+                          )}
                         </div>
                       );
                     })}

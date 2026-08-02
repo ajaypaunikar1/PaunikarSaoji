@@ -10,6 +10,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import type { Bill, PaymentMethod } from '../types/types';
 import { toast } from 'sonner';
 
+const RESTAURANT_PHONE = '+91 98765 43210'; // Update with real number
+
 const Billing: React.FC = () => {
   const { 
     tables, orders, generateBill, payBill, bills, language,
@@ -19,8 +21,8 @@ const Billing: React.FC = () => {
 
   // Billing screen state
   const [selectedTableId, setSelectedTableId] = useState<number | null>(null);
-  const [discountAmt, setDiscountAmt] = useState<number>(0);
-  const [customGstPct, setCustomGstPct] = useState<number>(5);
+  const [discountPct, setDiscountPct] = useState<number>(0);   // Discount in %
+  const [customGstPct, setCustomGstPct] = useState<number>(18); // Default 18%
   const [cancelReason, setCancelReason] = useState<string>('');
   const [activeCancelItemId, setActiveCancelItemId] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
@@ -52,12 +54,15 @@ const Billing: React.FC = () => {
       orderId: selectedOrder.id,
       tableId: selectedTableId,
       paymentStatus: 'Pending' as const,
-      timestamp: new Date().toLocaleTimeString()
+      timestamp: new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true }),
+      date: new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: '2-digit', year: 'numeric' })
     };
 
     // Calculate dynamically based on inputs
     const subtotal = selectedOrder.grandTotal;
     const gst = settings?.gstEnabled ? Math.round(subtotal * (customGstPct / 100) * 100) / 100 : 0;
+    // Discount is now a percentage
+    const discountAmt = Math.round(subtotal * (discountPct / 100) * 100) / 100;
     const discount = Math.min(discountAmt, subtotal + gst);
     const grandTotal = Math.max(0, Math.round((subtotal + gst - discount) * 100) / 100);
 
@@ -65,16 +70,18 @@ const Billing: React.FC = () => {
       ...baseBill,
       subtotal,
       gst,
+      gstPct: customGstPct,
       discount,
+      discountPct,
       grandTotal,
     };
-  }, [selectedTableId, selectedOrder, discountAmt, customGstPct, bills, settings?.gstEnabled]);
+  }, [selectedTableId, selectedOrder, discountPct, customGstPct, bills, settings?.gstEnabled]);
 
   // UPI payment string generator
   const upiString = useMemo(() => {
     if (!activeBill) return '';
     const amount = activeBill.grandTotal;
-    return `upi://pay?pa=restaurant@upi&pn=KineticKitchen&am=${amount}&cu=INR&tn=Table${activeBill.tableId}Order`;
+    return `upi://pay?pa=restaurant@upi&pn=PaunikarSaoji&am=${amount}&cu=INR&tn=Table${activeBill.tableId}Order`;
   }, [activeBill]);
 
   // Submit payment
@@ -85,7 +92,7 @@ const Billing: React.FC = () => {
     }
 
     try {
-      const finalBill = await generateBill(selectedTableId, discountAmt, customGstPct);
+      const finalBill = await generateBill(selectedTableId, Math.round(selectedOrder.grandTotal * (discountPct / 100) * 100) / 100, customGstPct);
       const waiterName = users.find(u => u.id === selectedOrder.waiterId)?.name || 'Staff';
 
       // Trigger ESC/POS network printer via backend if available
@@ -103,8 +110,8 @@ const Billing: React.FC = () => {
       handlePrintReceipt({ ...finalBill, paymentMethod: paymentMethod || 'Cash' }, selectedOrder.items, waiterName);
 
       setSelectedTableId(null);
-      setDiscountAmt(0);
-      setCustomGstPct(5);
+      setDiscountPct(0);
+      setCustomGstPct(18);
     } catch (err: any) {
       toast.error(err.message || 'Payment processing failed');
     }
@@ -117,6 +124,7 @@ const Billing: React.FC = () => {
       return;
     }
     try {
+      const discountAmt = Math.round(selectedOrder.grandTotal * (discountPct / 100) * 100) / 100;
       const finalBill = await generateBill(selectedTableId, discountAmt, customGstPct);
       const waiterName = users.find(u => u.id === selectedOrder.waiterId)?.name || 'Staff';
 
@@ -202,7 +210,7 @@ const Billing: React.FC = () => {
                     key={tbl.id}
                     onClick={() => {
                       setSelectedTableId(tbl.id);
-                      setDiscountAmt(0);
+                      setDiscountPct(0);
                       setPaymentMethod(null);
                     }}
                     className={`p-4 rounded-2xl border transition duration-300 flex justify-between items-center cursor-pointer ${
@@ -327,28 +335,30 @@ const Billing: React.FC = () => {
                         <input 
                           type="number"
                           min="0"
+                          max="28"
                           value={customGstPct}
                           onChange={e => setCustomGstPct(Math.max(0, parseFloat(e.target.value) || 0))}
                           className="w-16 bg-slate-50 border border-slate-200 rounded font-mono text-right text-slate-800 p-1 text-xs focus:outline-none focus:border-emerald-500"
                         />
-                        <span className="font-mono text-slate-800 w-16 text-right">₹{activeBill.gst}</span>
+                        <span className="font-mono text-slate-800 w-16 text-right">₹{activeBill.gst.toFixed(2)}</span>
                       </div>
                     </div>
 
-                    {/* Editable Discount Input */}
+                    {/* Editable Discount Input — now in % */}
                     <div className="flex justify-between items-center py-1">
                       <span className="flex items-center gap-1 font-bold text-slate-700">
-                        <Percent size={11} className="text-emerald-500" /> Discount (₹)
+                        <Percent size={11} className="text-emerald-500" /> Discount (%)
                       </span>
                       <div className="flex items-center gap-2">
                         <input 
                           type="number"
                           min="0"
-                          value={discountAmt || ''}
-                          onChange={e => setDiscountAmt(Math.max(0, parseInt(e.target.value) || 0))}
+                          max="100"
+                          value={discountPct || ''}
+                          onChange={e => setDiscountPct(Math.max(0, Math.min(100, parseFloat(e.target.value) || 0)))}
                           className="w-16 bg-slate-50 border border-slate-200 rounded font-mono text-right text-slate-800 p-1 text-xs focus:outline-none focus:border-emerald-500"
                         />
-                        <span className="font-mono text-slate-800 w-16 text-right">-₹{activeBill.discount}</span>
+                        <span className="font-mono text-slate-800 w-16 text-right">-₹{activeBill.discount.toFixed(2)}</span>
                       </div>
                     </div>
                     
@@ -393,11 +403,16 @@ const Billing: React.FC = () => {
         {printBillData && (
           <div className="print-area hidden">
             {/* 1. COUNTER BILL (CUSTOMER RECEIPT) */}
-            <div style={{ width: '80mm', padding: '5px', boxSizing: 'border-box' }}>
+            <div style={{ width: '80mm', padding: '5px', boxSizing: 'border-box', fontFamily: 'Arial, sans-serif' }}>
               <div style={{ textAlign: 'center', borderBottom: '1px dashed black', paddingBottom: '10px', marginBottom: '10px' }}>
-                <h1 style={{ margin: '0', fontSize: '16px', fontWeight: 'bold' }}>PAUNIKAR SAOJI RESTAURANT</h1>
-                <p style={{ margin: '2px 0 0 0', fontSize: '10px' }}>Opp. Deccan Gymkhana, Pune, MH</p>
-                <p style={{ margin: '1px 0 0 0', fontSize: '9px', fontWeight: 'bold', fontFamily: 'monospace' }}>GSTIN: 27AAAAA1111A1Z1</p>
+                {/* Restaurant Logo */}
+                <div style={{ marginBottom: '6px' }}>
+                  <img src="/favicon.svg" alt="Logo" style={{ width: '40px', height: '40px', margin: '0 auto', display: 'block' }} />
+                </div>
+                <h1 style={{ margin: '0', fontSize: '15px', fontWeight: 'bold', letterSpacing: '0.5px' }}>PAUNIKAR SAOJI RESTAURANT</h1>
+                <p style={{ margin: '3px 0 0 0', fontSize: '9px', lineHeight: '1.4' }}>Plot no.10 Near Purti Bazar, Manewada Rd,</p>
+                <p style={{ margin: '0', fontSize: '9px', lineHeight: '1.4' }}>Besa Pipla, Maharashtra 440037</p>
+                <p style={{ margin: '2px 0 0 0', fontSize: '9px', fontWeight: 'bold' }}>📞 {RESTAURANT_PHONE}</p>
                 <h3 style={{ margin: '6px 0 0 0', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '1px' }}>TAX INVOICE (कर बीजक)</h3>
               </div>
 
@@ -416,8 +431,23 @@ const Billing: React.FC = () => {
                     <td style={{ textAlign: 'right' }}>{printBillData.waiterName}</td>
                   </tr>
                   <tr>
-                    <td>Date/Time:</td>
-                    <td style={{ textAlign: 'right', fontFamily: 'monospace' }}>{printBillData.bill.timestamp}</td>
+                    <td>Invoice Date:</td>
+                    <td style={{ textAlign: 'right', fontFamily: 'monospace' }}>
+                      {new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: '2-digit', year: 'numeric' })}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>Invoice Time:</td>
+                    <td style={{ textAlign: 'right', fontFamily: 'monospace' }}>
+                      {new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true })}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>Payment:</td>
+                    <td style={{ textAlign: 'right', fontWeight: 'bold' }}>
+                      {printBillData.bill.paymentMethod === 'UPI' ? '💳 UPI' : 
+                       printBillData.bill.paymentMethod === 'Card' ? '💳 Card' : '💵 Cash'}
+                    </td>
                   </tr>
                 </tbody>
               </table>
@@ -450,29 +480,39 @@ const Billing: React.FC = () => {
 
               <div style={{ borderBottom: '1px dashed black', marginBottom: '6px' }} />
 
+              {/* Totals — CGST 9% + SGST 9% for 18% GST */}
               <table style={{ width: '100%', fontSize: '10px', fontFamily: 'monospace', marginBottom: '10px' }}>
                 <tbody>
                   <tr>
                     <td>Subtotal:</td>
-                    <td style={{ textAlign: 'right' }}>₹{printBillData.bill.subtotal}</td>
+                    <td style={{ textAlign: 'right' }}>₹{printBillData.bill.subtotal.toFixed(2)}</td>
                   </tr>
-                  <tr>
-                    <td>CGST (2.5%):</td>
-                    <td style={{ textAlign: 'right' }}>₹{Math.round(printBillData.bill.gst / 2 * 100) / 100}</td>
-                  </tr>
-                  <tr>
-                    <td>SGST (2.5%):</td>
-                    <td style={{ textAlign: 'right' }}>₹{Math.round(printBillData.bill.gst / 2 * 100) / 100}</td>
-                  </tr>
+                  {printBillData.bill.gst > 0 && (() => {
+                    const gstPct = printBillData.bill.gstPct || 18;
+                    const halfPct = gstPct / 2;
+                    const halfAmt = Math.round(printBillData.bill.gst / 2 * 100) / 100;
+                    return (
+                      <>
+                        <tr>
+                          <td>CGST ({halfPct}%):</td>
+                          <td style={{ textAlign: 'right' }}>₹{halfAmt.toFixed(2)}</td>
+                        </tr>
+                        <tr>
+                          <td>SGST ({halfPct}%):</td>
+                          <td style={{ textAlign: 'right' }}>₹{halfAmt.toFixed(2)}</td>
+                        </tr>
+                      </>
+                    );
+                  })()}
                   {printBillData.bill.discount > 0 && (
-                    <tr style={{ color: 'red' }}>
-                      <td>Discount:</td>
-                      <td style={{ textAlign: 'right' }}>-₹{printBillData.bill.discount}</td>
+                    <tr style={{ color: 'green' }}>
+                      <td>Discount{printBillData.bill.discountPct ? ` (${printBillData.bill.discountPct}%)` : ''}:</td>
+                      <td style={{ textAlign: 'right' }}>-₹{printBillData.bill.discount.toFixed(2)}</td>
                     </tr>
                   )}
                   <tr style={{ fontSize: '12px', fontWeight: 'bold', borderTop: '1px solid black' }}>
-                    <td style={{ paddingTop: '4px' }}>Grand Total:</td>
-                    <td style={{ textAlign: 'right', paddingTop: '4px' }}>₹{printBillData.bill.grandTotal}</td>
+                    <td style={{ paddingTop: '4px' }}>GRAND TOTAL:</td>
+                    <td style={{ textAlign: 'right', paddingTop: '4px' }}>₹{printBillData.bill.grandTotal.toFixed(2)}</td>
                   </tr>
                 </tbody>
               </table>
@@ -480,8 +520,12 @@ const Billing: React.FC = () => {
               <div style={{ borderBottom: '1px dashed black', marginBottom: '8px' }} />
 
               <div style={{ textAlign: 'center', fontSize: '9px', marginTop: '10px' }}>
-                <p style={{ margin: '0', fontWeight: 'bold' }}>Payment Paid via: {printBillData.bill.paymentMethod || 'Paid'}</p>
-                <p style={{ margin: '4px 0 0 0', fontStyle: 'italic' }}>Thank you! Visit Again.</p>
+                <p style={{ margin: '0', fontWeight: 'bold' }}>
+                  Payment: {printBillData.bill.paymentMethod === 'UPI' ? 'Paid via UPI' : 
+                             printBillData.bill.paymentMethod === 'Card' ? 'Paid via Card' : 'Paid in Cash'}
+                </p>
+                <p style={{ margin: '6px 0 0 0', fontStyle: 'italic' }}>Thank you! Visit Again. 🙏</p>
+                <p style={{ margin: '2px 0 0 0', fontSize: '8px', color: '#555' }}>Paunikar Saoji Restaurant • {RESTAURANT_PHONE}</p>
               </div>
             </div>
 
@@ -507,7 +551,10 @@ const Billing: React.FC = () => {
                   </tr>
                   <tr>
                     <td>Date/Time:</td>
-                    <td style={{ textAlign: 'right' }}>{printBillData.bill.timestamp}</td>
+                    <td style={{ textAlign: 'right' }}>
+                      {new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })} {' '}
+                      {new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true })}
+                    </td>
                   </tr>
                 </tbody>
               </table>

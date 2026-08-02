@@ -48,6 +48,7 @@ export async function printKOT(order) {
   try {
     const settings = await prisma.settings.findFirst({});
     const ip = settings ? settings.kitchenPrinterIp : '127.0.0.1';
+    const nowIST = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true });
 
     let kot = '';
     kot += CHARS.INIT;
@@ -58,7 +59,7 @@ export async function printKOT(order) {
     kot += CHARS.TEXT_NORMAL;
     kot += `Table: T-${order.tableId}\n`;
     kot += `Order: #${order.id.substring(4, 10)}\n`;
-    kot += `Time: ${order.timestamp || new Date().toLocaleTimeString()}\n`;
+    kot += `Time: ${nowIST}\n`;
     kot += CHARS.TEXT_BOLD_OFF;
     kot += '--------------------------------\n';
     kot += CHARS.ALIGN_LEFT;
@@ -86,9 +87,11 @@ export async function printBillReceipt(bill, order) {
   try {
     const settings = await prisma.settings.findFirst({});
     const ip = settings ? settings.billingPrinterIp : '127.0.0.1';
-    const restName = settings ? settings.restaurantName : 'Paunikar Saoji Family Restaurant';
-    const address = settings ? settings.address : 'Nagpur, Maharashtra';
-    const gstNo = settings ? settings.gstNumber : '27AAAAA1111A1Z1';
+    const restName = settings ? settings.restaurantName : 'Paunikar Saoji Restaurant';
+    const phone = settings?.phone || '+91 98765 43210';
+    const nowIST = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true });
+    const gstPct = bill.gstPct || 18;
+    const halfPct = gstPct / 2;
 
     let receipt = '';
     receipt += CHARS.INIT;
@@ -97,38 +100,47 @@ export async function printBillReceipt(bill, order) {
     receipt += CHARS.TEXT_DOUBLE_SIZE;
     receipt += `${restName}\n`;
     receipt += CHARS.TEXT_NORMAL;
-    receipt += `${address}\n`;
-    receipt += `GSTIN: ${gstNo}\n`;
+    receipt += `Plot no.10 Near Purti Bazar,\n`;
+    receipt += `Manewada Rd, Besa Pipla,\n`;
+    receipt += `Maharashtra 440037\n`;
+    receipt += `Ph: ${phone}\n`;
+    receipt += 'TAX INVOICE (kar bijak)\n';
     receipt += '--------------------------------\n';
     receipt += CHARS.ALIGN_LEFT;
     receipt += `Invoice: #${bill.id ? bill.id.substring(5, 12) : 'PENDING'}\n`;
     receipt += `Table: T-${bill.tableId}\n`;
-    receipt += `Date: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}\n`;
+    receipt += `Date/Time: ${nowIST}\n`;
+    receipt += `Payment: ${bill.paymentMethod || 'Cash'}\n`;
     receipt += '--------------------------------\n';
     
     // Items
     order.items.forEach(item => {
       const lineTotal = item.price * item.quantity;
       receipt += `${item.name}\n`;
-      receipt += `  ${item.quantity} x ₹${item.price} = ₹${lineTotal}\n`;
+      receipt += `  ${item.quantity} x Rs.${item.price} = Rs.${lineTotal}\n`;
     });
     receipt += '--------------------------------\n';
     
     // Totals
     receipt += CHARS.ALIGN_RIGHT;
-    receipt += `Subtotal: ₹${bill.subtotal}\n`;
-    receipt += `GST (5%): ₹${bill.gst}\n`;
+    receipt += `Subtotal: Rs.${bill.subtotal}\n`;
+    if (bill.gst > 0) {
+      const halfAmt = Math.round(bill.gst / 2 * 100) / 100;
+      receipt += `CGST (${halfPct}%): Rs.${halfAmt}\n`;
+      receipt += `SGST (${halfPct}%): Rs.${halfAmt}\n`;
+    }
     if (bill.discount > 0) {
-      receipt += `Discount: -₹${bill.discount}\n`;
+      const discLabel = bill.discountPct ? `Discount (${bill.discountPct}%)` : 'Discount';
+      receipt += `${discLabel}: -Rs.${bill.discount}\n`;
     }
     receipt += CHARS.TEXT_BOLD_ON;
-    receipt += `GRAND TOTAL: ₹${bill.grandTotal}\n`;
+    receipt += `GRAND TOTAL: Rs.${bill.grandTotal}\n`;
     receipt += CHARS.TEXT_BOLD_OFF;
     receipt += '--------------------------------\n';
     
     receipt += CHARS.ALIGN_CENTER;
-    receipt += 'Thank you for dining with us!\n';
-    receipt += 'Please visit again.\n\n\n\n';
+    receipt += 'Thank you! Visit Again.\n';
+    receipt += `${restName}\n\n\n\n`;
     receipt += CHARS.FEED_AND_CUT;
 
     await sendToPrinter(ip, Buffer.from(receipt, 'utf-8'));

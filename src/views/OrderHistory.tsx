@@ -10,7 +10,7 @@ const OrderHistory: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string>('All');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
-  // Filter orders based on search and status
+  // Filter orders based on search and status, sorted newest first
   const filteredOrders = useMemo(() => {
     return orders.filter(order => {
       const waiter = users.find(u => u.id === order.waiterId);
@@ -23,6 +23,9 @@ const OrderHistory: React.FC = () => {
       const statusMatch = statusFilter === 'All' || order.status === statusFilter;
 
       return searchMatch && statusMatch;
+    }).sort((a, b) => {
+      // Sort by id (which includes timestamp) descending — newest first
+      return b.id.localeCompare(a.id);
     });
   }, [orders, searchTerm, statusFilter, users]);
 
@@ -93,6 +96,7 @@ const OrderHistory: React.FC = () => {
                 <th className="p-4 pl-6">Order ID</th>
                 <th className="p-4">Table</th>
                 <th className="p-4">Waiter</th>
+                <th className="p-4">Date</th>
                 <th className="p-4">Time</th>
                 <th className="p-4">Status</th>
                 <th className="p-4 text-right pr-6">Total Amount</th>
@@ -102,7 +106,7 @@ const OrderHistory: React.FC = () => {
             <tbody className="divide-y divide-slate-100 text-xs">
               {filteredOrders.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="p-12 text-center text-slate-450 font-medium">
+                  <td colSpan={8} className="p-12 text-center text-slate-450 font-medium">
                     No orders matching the current filter options.
                   </td>
                 </tr>
@@ -114,6 +118,7 @@ const OrderHistory: React.FC = () => {
                       <td className="p-4 pl-6 font-mono font-bold text-slate-600">#{order.id.substring(4, 12)}</td>
                       <td className="p-4 font-bold text-slate-800">Table {order.tableId}</td>
                       <td className="p-4 text-slate-605 font-medium">{waiterName}</td>
+                      <td className="p-4 text-slate-500 font-mono text-[10px]">{order.date || '—'}</td>
                       <td className="p-4 text-slate-505 font-mono">{order.timestamp}</td>
                       <td className="p-4">
                         <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase border ${getStatusColor(order.status)}`}>
@@ -175,10 +180,14 @@ const OrderHistory: React.FC = () => {
                   </span>
                 </div>
                 <div className="mt-2">
-                  <span className="text-slate-450 text-[10px] block">Order Timestamp</span>
-                  <span className="font-mono font-bold text-slate-700">{selectedOrder.timestamp}</span>
+                  <span className="text-slate-450 text-[10px] block">Date</span>
+                  <span className="font-mono font-bold text-slate-700">{selectedOrder.date || '—'}</span>
                 </div>
                 <div className="mt-2">
+                  <span className="text-slate-450 text-[10px] block">Time</span>
+                  <span className="font-mono font-bold text-slate-700">{selectedOrder.timestamp}</span>
+                </div>
+                <div className="mt-2 col-span-2">
                   <span className="text-slate-450 text-[10px] block">Order Status</span>
                   <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase border inline-block mt-0.5 ${getStatusColor(selectedOrder.status)}`}>
                     {selectedOrder.status}
