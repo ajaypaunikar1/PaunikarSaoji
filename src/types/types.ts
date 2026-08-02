@@ -35,6 +35,7 @@ export interface User {
   performance: number; // rating 1 to 5
   overtimeHours: number;
   password?: string;
+  isFirstLogin?: boolean;
 }
 
 export interface Table {

@@ -20,6 +20,7 @@ model User {
   salary         Float
   performance    Float    @default(5)
   overtimeHours  Float    @default(0)
+  isFirstLogin   Boolean  @default(true)
   branchId       String   @default("branch-main")
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt

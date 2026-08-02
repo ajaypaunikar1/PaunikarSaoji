@@ -52,7 +52,8 @@ router.post('/login', async (req, res) => {
         zone: user.zone,
         salary: user.salary,
         performance: user.performance,
-        overtimeHours: user.overtimeHours
+        overtimeHours: user.overtimeHours,
+        isFirstLogin: user.isFirstLogin
       }
     });
 
@@ -91,12 +92,15 @@ router.post('/change-password', protect, async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(newPassword, salt);
 
-    await prisma.user.update({
+    const updatedUser = await prisma.user.update({
       where: { id: req.user.id },
-      data: { password: hashedPassword }
+      data: { 
+        password: hashedPassword,
+        isFirstLogin: false
+      }
     });
 
-    res.json({ success: true, message: 'Password updated successfully' });
+    res.json({ success: true, message: 'Password updated successfully', user: updatedUser });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

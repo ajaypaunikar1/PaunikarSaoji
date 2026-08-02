@@ -720,16 +720,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             // Load fresh collections
             await loadDatabaseData();
 
-            // Auto clock-in waiter
-            if (response.user.role === 'Waiter') {
-              fetch(`${API_BASE}/staff/attendance/clock-in`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${response.token}`
-                }
-              });
-            }
             addAuditLog(`Logged in as ${response.user.role}`);
           } else {
             toast.error(response.message || 'Login failed');

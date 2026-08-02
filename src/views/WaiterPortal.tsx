@@ -3,7 +3,8 @@ import { useApp } from '../context/AppContext';
 import { translations } from '../translations/translations';
 import { 
   UtensilsCrossed, CalendarRange, UserCheck, 
-  MapPin, Clock, LogOut, CheckCircle2, User, Trash
+  MapPin, Clock, LogOut, CheckCircle2, User, Trash,
+  ChefHat, Key, Eye, EyeOff, Lock, Play, CheckCheck, Sparkles
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Table, PortionType } from '../types/types';
@@ -14,18 +15,62 @@ const WaiterPortal: React.FC = () => {
   const { 
     currentUser, logout, language, changeLanguage, tables, menuItems, 
     addOrder, attendance, markAttendance, clockOut, leaves, submitLeave,
-    payroll, orders, generateBill, updateOrder, systemStatus
+    payroll, orders, generateBill, updateOrder, systemStatus, updateOrderStatus
   } = useApp();
   const router = useRouter();
   const t = translations[language];
 
   // Navigation tab
-  const [activeTab, setActiveTab] = useState<'tables' | 'attendance' | 'leaves' | 'profile'>('tables');
+  const [activeTab, setActiveTab] = useState<'tables' | 'kds' | 'attendance' | 'leaves' | 'profile'>('tables');
 
   // Ordering workflow
   const [orderingTable, setOrderingTable] = useState<Table | null>(null);
   const [basket, setBasket] = useState<{ id: string; name: string; portion: PortionType; price: number; quantity: number; specialNotes: string }[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<'All' | 'Vegetarian' | 'Egg Curry' | 'Breads' | 'Rice' | 'Papad' | 'Starters' | 'Curries' | 'Handi Dishes'>('All');
+
+  // Password change state
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [pwLoading, setPwLoading] = useState(false);
+
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPassword || newPassword.length < 6) {
+      toast.error('New password must be at least 6 characters');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error('Passwords do not match');
+      return;
+    }
+
+    setPwLoading(true);
+    try {
+      const token = localStorage.getItem('rms_token');
+      const res = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ currentPassword, newPassword })
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success('Password updated successfully');
+        setCurrentPassword('');
+        setNewPassword('');
+        setConfirmPassword('');
+      } else {
+        toast.error(data.message || 'Failed to update password');
+      }
+    } catch (err) {
+      toast.error('Network error. Please try again.');
+    } finally {
+      setPwLoading(false);
+    }
+  };
 
   // Draft persistence key
   const DRAFT_KEY = `rms_draft_waiter_${currentUser?.id || 'u5'}`;
@@ -203,16 +248,16 @@ const WaiterPortal: React.FC = () => {
     <div className="min-h-screen bg-[#F7F7F8] text-slate-800 flex flex-col justify-between select-none">
       
       {/* Mobile Top App Bar */}
-      <header className="px-5 py-4 bg-white border-b border-slate-200 flex items-center justify-between sticky top-0 z-30 shadow-xs">
+      <header className="px-5 py-4 bg-[#1B1B2E] border-b border-white/10 flex items-center justify-between sticky top-0 z-30 shadow-md text-white">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white font-bold text-xs">
+          <div className="w-8 h-8 rounded-xl bg-indigo-650 flex items-center justify-center text-white font-black text-xs shadow-lg shadow-indigo-900/40">
             PS
           </div>
           <div>
-            <h1 className="text-xs font-black text-slate-800 m-0 tracking-tight">{currentUser?.name}</h1>
-            <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1">
+            <h1 className="text-xs font-black text-white m-0 tracking-tight">{currentUser?.name}</h1>
+            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1">
               <MapPin size={9} /> Zone {currentUser?.zone} &bull; 
-              <span className={attendanceToday ? "text-emerald-600 font-extrabold" : "text-rose-600 font-extrabold"}>
+              <span className={attendanceToday ? "text-emerald-455 font-extrabold" : "text-rose-400 font-extrabold"}>
                 {attendanceToday ? "Clocked In" : "Not Clocked In"}
               </span>
             </span>
@@ -221,16 +266,16 @@ const WaiterPortal: React.FC = () => {
 
         <div className="flex items-center gap-2">
           {/* System Status Indicators */}
-          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200/80 px-2 py-1 rounded-lg text-[8px] font-bold select-none h-7">
+          <div className="flex items-center gap-1.5 bg-white/5 border border-white/10 px-2 py-1 rounded-lg text-[8px] font-bold select-none h-7 text-slate-350">
             <span className={`w-1.5 h-1.5 rounded-full ${systemStatus.server === 'online' ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
             <span className={`w-1.5 h-1.5 rounded-full ${systemStatus.database === 'connected' ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
-            <span className="text-slate-450 uppercase tracking-wider">POS Status</span>
+            <span className="text-slate-400 uppercase tracking-wider">POS Status</span>
           </div>
 
           {/* Lang Toggle */}
           <button 
             onClick={() => changeLanguage(language === 'en' ? 'mr' : 'en')}
-            className="text-[10px] font-bold px-2 py-1 bg-slate-50 border border-slate-200 rounded cursor-pointer"
+            className="text-[10px] font-bold px-2 py-1 bg-white/10 hover:bg-white/20 border border-white/10 text-white rounded cursor-pointer transition"
           >
             {language === 'en' ? 'मराठी' : 'EN'}
           </button>
@@ -240,7 +285,7 @@ const WaiterPortal: React.FC = () => {
               logout();
               router.push('/login');
             }}
-            className="p-1 rounded bg-rose-50 border border-rose-200 text-rose-600 cursor-pointer hover:bg-rose-100"
+            className="p-1 rounded bg-rose-500/20 border border-rose-500/30 text-rose-400 cursor-pointer hover:bg-rose-500/40"
           >
             <LogOut size={14} />
           </button>
@@ -580,6 +625,107 @@ const WaiterPortal: React.FC = () => {
             </motion.div>
           )}
 
+          {/* TAB: KDS */}
+          {activeTab === 'kds' && (
+            <motion.div 
+              key="kds" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="space-y-4"
+            >
+              <div className="flex justify-between items-center">
+                <span className="text-xs font-black uppercase tracking-wider text-slate-500">KDS Active Queue</span>
+                <span className="text-[10px] text-slate-400 font-bold">
+                  {orders.filter(o => o.status !== 'Served').length} Orders
+                </span>
+              </div>
+
+              {orders.filter(o => o.status !== 'Served').length === 0 ? (
+                <div className="text-center py-10 p-6 rounded-3xl bg-white border border-slate-200 shadow-sm flex flex-col items-center gap-2">
+                  <ChefHat size={36} className="text-slate-400" />
+                  <p className="text-xs text-slate-505 font-medium">No active preparation orders!</p>
+                </div>
+              ) : (
+                <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
+                  {orders.filter(o => o.status !== 'Served').map(order => {
+                    return (
+                      <div 
+                        key={order.id} 
+                        className={`p-4 bg-white border border-slate-200 rounded-2xl shadow-sm space-y-3 relative overflow-hidden`}
+                        style={{ borderTopWidth: '4px', borderTopColor: order.status === 'Pending' ? '#ef4444' : order.status === 'Preparing' ? '#f59e0b' : '#06b6d4' }}
+                      >
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <span className="text-xs font-black text-slate-800 font-mono">Table {order.tableId}</span>
+                            <span className="text-[9px] font-mono text-slate-400 block mt-0.5">#{order.id.substring(4, 8)}</span>
+                          </div>
+                          <span className={`text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded border ${
+                            order.status === 'Pending' 
+                              ? 'bg-rose-100 border-rose-200 text-rose-700' 
+                              : order.status === 'Preparing' 
+                                ? 'bg-amber-100 border-amber-200 text-amber-700 animate-pulse'
+                                : 'bg-cyan-100 border-cyan-200 text-cyan-700'
+                          }`}>
+                            {order.status}
+                          </span>
+                        </div>
+
+                        {/* Items */}
+                        <div className="space-y-1.5 text-xs">
+                          {order.items.filter(item => item.status !== 'Served').map((item, idx) => (
+                            <div key={idx} className="flex justify-between items-center text-xs">
+                              <div>
+                                <span className="font-bold text-slate-800">{item.quantity}x {item.name}</span>
+                                <span className="ml-1.5 text-[8px] font-bold uppercase bg-slate-100 border border-slate-150 px-1.5 py-0.2 rounded text-slate-500">
+                                  {item.portion}
+                                </span>
+                                {item.specialNotes && (
+                                  <p className="text-[9px] text-amber-600 font-medium italic m-0 mt-0.5">"{item.specialNotes}"</p>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Action buttons */}
+                        <div className="flex gap-2 pt-2 border-t border-slate-100">
+                          <button
+                            onClick={() => {
+                              let nextStatus: OrderStatus = 'Served';
+                              if (order.status === 'Pending') nextStatus = 'Preparing';
+                              else if (order.status === 'Preparing') nextStatus = 'Ready';
+                              else if (order.status === 'Ready') nextStatus = 'Served';
+
+                              const updatedItems = order.items.map(item => ({
+                                ...item,
+                                status: (item.status === 'Pending' || item.status === order.status) ? nextStatus : item.status
+                              }));
+                              updateOrder(order.id, { items: updatedItems });
+                              updateOrderStatus(order.id, nextStatus);
+                              toast.success(`Table ${order.tableId} marked as ${nextStatus}`);
+                            }}
+                            className={`w-full py-2 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer text-white transition ${
+                              order.status === 'Pending'
+                                ? 'bg-rose-500 hover:bg-rose-600'
+                                : order.status === 'Preparing'
+                                  ? 'bg-amber-500 hover:bg-amber-600 !text-slate-950'
+                                  : 'bg-cyan-500 hover:bg-cyan-600'
+                            }`}
+                          >
+                            {order.status === 'Pending' && <Play size={10} />}
+                            {order.status === 'Preparing' && <CheckCheck size={10} />}
+                            {order.status === 'Ready' && <Sparkles size={10} />}
+                            <span>
+                              {order.status === 'Pending' ? 'Start Preparing' : order.status === 'Preparing' ? 'Mark Ready' : 'Mark Served'}
+                            </span>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </motion.div>
+          )}
+
           {/* TAB: ATTENDANCE */}
           {activeTab === 'attendance' && (
             <motion.div 
@@ -826,6 +972,20 @@ const WaiterPortal: React.FC = () => {
         >
           <UtensilsCrossed size={18} />
           <span className="text-[9px] font-bold uppercase tracking-wider">{t.tables}</span>
+        </button>
+
+        {/* Tab 5: KDS Queue */}
+        <button 
+          onClick={() => {
+            setActiveTab('kds');
+            setOrderingTable(null);
+          }}
+          className={`p-2.5 rounded-xl flex flex-col items-center gap-0.5 cursor-pointer transition-all ${
+            activeTab === 'kds' ? 'text-indigo-400 scale-105' : 'text-slate-400 hover:text-white'
+          }`}
+        >
+          <ChefHat size={18} />
+          <span className="text-[9px] font-bold uppercase tracking-wider font-sans">KDS</span>
         </button>
 
         {/* Tab 2: Attendance */}
