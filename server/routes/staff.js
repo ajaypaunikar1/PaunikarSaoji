@@ -349,8 +349,8 @@ router.post('/attendance/manual', protect, authorize('SuperAdmin', 'Manager'), a
         where: { id: existing.id },
         data: {
           status,
-          clockIn: clockIn !== undefined ? clockIn : undefined,
-          clockOut: clockOut !== undefined ? clockOut : undefined
+          clockIn: status === 'Absent' ? '' : (clockIn !== undefined ? clockIn : undefined),
+          clockOut: status === 'Absent' ? '' : (clockOut !== undefined ? clockOut : undefined)
         }
       });
     } else {
@@ -359,8 +359,8 @@ router.post('/attendance/manual', protect, authorize('SuperAdmin', 'Manager'), a
           id: `att-${Date.now()}`,
           employeeId,
           date,
-          clockIn: clockIn || '09:00:00',
-          clockOut: clockOut || '',
+          clockIn: status === 'Absent' ? '' : (clockIn || '09:00:00'),
+          clockOut: status === 'Absent' ? '' : (clockOut || ''),
           status
         }
       });

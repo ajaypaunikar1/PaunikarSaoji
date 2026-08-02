@@ -72,6 +72,7 @@ const WaiterPortal: React.FC = () => {
   // Attendance Clock-in State
   const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
   const attendanceToday = attendance.find(a => a.employeeId === currentUser?.id && a.date === todayStr);
+  const isPresent = attendanceToday && (attendanceToday.status === 'Present' || attendanceToday.status === 'Late');
 
   // Filter tables assigned to waiter zone or show all
   const filteredTables = tables.filter(tbl => currentUser?.zone === 'All' || tbl.zone === currentUser?.zone);
@@ -80,6 +81,10 @@ const WaiterPortal: React.FC = () => {
   const handleAddToBasket = (menuItem: any, portion: PortionType) => {
     if (currentUser?.status === 'Disabled') {
       toast.error('Your account is turned off. You cannot place orders.');
+      return;
+    }
+    if (!isPresent) {
+      toast.error('Order capabilities locked. You must Clock In first under the Hours tab.');
       return;
     }
     const price = portion === 'Half' 
@@ -112,6 +117,10 @@ const WaiterPortal: React.FC = () => {
       toast.error('Your account is turned off. You cannot modify orders.');
       return;
     }
+    if (!isPresent) {
+      toast.error('Order capabilities locked. You must Clock In first under the Hours tab.');
+      return;
+    }
     setBasket(prev => prev.map((item, idx) => {
       if (idx === index) {
         const newQty = item.quantity + amt;
@@ -130,6 +139,10 @@ const WaiterPortal: React.FC = () => {
     if (!orderingTable || basket.length === 0) return;
     if (currentUser?.status === 'Disabled') {
       toast.error('Your account is turned off. You cannot place orders.');
+      return;
+    }
+    if (!isPresent) {
+      toast.error('Order capabilities locked. You must Clock In first under the Hours tab.');
       return;
     }
 
@@ -242,6 +255,12 @@ const WaiterPortal: React.FC = () => {
             <span>Account Turned Off: Ordering is disabled. You can view all information but cannot place or modify orders.</span>
           </div>
         )}
+        {!isPresent && currentUser?.status !== 'Disabled' && (
+          <div className="mb-4 p-3 bg-amber-50 border border-amber-200 text-amber-850 text-[11px] font-black rounded-2xl flex items-center gap-2 shadow-xs">
+            <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping shrink-0" />
+            <span>Order Capabilities Locked: You must Clock In under the Hours tab to mark yourself Present first.</span>
+          </div>
+        )}
         <AnimatePresence mode="wait">
           
           {/* TAB: TABLES */}
@@ -270,6 +289,10 @@ const WaiterPortal: React.FC = () => {
                               toast.error('Account is disabled. Cannot take orders.');
                               return;
                             }
+                            if (!isPresent) {
+                              toast.error('Order capabilities locked. You must Clock In first under the Hours tab.');
+                              return;
+                            }
                             if (tbl.status === 'Available' || tbl.status === 'Occupied' || tbl.status === 'Billing') {
                               setOrderingTable(tbl);
                               setBasket([]);
@@ -280,13 +303,15 @@ const WaiterPortal: React.FC = () => {
                         className={`relative p-4 rounded-2xl border flex flex-col justify-between h-28 cursor-pointer shadow-sm transition duration-200 hover:scale-[1.01] ${
                             currentUser?.status === 'Disabled'
                               ? 'bg-slate-100 border-slate-200 text-slate-400 opacity-60 cursor-not-allowed'
-                              : ord?.status === 'Ready'
-                                ? 'bg-teal-50 border-teal-300 text-teal-900 ring-2 ring-teal-400/40'
-                                : tbl.status === 'Occupied' 
-                                  ? 'bg-amber-50 border-amber-200 text-amber-900' 
-                                  : tbl.status === 'Billing'
-                                    ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
-                                    : 'bg-white border-slate-200 text-slate-700 hover:border-slate-350'
+                              : !isPresent
+                                ? 'bg-slate-100 border-slate-200 text-slate-400 opacity-70 cursor-not-allowed'
+                                : ord?.status === 'Ready'
+                                  ? 'bg-teal-50 border-teal-300 text-teal-900 ring-2 ring-teal-400/40'
+                                  : tbl.status === 'Occupied' 
+                                    ? 'bg-amber-50 border-amber-200 text-amber-900' 
+                                    : tbl.status === 'Billing'
+                                      ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                                      : 'bg-white border-slate-200 text-slate-700 hover:border-slate-350'
                           }`}
                         >
                           <div className="flex justify-between items-center">
