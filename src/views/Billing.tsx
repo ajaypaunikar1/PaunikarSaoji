@@ -79,8 +79,10 @@ const Billing: React.FC = () => {
   const upiString = useMemo(() => {
     if (!activeBill) return '';
     const amount = activeBill.grandTotal;
-    return `upi://pay?pa=restaurant@upi&pn=PaunikarSaoji&am=${amount}&cu=INR&tn=Table${activeBill.tableId}Order`;
-  }, [activeBill]);
+    const upiId = settings?.upiId || 'restaurant@upi';
+    const restName = encodeURIComponent(settings?.restaurantName || 'PaunikarSaoji');
+    return `upi://pay?pa=${upiId}&pn=${restName}&am=${amount}&cu=INR&tn=Table${activeBill.tableId}Order`;
+  }, [activeBill, settings]);
 
   // Submit payment
   const handleProcessPayment = async () => {
@@ -210,7 +212,7 @@ const Billing: React.FC = () => {
                       setSelectedTableId(tbl.id);
                       setDiscountPct(0);
                       setCustomGstPct(settings?.gstEnabled ? 18 : 0);
-                      setPaymentMethod(null);
+                      setPaymentMethod('Cash');
                     }}
                     className={`p-4 rounded-2xl border transition duration-300 flex justify-between items-center cursor-pointer ${
                       isSelected 
@@ -367,6 +369,47 @@ const Billing: React.FC = () => {
                     </div>
                   </div>
                 </div>
+
+                {/* Payment Method Selector */}
+                <div className="space-y-2.5">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Payment Method / पेमेंट पद्धत</span>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      onClick={() => setPaymentMethod('Cash')}
+                      className={`py-3 px-4 rounded-xl border-2 font-bold text-xs uppercase tracking-wide flex items-center justify-center gap-2 cursor-pointer transition duration-200 ${
+                        paymentMethod === 'Cash'
+                          ? 'border-emerald-600 bg-emerald-50 text-emerald-950 shadow-xs'
+                          : 'border-slate-200 hover:border-slate-350 text-slate-650 bg-white'
+                      }`}
+                    >
+                      <Wallet size={15} className="text-emerald-650" />
+                      <span>Cash / रोख</span>
+                    </button>
+
+                    <button
+                      onClick={() => setPaymentMethod('UPI')}
+                      className={`py-3 px-4 rounded-xl border-2 font-bold text-xs uppercase tracking-wide flex items-center justify-center gap-2 cursor-pointer transition duration-200 ${
+                        paymentMethod === 'UPI'
+                          ? 'border-indigo-600 bg-indigo-50 text-indigo-950 shadow-xs'
+                          : 'border-slate-200 hover:border-slate-350 text-slate-650 bg-white'
+                      }`}
+                    >
+                      <Smartphone size={15} className="text-indigo-600" />
+                      <span>UPI / ऑनलाईन</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* UPI scan QR code */}
+                {paymentMethod === 'UPI' && upiString && (
+                  <div className="p-4 rounded-2xl bg-indigo-50/40 border border-indigo-100 flex flex-col items-center gap-2.5 transition">
+                    <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-widest">Scan QR to Pay</span>
+                    <div className="bg-white p-3 rounded-2xl border border-indigo-150 shadow-inner">
+                      <QRCodeSVG value={upiString} size={110} />
+                    </div>
+                    <span className="text-xs font-black text-slate-800 font-mono">₹{activeBill.grandTotal}</span>
+                  </div>
+                )}
 
                 {/* Payment & Checkout Buttons */}
                 <div className="pt-2 grid grid-cols-2 gap-3">
