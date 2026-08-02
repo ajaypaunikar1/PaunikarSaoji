@@ -161,6 +161,7 @@ model Settings {
   id                                   String   @id
   restaurantName                       String
   address                              String
+  phone                                String   @default("")
   gstNumber                            String
   upiId                                String   @default("restaurant@upi")
   zones                                Json     @default("[\"A\", \"B\", \"C\"]")

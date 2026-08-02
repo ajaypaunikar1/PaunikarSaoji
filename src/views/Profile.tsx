@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import { Shield, Settings as SettingsIcon, Save, Key, User, Eye, EyeOff } from 'lucide-react';
+import { Shield, Settings as SettingsIcon, Save, Key, User, Eye, EyeOff, Store, Phone } from 'lucide-react';
 import { toast } from 'sonner';
 
 const Profile: React.FC = () => {
@@ -9,7 +9,27 @@ const Profile: React.FC = () => {
   // Settings States
   const [cancellationApproval, setCancellationApproval] = useState(settings?.cancellationApproval || false);
   const [gstEnabled, setGstEnabled] = useState(settings?.gstEnabled || false);
-  
+
+  // Restaurant Info States (from DB settings, fully editable)
+  const [restaurantName, setRestaurantName] = useState(settings?.restaurantName || '');
+  const [address, setAddress] = useState(settings?.address || '');
+  const [phone, setPhone] = useState(settings?.phone || '');
+  const [gstNumber, setGstNumber] = useState(settings?.gstNumber || '');
+  const [upiId, setUpiId] = useState(settings?.upiId || '');
+
+  // Sync restaurant info when settings load from DB
+  useEffect(() => {
+    if (settings) {
+      setRestaurantName(settings.restaurantName || '');
+      setAddress(settings.address || '');
+      setPhone(settings.phone || '');
+      setGstNumber(settings.gstNumber || '');
+      setUpiId(settings.upiId || '');
+      setCancellationApproval(settings.cancellationApproval || false);
+      setGstEnabled(settings.gstEnabled || false);
+    }
+  }, [settings]);
+
   // Change Password States
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -63,11 +83,16 @@ const Profile: React.FC = () => {
   const handleSaveSettings = async () => {
     try {
       await updateSettings({
+        restaurantName,
+        address,
+        phone,
+        gstNumber,
+        upiId,
         cancellationApproval,
         gstEnabled,
         rbac: rbacConfig
       });
-      toast.success('Admin settings saved successfully');
+      toast.success('Settings saved successfully');
     } catch (e) {
       toast.error('Failed to save settings');
     }
@@ -213,6 +238,81 @@ const Profile: React.FC = () => {
           
           {isAdmin && (
             <>
+              {/* Restaurant Info Card */}
+              <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <Store size={18} className="text-emerald-600" />
+                    <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Restaurant Information</h3>
+                  </div>
+                  <button onClick={handleSaveSettings} className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition shadow-sm cursor-pointer">
+                    <Save size={14} /> Save All
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                  <div className="md:col-span-2">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Restaurant Name</label>
+                    <input
+                      type="text"
+                      value={restaurantName}
+                      onChange={e => setRestaurantName(e.target.value)}
+                      placeholder="e.g. Paunikar Saoji Restaurant"
+                      className="w-full bg-slate-50 border border-slate-200 text-slate-800 p-2.5 rounded-xl focus:outline-none focus:border-emerald-400 transition"
+                    />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Address (shown on bill)</label>
+                    <textarea
+                      value={address}
+                      onChange={e => setAddress(e.target.value)}
+                      rows={2}
+                      placeholder="e.g. Plot no.10 Near Purti Bazar, Manewada Rd, Besa Pipla, Maharashtra 440037"
+                      className="w-full bg-slate-50 border border-slate-200 text-slate-800 p-2.5 rounded-xl focus:outline-none focus:border-emerald-400 transition resize-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">Phone Number</label>
+                    <div className="relative">
+                      <span className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-slate-400">
+                        <Phone size={12} />
+                      </span>
+                      <input
+                        type="tel"
+                        value={phone}
+                        onChange={e => setPhone(e.target.value)}
+                        placeholder="+91 98765 43210"
+                        className="w-full bg-slate-50 border border-slate-200 text-slate-800 p-2.5 pl-8 rounded-xl focus:outline-none focus:border-emerald-400 transition"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">GST Number (optional)</label>
+                    <input
+                      type="text"
+                      value={gstNumber}
+                      onChange={e => setGstNumber(e.target.value)}
+                      placeholder="e.g. 27AAAAA1111A1Z1 (leave blank to hide)"
+                      className="w-full bg-slate-50 border border-slate-200 text-slate-800 p-2.5 rounded-xl focus:outline-none focus:border-emerald-400 transition font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">UPI ID</label>
+                    <input
+                      type="text"
+                      value={upiId}
+                      onChange={e => setUpiId(e.target.value)}
+                      placeholder="e.g. restaurant@upi"
+                      className="w-full bg-slate-50 border border-slate-200 text-slate-800 p-2.5 rounded-xl focus:outline-none focus:border-emerald-400 transition font-mono"
+                    />
+                  </div>
+                </div>
+              </div>
+
               {/* General App Toggles */}
               <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
                 <div className="flex items-center gap-2 mb-4">

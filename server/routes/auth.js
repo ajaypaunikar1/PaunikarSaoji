@@ -2,7 +2,7 @@ import express from 'express';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import prisma from '../config/db.js';
-import { authenticateToken } from '../middleware/auth.js';
+import { protect } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -63,7 +63,7 @@ router.post('/login', async (req, res) => {
 
 // @route   POST /api/auth/change-password
 // @desc    Change authenticated user's password
-router.post('/change-password', authenticateToken, async (req, res) => {
+router.post('/change-password', protect, async (req, res) => {
   const { currentPassword, newPassword } = req.body;
 
   if (!newPassword || newPassword.length < 6) {

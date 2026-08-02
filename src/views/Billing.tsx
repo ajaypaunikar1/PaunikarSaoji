@@ -10,8 +10,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import type { Bill, PaymentMethod } from '../types/types';
 import { toast } from 'sonner';
 
-const RESTAURANT_PHONE = '+91 98765 43210'; // Update with real number
-
 const Billing: React.FC = () => {
   const { 
     tables, orders, generateBill, payBill, bills, language,
@@ -409,10 +407,11 @@ const Billing: React.FC = () => {
                 <div style={{ marginBottom: '6px' }}>
                   <img src="/favicon.svg" alt="Logo" style={{ width: '40px', height: '40px', margin: '0 auto', display: 'block' }} />
                 </div>
-                <h1 style={{ margin: '0', fontSize: '15px', fontWeight: 'bold', letterSpacing: '0.5px' }}>PAUNIKAR SAOJI RESTAURANT</h1>
-                <p style={{ margin: '3px 0 0 0', fontSize: '9px', lineHeight: '1.4' }}>Plot no.10 Near Purti Bazar, Manewada Rd,</p>
-                <p style={{ margin: '0', fontSize: '9px', lineHeight: '1.4' }}>Besa Pipla, Maharashtra 440037</p>
-                <p style={{ margin: '2px 0 0 0', fontSize: '9px', fontWeight: 'bold' }}>📞 {RESTAURANT_PHONE}</p>
+                <h1 style={{ margin: '0', fontSize: '15px', fontWeight: 'bold', letterSpacing: '0.5px' }}>{settings?.restaurantName || 'Paunikar Saoji Restaurant'}</h1>
+                <p style={{ margin: '3px 0 0 0', fontSize: '9px', lineHeight: '1.4', whiteSpace: 'pre-line' }}>{settings?.address || ''}</p>
+                {settings?.phone && (
+                  <p style={{ margin: '2px 0 0 0', fontSize: '9px', fontWeight: 'bold' }}>📞 {settings.phone}</p>
+                )}
                 <h3 style={{ margin: '6px 0 0 0', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '1px' }}>TAX INVOICE (कर बीजक)</h3>
               </div>
 
@@ -525,7 +524,9 @@ const Billing: React.FC = () => {
                              printBillData.bill.paymentMethod === 'Card' ? 'Paid via Card' : 'Paid in Cash'}
                 </p>
                 <p style={{ margin: '6px 0 0 0', fontStyle: 'italic' }}>Thank you! Visit Again. 🙏</p>
-                <p style={{ margin: '2px 0 0 0', fontSize: '8px', color: '#555' }}>Paunikar Saoji Restaurant • {RESTAURANT_PHONE}</p>
+                {settings?.phone && (
+                  <p style={{ margin: '2px 0 0 0', fontSize: '8px', color: '#555' }}>{settings.restaurantName || 'Paunikar Saoji Restaurant'} • {settings.phone}</p>
+                )}
               </div>
             </div>
 

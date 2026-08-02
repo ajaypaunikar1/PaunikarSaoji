@@ -73,7 +73,8 @@ export async function printKOT(order) {
     });
     kot += '--------------------------------\n';
     kot += CHARS.ALIGN_CENTER;
-    kot += 'PAUNIKAR SAOJI KITCHEN\n\n\n\n';
+    const restName = settings ? settings.restaurantName : 'Paunikar Saoji Restaurant';
+    kot += `${restName} KITCHEN\n\n\n\n`;
     kot += CHARS.FEED_AND_CUT;
 
     await sendToPrinter(ip, Buffer.from(kot, 'utf-8'));
@@ -87,8 +88,9 @@ export async function printBillReceipt(bill, order) {
   try {
     const settings = await prisma.settings.findFirst({});
     const ip = settings ? settings.billingPrinterIp : '127.0.0.1';
-    const restName = settings ? settings.restaurantName : 'Paunikar Saoji Restaurant';
-    const phone = settings?.phone || '+91 98765 43210';
+    const restName = settings?.restaurantName || 'Paunikar Saoji Restaurant';
+    const address = settings?.address || '';
+    const phone = settings?.phone || '';
     const nowIST = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true });
     const gstPct = bill.gstPct || 18;
     const halfPct = gstPct / 2;
@@ -100,10 +102,8 @@ export async function printBillReceipt(bill, order) {
     receipt += CHARS.TEXT_DOUBLE_SIZE;
     receipt += `${restName}\n`;
     receipt += CHARS.TEXT_NORMAL;
-    receipt += `Plot no.10 Near Purti Bazar,\n`;
-    receipt += `Manewada Rd, Besa Pipla,\n`;
-    receipt += `Maharashtra 440037\n`;
-    receipt += `Ph: ${phone}\n`;
+    if (address) receipt += `${address}\n`;
+    if (phone) receipt += `Ph: ${phone}\n`;
     receipt += 'TAX INVOICE (kar bijak)\n';
     receipt += '--------------------------------\n';
     receipt += CHARS.ALIGN_LEFT;

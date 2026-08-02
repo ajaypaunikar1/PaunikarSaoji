@@ -70,9 +70,10 @@ app.get('/api/settings', async (req, res) => {
       settings = await prisma.settings.create({
         data: {
           id: 'settings-main',
-          restaurantName: 'Paunikar Saoji Family Restaurant',
-          address: 'Nagpur, Maharashtra',
-          gstNumber: '27AAAAA1111A1Z1',
+          restaurantName: 'Paunikar Saoji Restaurant',
+          address: 'Plot no.10 Near Purti Bazar, Manewada Rd, Besa Pipla, Maharashtra 440037',
+          phone: '',
+          gstNumber: '',
           upiId: 'restaurant@upi',
           zones: ['A', 'B', 'C'],
           mergedGroups: [],
@@ -95,9 +96,10 @@ app.put('/api/settings', async (req, res) => {
       update: updates,
       create: {
         id: 'settings-main',
-        restaurantName: updates.restaurantName || 'Paunikar Saoji Family Restaurant',
-        address: updates.address || 'Nagpur, Maharashtra',
-        gstNumber: updates.gstNumber || '27AAAAA1111A1Z1',
+        restaurantName: updates.restaurantName || 'Paunikar Saoji Restaurant',
+        address: updates.address || 'Plot no.10 Near Purti Bazar, Manewada Rd, Besa Pipla, Maharashtra 440037',
+        phone: updates.phone || '',
+        gstNumber: updates.gstNumber || '',
         upiId: updates.upiId || 'restaurant@upi',
         zones: updates.zones || ['A', 'B', 'C'],
         mergedGroups: updates.mergedGroups || [],
