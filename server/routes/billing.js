@@ -32,17 +32,32 @@ router.get('/pending-bills', async (req, res) => {
 // @route   POST /api/billing/generate
 // @desc    Generate tax invoice bill
 router.post('/generate', protect, async (req, res) => {
-  const { tableId, discount, gstPct = 5 } = req.body;
+  const { tableId, discount, gstPct = 5, orderId, isParcel } = req.body;
 
   try {
-    const table = await prisma.table.findUnique({ where: { id: Number(tableId) } });
-    if (!table || !table.orderId) {
-      return res.status(400).json({ success: false, message: 'Table has no active order' });
-    }
+    const parcel = !!isParcel;
 
-    const order = await prisma.order.findUnique({ where: { id: table.orderId } });
-    if (!order) {
-      return res.status(404).json({ success: false, message: 'Order not found' });
+    let order;
+    let billTableId;
+    if (parcel) {
+      if (!orderId) {
+        return res.status(400).json({ success: false, message: 'orderId is required for parcel bills' });
+      }
+      order = await prisma.order.findUnique({ where: { id: orderId } });
+      if (!order) {
+        return res.status(404).json({ success: false, message: 'Order not found' });
+      }
+      billTableId = 0;
+    } else {
+      const table = await prisma.table.findUnique({ where: { id: Number(tableId) } });
+      if (!table || !table.orderId) {
+        return res.status(400).json({ success: false, message: 'Table has no active order' });
+      }
+      order = await prisma.order.findUnique({ where: { id: table.orderId } });
+      if (!order) {
+        return res.status(404).json({ success: false, message: 'Order not found' });
+      }
+      billTableId = Number(tableId);
     }
 
     // Calculations
@@ -73,11 +88,12 @@ router.post('/generate', protect, async (req, res) => {
         data: {
           id: `bill-${Date.now()}`,
           orderId: order.id,
-          tableId: Number(tableId),
+          tableId: billTableId,
           subtotal,
           gst,
           discount: discountVal,
           grandTotal,
+          isParcel: parcel,
           paymentStatus: 'Pending',
           timestamp: new Date().toLocaleTimeString()
         }
@@ -87,16 +103,18 @@ router.post('/generate', protect, async (req, res) => {
     // Print Receipt to Counter Printer
     printBillReceipt(newBill, order);
 
-    // Set Table status to Billing
-    await prisma.table.update({
-      where: { id: Number(tableId) },
-      data: { status: 'Billing' }
-    });
+    if (!parcel) {
+      // Set Table status to Billing
+      await prisma.table.update({
+        where: { id: billTableId },
+        data: { status: 'Billing' }
+      });
+    }
 
     // Create Notification
     const notif = await prisma.notification.create({
       data: {
-        title: `Bill Generated - Table ${tableId}`,
+        title: parcel ? 'Parcel Bill Generated' : `Bill Generated - Table ${billTableId}`,
         message: `Total: ₹${grandTotal} (Subtotal: ₹${subtotal}, GST: ₹${gst})`,
         type: 'Billing',
         timestamp: new Date().toLocaleTimeString(),

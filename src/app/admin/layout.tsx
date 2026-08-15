@@ -7,7 +7,7 @@ import { translations } from '../../translations/translations';
 import { 
   LayoutDashboard, UtensilsCrossed, ChefHat, Receipt, 
   MenuSquare, Users, Bell, ClipboardList, 
-  UserCheck, TrendingUp, Settings, LogOut, Search, Menu
+  UserCheck, TrendingUp, Settings, LogOut, Search, Menu, ShoppingBag
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 
@@ -78,10 +78,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const defaultRbac: Record<string, string[]> = {
-    SuperAdmin: ['dashboard', 'tables', 'billing', 'menu', 'employees', 'attendance', 'orders', 'reports', 'kds', 'profile'],
-    Admin: ['dashboard', 'tables', 'billing', 'menu', 'employees', 'attendance', 'orders', 'reports', 'kds', 'profile'],
-    Manager: ['dashboard', 'tables', 'billing', 'menu', 'employees', 'attendance', 'orders', 'reports', 'kds'],
-    Cashier: ['dashboard', 'tables', 'billing', 'orders'],
+    SuperAdmin: ['dashboard', 'tables', 'billing', 'menu', 'parcel', 'employees', 'attendance', 'orders', 'reports', 'kds', 'profile'],
+    Admin: ['dashboard', 'tables', 'billing', 'menu', 'parcel', 'employees', 'attendance', 'orders', 'reports', 'kds', 'profile'],
+    Manager: ['dashboard', 'tables', 'billing', 'menu', 'parcel', 'employees', 'attendance', 'orders', 'reports', 'kds'],
+    Cashier: ['dashboard', 'tables', 'billing', 'parcel', 'orders'],
     Waiter: ['tables', 'attendance'],
     Chef: ['kds', 'attendance']
   };
@@ -96,6 +96,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { path: '/admin/tables', id: 'tables', icon: UtensilsCrossed, label: t.tables },
     { path: '/admin/billing', id: 'billing', icon: Receipt, label: t.billing },
     { path: '/admin/menu', id: 'menu', icon: MenuSquare, label: t.menu },
+    { path: '/admin/parcel', id: 'parcel', icon: ShoppingBag, label: 'Parcel' },
     { path: '/admin/employees', id: 'employees', icon: Users, label: t.employees },
     { path: '/admin/attendance', id: 'attendance', icon: UserCheck, label: 'Attendance' },
     { path: '/admin/orders', id: 'orders', icon: ClipboardList, label: 'Orders' },

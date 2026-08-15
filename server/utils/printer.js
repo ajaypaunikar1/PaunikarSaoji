@@ -57,9 +57,12 @@ export async function printKOT(order) {
     kot += CHARS.TEXT_BOLD_ON;
     kot += 'KOT TICKET\n';
     kot += CHARS.TEXT_NORMAL;
-    kot += `Table: T-${order.tableId}\n`;
+    kot += order.isParcel ? `Order Type: PARCEL\n` : `Table: T-${order.tableId}\n`;
     kot += `Order: #${order.id.substring(4, 10)}\n`;
     kot += `Time: ${nowIST}\n`;
+    if (order.isParcel && order.customerName) {
+      kot += `Customer: ${order.customerName}\n`;
+    }
     kot += CHARS.TEXT_BOLD_OFF;
     kot += '--------------------------------\n';
     kot += CHARS.ALIGN_LEFT;
@@ -108,7 +111,10 @@ export async function printBillReceipt(bill, order) {
     receipt += '--------------------------------\n';
     receipt += CHARS.ALIGN_LEFT;
     receipt += `Invoice: #${bill.id ? bill.id.substring(5, 12) : 'PENDING'}\n`;
-    receipt += `Table: T-${bill.tableId}\n`;
+    receipt += bill.isParcel ? `Order Type: PARCEL\n` : `Table: T-${bill.tableId}\n`;
+    if (bill.isParcel && order.customerName) {
+      receipt += `Customer: ${order.customerName}\n`;
+    }
     receipt += `Date/Time: ${nowIST}\n`;
     receipt += `Payment: ${bill.paymentMethod || 'Cash'}\n`;
     receipt += '--------------------------------\n';

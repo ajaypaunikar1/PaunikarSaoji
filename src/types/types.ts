@@ -64,13 +64,15 @@ export interface OrderItem {
 
 export interface Order {
   id: string;
-  tableId: number;
+  tableId: number; // 0 for parcel/takeaway orders
   waiterId: string;
   items: OrderItem[];
   status: OrderStatus;
   notes?: string;
   timestamp: string;
   date?: string; // DD/MM/YYYY
+  isParcel?: boolean; // takeaway/parcel order (no table)
+  customerName?: string;
   grandTotal: number;
 }
 
@@ -122,6 +124,7 @@ export interface Bill {
   discount: number;
   discountPct?: number; // discount percentage used
   grandTotal: number;
+  isParcel?: boolean;
   paymentMethod?: PaymentMethod;
   paymentStatus: 'Pending' | 'Paid';
   timestamp: string;

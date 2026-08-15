@@ -16,7 +16,9 @@ const OrderHistory: React.FC = () => {
       const waiter = users.find(u => u.id === order.waiterId);
       const waiterName = waiter ? waiter.name.toLowerCase() : 'waiter';
       const orderIdMatch = order.id.toLowerCase().includes(searchTerm.toLowerCase());
-      const tableMatch = `table ${order.tableId}`.toLowerCase().includes(searchTerm.toLowerCase());
+      const tableMatch = order.isParcel
+        ? 'parcel'.includes(searchTerm.toLowerCase())
+        : `table ${order.tableId}`.toLowerCase().includes(searchTerm.toLowerCase());
       const waiterMatch = waiterName.includes(searchTerm.toLowerCase());
       
       const searchMatch = orderIdMatch || tableMatch || waiterMatch;
@@ -130,7 +132,7 @@ const OrderHistory: React.FC = () => {
                   return (
                     <tr key={order.id} className="hover:bg-slate-50/40 transition">
                       <td className="p-4 pl-6 font-mono font-bold text-slate-600">#{order.id.substring(4, 12)}</td>
-                      <td className="p-4 font-bold text-slate-800">Table {order.tableId}</td>
+                      <td className="p-4 font-bold text-slate-800">{order.isParcel ? <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 text-[9px] font-black uppercase">Parcel</span> : `Table ${order.tableId}`}</td>
                       <td className="p-4 text-slate-605 font-medium">{waiterName}</td>
                       <td className="p-4 text-slate-500 font-mono text-[10px]">{getOrderDate(order)}</td>
                       <td className="p-4 text-slate-505 font-mono">{order.timestamp}</td>
@@ -185,7 +187,7 @@ const OrderHistory: React.FC = () => {
               <div className="p-4 rounded-2xl bg-slate-50 border border-slate-150 grid grid-cols-2 gap-2 text-xs">
                 <div>
                   <span className="text-slate-450 text-[10px] block">Table Number</span>
-                  <span className="font-extrabold text-slate-800">Table {selectedOrder.tableId}</span>
+                  <span className="font-extrabold text-slate-800">{selectedOrder.isParcel ? 'Parcel' : `Table ${selectedOrder.tableId}`}</span>
                 </div>
                 <div>
                   <span className="text-slate-450 text-[10px] block">Waiter Name</span>
@@ -207,6 +209,12 @@ const OrderHistory: React.FC = () => {
                     {selectedOrder.status}
                   </span>
                 </div>
+                {selectedOrder.isParcel && selectedOrder.customerName && (
+                  <div className="mt-2 col-span-2">
+                    <span className="text-slate-450 text-[10px] block">Customer</span>
+                    <span className="font-bold text-slate-800">{selectedOrder.customerName}</span>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2">

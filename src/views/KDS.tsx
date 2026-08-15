@@ -162,10 +162,15 @@ const KDS: React.FC = () => {
                   {/* Card Header */}
                   <div className="p-4 border-b border-slate-100 flex justify-between items-start">
                     <div>
-                      <span className="text-xs font-black text-slate-800 font-mono uppercase tracking-wider">Table {order.tableId}</span>
+                      <span className="text-xs font-black text-slate-800 font-mono uppercase tracking-wider">{order.isParcel ? 'PARCEL ORDER' : `Table ${order.tableId}`}</span>
                       <p className="text-[10px] text-slate-500 mt-1 uppercase tracking-widest font-semibold">
                         Waiter: {waiter?.name || order.waiterId}
                       </p>
+                      {order.isParcel && order.customerName && (
+                        <p className="text-[10px] text-emerald-600 mt-0.5 uppercase tracking-widest font-bold">
+                          For: {order.customerName}
+                        </p>
+                      )}
                     </div>
                     <div className="flex flex-col items-end gap-1">
                       <span className="px-2.5 py-1 rounded-full text-xs font-black font-mono bg-indigo-100 text-indigo-800 border border-indigo-200 shadow-xs">
@@ -263,7 +268,7 @@ const KDS: React.FC = () => {
                 </tr>
                 <tr>
                   <td style={{ fontWeight: 'bold' }}>Table Number:</td>
-                  <td style={{ textAlign: 'right', fontWeight: 'bold' }}>Table {printKOTData.tableId}</td>
+                  <td style={{ textAlign: 'right', fontWeight: 'bold' }}>{printKOTData.isParcel ? 'PARCEL' : `Table ${printKOTData.tableId}`}</td>
                 </tr>
                 <tr>
                   <td style={{ fontWeight: 'bold' }}>Waiter:</td>
@@ -352,7 +357,7 @@ const KDS: React.FC = () => {
                     </div>
                     <div className="flex justify-between">
                       <span className="font-bold">Table No:</span>
-                      <span className="font-extrabold text-emerald-600">Table {printKOTData.tableId}</span>
+                      <span className="font-extrabold text-emerald-600">{printKOTData.isParcel ? 'PARCEL' : `Table ${printKOTData.tableId}`}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="font-bold">Waiter:</span>

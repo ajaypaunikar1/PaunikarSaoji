@@ -57,17 +57,20 @@ model MenuItem {
 }
 
 model Order {
-  id         String   @id
-  tableId    Int
-  waiterId   String
-  items      Json     @default("[]")
-  status     String   @default("Pending")
-  notes      String?
-  timestamp  String?
-  grandTotal Float
-  branchId   String   @default("branch-main")
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id           String   @id
+  tableId      Int
+  waiterId     String
+  items        Json     @default("[]")
+  status       String   @default("Pending")
+  notes        String?
+  timestamp    String?
+  date         String?
+  isParcel     Boolean  @default(false)
+  customerName String?
+  grandTotal   Float
+  branchId     String   @default("branch-main")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }
 
 model Attendance {
@@ -128,6 +131,7 @@ model Bill {
   gst           Float
   discount      Float    @default(0)
   grandTotal    Float
+  isParcel      Boolean  @default(false)
   paymentMethod String?
   paymentStatus String   @default("Pending")
   timestamp     String

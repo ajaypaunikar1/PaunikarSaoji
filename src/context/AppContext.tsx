@@ -61,6 +61,8 @@ interface AppContextType {
   login: (username: string, password?: string, role?: UserRole) => boolean;
   logout: () => void;
   addOrder: (tableId: number, items: Omit<Order['items'][0], 'id'>[], notes?: string) => Order;
+  addParcelOrder: (items: Omit<Order['items'][0], 'id'>[], notes?: string, customerName?: string) => Order;
+  generateParcelBill: (orderId: string, discount?: number, gstPct?: number) => Promise<Bill>;
   updateOrder: (orderId: string, updates: Partial<Order>) => void;
   updateOrderStatus: (orderId: string, status: Order['status']) => void;
   mergeTables: (sourceIds: number[], destinationId: number) => void;
@@ -858,6 +860,115 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
 
     return newOrder;
+  };
+
+  const addParcelOrder = (items: Omit<Order['items'][0], 'id'>[], notes?: string, customerName?: string): Order => {
+    const waiterId = currentUser?.id || 'u5';
+    const orderId = `ord-${Date.now()}`;
+    const timestamp = getISTTime();
+    const date = getISTDate();
+
+    const orderItems = items.map((item, idx) => ({
+      ...item,
+      id: `${orderId}-item-${idx}`,
+      status: 'Pending' as const
+    }));
+
+    const grandTotal = orderItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+
+    const newOrder: Order = {
+      id: orderId,
+      tableId: 0,
+      waiterId,
+      items: orderItems,
+      status: 'Pending',
+      notes,
+      timestamp,
+      date,
+      isParcel: true,
+      customerName,
+      grandTotal
+    };
+
+    if (isBackendMode) {
+      fetch(`${API_BASE}/orders`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({ isParcel: true, items, notes, customerName })
+      }).then(() => {
+        toast.success('Parcel order sent to kitchen');
+        loadDatabaseData();
+      });
+    } else {
+      setOrders(prev => [...prev, newOrder]);
+
+      const newNotif: Notification = {
+        id: `notif-${Date.now()}`,
+        title: 'New Parcel Order',
+        message: `${orderItems.length} items ordered by ${currentUser?.name || 'Staff'}${customerName ? ` for ${customerName}` : ''}`,
+        type: 'Order',
+        timestamp,
+        read: false
+      };
+      setNotifications(prev => [newNotif, ...prev]);
+      addAuditLog(`Created Parcel Order ${orderId}${customerName ? ` for ${customerName}` : ''}`);
+      toast.success('Parcel order sent to kitchen');
+    }
+
+    return newOrder;
+  };
+
+  const generateParcelBill = async (orderId: string, discount: number = 0, gstPct: number = 18): Promise<Bill> => {
+    const order = orders.find(o => o.id === orderId);
+    if (!order) throw new Error("Order not found");
+
+    const subtotal = order.grandTotal;
+    const gst = Math.round(subtotal * (gstPct / 100) * 100) / 100;
+    const grandTotal = Math.round((subtotal + gst - discount) * 100) / 100;
+    const discountPct = subtotal > 0 ? Math.round((discount / subtotal) * 100 * 100) / 100 : 0;
+
+    const newBill: Bill = {
+      id: `bill-${Date.now()}`,
+      orderId: order.id,
+      tableId: 0,
+      isParcel: true,
+      subtotal,
+      gst,
+      gstPct,
+      discount,
+      discountPct,
+      grandTotal,
+      paymentStatus: 'Pending',
+      timestamp: getISTTime(),
+      date: getISTDate()
+    };
+
+    if (isBackendMode) {
+      const res = await fetch(`${API_BASE}/billing/generate`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({ orderId, isParcel: true, discount, gstPct })
+      }).then(r => r.json());
+      if (res.success) {
+        loadDatabaseData();
+        return { ...res.data, id: res.data.id || res.data._id };
+      } else {
+        throw new Error(res.message || "Failed to generate parcel bill");
+      }
+    } else {
+      setBills(prev => [...prev, newBill]);
+      const newNotif: Notification = {
+        id: `notif-${Date.now()}`,
+        title: 'Parcel Bill Generated',
+        message: `Total: ₹${grandTotal} (Subtotal: ₹${subtotal}, GST: ₹${gst})`,
+        type: 'Billing',
+        timestamp: getISTTime(),
+        read: false
+      };
+      setNotifications(prev => [newNotif, ...prev]);
+      addAuditLog(`Generated parcel bill ${newBill.id}`);
+      return newBill;
+    }
   };
 
   const updateOrder = (orderId: string, updates: Partial<Order>) => {
@@ -1824,7 +1935,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     <AppContext.Provider value={{
       currentUser, users, tables, orders, menuItems, attendance, leaves, payroll,
       notifications, bills, cancellationRequests, auditLogs, language, mergedGroups,
-      zones, login, logout, addOrder, updateOrder, updateOrderStatus, mergeTables,
+      zones, login, logout, addOrder, addParcelOrder, generateParcelBill, updateOrder, updateOrderStatus, mergeTables,
       splitTables, transferTable, generateBill, payBill, submitLeave, approveLeave,
       rejectLeave, markAttendance, clockOut, requestCancellation, approveCancellation,
       rejectCancellation, addEmployee, updateEmployee, changeLanguage, addMenuItem,

@@ -654,7 +654,7 @@ const WaiterPortal: React.FC = () => {
                       >
                         <div className="flex justify-between items-start">
                           <div>
-                            <span className="text-xs font-black text-slate-800 font-mono">Table {order.tableId}</span>
+                            <span className="text-xs font-black text-slate-800 font-mono">{order.isParcel ? 'PARCEL' : `Table ${order.tableId}`}</span>
                             <span className="text-[9px] font-mono text-slate-400 block mt-0.5">#{order.id.substring(4, 8)}</span>
                           </div>
                           <span className={`text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded border ${
@@ -700,7 +700,7 @@ const WaiterPortal: React.FC = () => {
                               }));
                               updateOrder(order.id, { items: updatedItems });
                               updateOrderStatus(order.id, nextStatus);
-                              toast.success(`Table ${order.tableId} marked as ${nextStatus}`);
+                              toast.success(`${order.isParcel ? 'Parcel' : `Table ${order.tableId}`} marked as ${nextStatus}`);
                             }}
                             className={`w-full py-2 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer text-white transition ${
                               order.status === 'Pending'

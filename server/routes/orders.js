@@ -82,7 +82,7 @@ router.delete('/reset', protect, async (req, res) => {
 // @route   POST /api/orders
 // @desc    Create new order (Waiter places order)
 router.post('/', protect, async (req, res) => {
-  const { tableId, items, notes } = req.body;
+  const { tableId, items, notes, isParcel, customerName } = req.body;
 
   try {
     const result = await orderQueue.enqueue(async () => {
@@ -91,9 +91,14 @@ router.post('/', protect, async (req, res) => {
         throw new Error('Your account is currently disabled. You cannot place new orders.');
       }
 
-      const table = await prisma.table.findUnique({ where: { id: Number(tableId) } });
-      if (!table) {
-        throw new Error('Table not found');
+      const parcel = !!isParcel;
+      const effectiveTableId = parcel ? 0 : Number(tableId);
+
+      if (!parcel) {
+        const table = await prisma.table.findUnique({ where: { id: effectiveTableId } });
+        if (!table) {
+          throw new Error('Table not found');
+        }
       }
 
       const orderId = `ord-${Date.now()}`;
@@ -110,13 +115,15 @@ router.post('/', protect, async (req, res) => {
       const newOrder = await prisma.order.create({
         data: {
           id: orderId,
-          tableId: Number(tableId),
+          tableId: effectiveTableId,
           waiterId: req.user.id,
           items: orderItems,
           status: 'Pending',
           notes,
           timestamp,
           date,
+          isParcel: parcel,
+          customerName: parcel ? (customerName || null) : null,
           grandTotal
         }
       });
@@ -124,22 +131,24 @@ router.post('/', protect, async (req, res) => {
       // Print KOT to Kitchen
       printKOT(newOrder);
 
-      // Link table
-      await prisma.table.update({
-        where: { id: Number(tableId) },
-        data: {
-          status: 'Occupied',
-          orderId: orderId,
-          waiterId: req.user.id,
-          guests: table.guests || 2
-        }
-      });
+      if (!parcel) {
+        // Link table
+        await prisma.table.update({
+          where: { id: effectiveTableId },
+          data: {
+            status: 'Occupied',
+            orderId: orderId,
+            waiterId: req.user.id,
+            guests: (await prisma.table.findUnique({ where: { id: effectiveTableId } }))?.guests || 2
+          }
+        });
+      }
 
       // Create Notification
       const notif = await prisma.notification.create({
         data: {
-          title: `New Order - Table ${tableId}`,
-          message: `${orderItems.length} items ordered by ${req.user.name}`,
+          title: parcel ? 'New Parcel Order' : `New Order - Table ${effectiveTableId}`,
+          message: `${orderItems.length} items ordered by ${req.user.name}${parcel && customerName ? ` for ${customerName}` : ''}`,
           type: 'Order',
           timestamp,
           read: false
