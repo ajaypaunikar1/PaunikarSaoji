@@ -20,6 +20,7 @@ router.get('/', protect, async (req, res) => {
         salary: true,
         performance: true,
         overtimeHours: true,
+        isFirstLogin: true,
         shiftStart: true,
         shiftEnd: true,
         createdAt: true,

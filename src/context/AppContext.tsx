@@ -44,6 +44,7 @@ const playNotificationSound = (userRole?: string) => {
 
 interface AppContextType {
   currentUser: User | null;
+  setCurrentUser: React.Dispatch<React.SetStateAction<User | null>>;
   users: User[];
   tables: Table[];
   orders: Order[];
@@ -240,9 +241,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   useEffect(() => {
     if (currentUser && users && users.length > 0) {
       const freshMe = users.find(u => u.id === currentUser.id);
-      if (freshMe && JSON.stringify(freshMe) !== JSON.stringify(currentUser)) {
-        setCurrentUser(freshMe);
-        localStorage.setItem('rms_user', JSON.stringify(freshMe));
+      if (freshMe) {
+        // isFirstLogin only ever clears (true -> false); never resurrects after a completed reset
+        const merged = {
+          ...freshMe,
+          isFirstLogin: freshMe.isFirstLogin === false ? false : currentUser.isFirstLogin
+        };
+        if (JSON.stringify(merged) !== JSON.stringify(currentUser)) {
+          setCurrentUser(merged);
+          localStorage.setItem('rms_user', JSON.stringify(merged));
+        }
       }
     }
   }, [users, currentUser]);
@@ -1933,7 +1941,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   return (
     <AppContext.Provider value={{
-      currentUser, users, tables, orders, menuItems, attendance, leaves, payroll,
+      currentUser, setCurrentUser, users, tables, orders, menuItems, attendance, leaves, payroll,
       notifications, bills, cancellationRequests, auditLogs, language, mergedGroups,
       zones, login, logout, addOrder, addParcelOrder, generateParcelBill, updateOrder, updateOrderStatus, mergeTables,
       splitTables, transferTable, generateBill, payBill, submitLeave, approveLeave,
