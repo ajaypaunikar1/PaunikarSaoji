@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import {
   ShoppingBag, Plus, Minus, Trash2, Search, Send, Printer,
-  Wallet, CreditCard, Smartphone, PackageCheck, UserRound
+  Wallet, CreditCard, Smartphone, PackageCheck, UserRound, Pencil, X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { MenuItem, PortionType, OrderItem, PaymentMethod } from '../types/types';
@@ -12,7 +12,7 @@ const CATEGORIES = ['All', 'Vegetarian', 'Egg Curry', 'Breads', 'Rice', 'Papad',
 
 const Parcel: React.FC = () => {
   const {
-    menuItems, orders, addParcelOrder, generateParcelBill, payBill,
+    menuItems, orders, addParcelOrder, updateOrder, generateParcelBill, payBill,
     settings, currentUser, users
   } = useApp();
 
@@ -27,6 +27,9 @@ const Parcel: React.FC = () => {
 
   // Cart
   const [cart, setCart] = useState<OrderItem[]>([]);
+
+  // Edit existing parcel order
+  const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
 
   // Checkout state
   const [gstPct, setGstPct] = useState<number>(settings?.gstEnabled === false ? 0 : 18);
@@ -49,13 +52,15 @@ const Parcel: React.FC = () => {
     });
   }, [menuItems, category, searchQuery]);
 
-  // Recent parcel orders
+  // Active parcel orders (not yet served / paid) — editable
   const parcelOrders = useMemo(() => {
     return orders
-      .filter(o => o.isParcel)
+      .filter(o => o.isParcel && o.status !== 'Served')
       .sort((a, b) => (b.timestamp || '').localeCompare(a.timestamp || ''))
       .slice(0, 8);
   }, [orders]);
+
+  const editingOrder = editingOrderId ? orders.find(o => o.id === editingOrderId) : null;
 
   const addToCart = (item: MenuItem, portion: PortionType) => {
     const price = portion === 'Single' ? item.price : (item.variants.find(v => v.name === portion)?.price || item.price);
@@ -92,6 +97,20 @@ const Parcel: React.FC = () => {
     setNotes('');
     setDiscountPct(0);
     setPaymentMethod(null);
+    setEditingOrderId(null);
+  };
+
+  const startEditing = (orderId: string) => {
+    const order = orders.find(o => o.id === orderId);
+    if (!order) return;
+    setCart(order.items);
+    setCustomerName(order.customerName || '');
+    setCustomerPhone('');
+    setNotes(order.notes || '');
+    setDiscountPct(0);
+    setPaymentMethod(null);
+    setEditingOrderId(orderId);
+    toast.info(`Editing parcel order #${orderId.substring(4, 10).toUpperCase()}`);
   };
 
   const subtotal = cart.reduce((sum, c) => sum + c.price * c.quantity, 0);
@@ -109,6 +128,16 @@ const Parcel: React.FC = () => {
   };
 
   const handleSendToKitchen = () => {
+    if (editingOrderId) {
+      if (cart.length === 0) {
+        toast.error('Add at least one item to the parcel');
+        return;
+      }
+      updateOrder(editingOrderId, { items: cart, notes: notes || undefined, customerName: customerName || undefined });
+      toast.success(`Parcel order updated & sent to kitchen (${editingOrderId.substring(4, 10).toUpperCase()})`);
+      clearCart();
+      return;
+    }
     const placed = placeOrder();
     if (!placed) return;
     toast.success(`Parcel order sent to kitchen (${placed.orderId.substring(4, 10).toUpperCase()})`);
@@ -116,13 +145,29 @@ const Parcel: React.FC = () => {
   };
 
   const handleCollectPayment = async () => {
-    const placed = placeOrder();
-    if (!placed) return;
     if (!paymentMethod) {
       toast.error('Select a payment method (Cash / UPI / Card)');
       return;
     }
     try {
+      if (editingOrderId) {
+        const bill = await generateParcelBill(editingOrderId, discountAmt, gstPct);
+        await payBill(bill.id, paymentMethod);
+        const editingOrder = orders.find(o => o.id === editingOrderId);
+        const waiterName = users.find(u => u.id === currentUser?.id)?.name || 'Staff';
+        setPrintData({
+          bill: { ...bill, paymentMethod },
+          orderItems: editingOrder?.items || cart,
+          waiterName,
+          customerName: customerName || editingOrder?.customerName,
+          phone: customerPhone
+        });
+        setTimeout(() => window.print(), 200);
+        clearCart();
+        return;
+      }
+      const placed = placeOrder();
+      if (!placed) return;
       const bill = await generateParcelBill(placed.orderId, discountAmt, gstPct);
       await payBill(bill.id, paymentMethod);
       const waiterName = users.find(u => u.id === currentUser?.id)?.name || 'Staff';
@@ -236,6 +281,17 @@ const Parcel: React.FC = () => {
 
         {/* RIGHT: Cart + checkout */}
         <div className="lg:col-span-2 space-y-4">
+          {editingOrderId && (
+            <div className="bg-indigo-50 border border-indigo-200 rounded-2xl px-4 py-3 flex items-center justify-between">
+              <span className="text-xs font-bold text-indigo-800 flex items-center gap-1.5">
+                <Pencil size={12} /> Editing parcel #{editingOrderId.substring(4, 10).toUpperCase()}
+              </span>
+              <button onClick={clearCart} className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer">
+                <X size={11} /> Cancel edit
+              </button>
+            </div>
+          )}
+
           {/* Customer details */}
           <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 space-y-2.5">
             <h3 className="text-xs font-black uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
@@ -353,25 +409,25 @@ const Parcel: React.FC = () => {
                 disabled={cart.length === 0}
                 className="py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-black text-xs uppercase tracking-wider disabled:opacity-40 cursor-pointer flex items-center justify-center gap-1.5"
               >
-                <Send size={13} /> Send to Kitchen
+                <Send size={13} /> {editingOrderId ? 'Update Order' : 'Send to Kitchen'}
               </button>
               <button
                 onClick={handleCollectPayment}
                 disabled={cart.length === 0}
                 className="py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs uppercase tracking-wider disabled:opacity-40 cursor-pointer flex items-center justify-center gap-1.5"
               >
-                <Printer size={13} /> Collect & Print
+                {editingOrderId ? <><Wallet size={13} /> Checkout</> : <><Printer size={13} /> Collect & Print</>}
               </button>
             </div>
           </div>
 
-          {/* Recent parcel orders */}
+          {/* Active parcel orders */}
           {parcelOrders.length > 0 && (
             <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4">
-              <h3 className="text-xs font-black uppercase tracking-wider text-slate-500 mb-2">Recent Parcel Orders</h3>
+              <h3 className="text-xs font-black uppercase tracking-wider text-slate-500 mb-2">Active Parcel Orders</h3>
               <div className="space-y-1.5 max-h-44 overflow-y-auto pr-1">
                 {parcelOrders.map(o => (
-                  <div key={o.id} className="p-2 rounded-xl bg-slate-50 border border-slate-200 flex justify-between items-center text-[11px]">
+                  <div key={o.id} className={`p-2 rounded-xl border flex justify-between items-center text-[11px] ${editingOrderId === o.id ? 'bg-indigo-50 border-indigo-200' : 'bg-slate-50 border-slate-200'}`}>
                     <div className="min-w-0">
                       <span className="font-mono font-bold text-slate-700">#{o.id.substring(4, 10).toUpperCase()}</span>
                       {o.customerName && <span className="ml-2 text-slate-500">· {o.customerName}</span>}
@@ -380,6 +436,13 @@ const Parcel: React.FC = () => {
                     <div className="flex items-center gap-2 shrink-0">
                       <span className="font-mono font-bold text-slate-800">₹{o.grandTotal}</span>
                       <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${getStatusColor(o.status)}`}>{o.status}</span>
+                      <button
+                        onClick={() => startEditing(o.id)}
+                        className="p-1.5 rounded-lg bg-white border border-indigo-200 text-indigo-600 hover:bg-indigo-50 cursor-pointer"
+                        title="Edit parcel order"
+                      >
+                        <Pencil size={11} />
+                      </button>
                     </div>
                   </div>
                 ))}

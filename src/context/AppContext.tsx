@@ -1379,10 +1379,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         throw new Error(res.message || "Failed to process payment");
       }
     } else {
-      let targetTableId = 0;
+      const paidBill = bills.find(b => b.id === billId);
+      const targetTableId = paidBill?.tableId || 0;
+
       setBills(prev => prev.map(b => {
         if (b.id === billId) {
-          targetTableId = b.tableId;
           return { ...b, paymentStatus: 'Paid', paymentMethod: method };
         }
         return b;
@@ -1393,13 +1394,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           ...t, status: 'Available', orderId: undefined, waiterId: undefined, guests: 0
         } : t));
 
-        const bill = bills.find(b => b.id === billId);
-        if (bill) {
-          setOrders(prev => prev.map(o => o.id === bill.orderId ? { ...o, status: 'Served' } : o));
-        }
-
         setMergedGroups(prev => prev.filter(group => !group.includes(targetTableId)));
-        toast.success(`Table ${targetTableId} checkout complete! Paid via ${method}.`);
+      }
+
+      if (paidBill) {
+        setOrders(prev => prev.map(o => o.id === paidBill.orderId ? { ...o, status: 'Served' } : o));
+        if (paidBill.isParcel) {
+          toast.success(`Parcel checkout complete! Paid via ${method}.`);
+        } else if (targetTableId > 0) {
+          toast.success(`Table ${targetTableId} checkout complete! Paid via ${method}.`);
+        }
       }
       addAuditLog(`Processed Payment for Bill ${billId} via ${method}`);
     }

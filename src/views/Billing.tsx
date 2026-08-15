@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import { translations } from '../translations/translations';
 import { 
   Receipt, CreditCard, Wallet, Smartphone,
-  Printer, Percent, Calculator
+  Printer, Percent, Calculator, PackageCheck
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -12,13 +12,14 @@ import { toast } from 'sonner';
 
 const Billing: React.FC = () => {
   const { 
-    tables, orders, generateBill, payBill, bills, language,
+    tables, orders, generateBill, generateParcelBill, payBill, bills, language,
     requestCancellation, users, settings, currentUser, updateOrder
   } = useApp();
   const t = translations[language];
 
   // Billing screen state
   const [selectedTableId, setSelectedTableId] = useState<number | null>(null);
+  const [selectedParcelId, setSelectedParcelId] = useState<string | null>(null);
   const [discountPct, setDiscountPct] = useState<number>(0);   // Discount in %
   const [customGstPct, setCustomGstPct] = useState<number>(18); // Default 18%
   const [cancelReason, setCancelReason] = useState<string>('');
@@ -30,27 +31,34 @@ const Billing: React.FC = () => {
     bill: Bill;
     orderItems: any[];
     waiterName: string;
+    customerName?: string;
   } | null>(null);
 
   // Filter occupied or billing tables
   const billingTables = tables.filter(tbl => tbl.status === 'Occupied' || tbl.status === 'Billing');
 
-  const selectedTable = tables.find(tbl => tbl.id === selectedTableId);
-  const selectedOrder = selectedTable?.orderId 
-    ? orders.find(o => o.id === selectedTable.orderId) 
-    : null;
+  // Active parcel / takeaway orders (not yet served / paid)
+  const activeParcels = orders.filter(o => o.isParcel && o.status !== 'Served');
 
-  // Active bill generated for the selected table
+  const selectedTable = tables.find(tbl => tbl.id === selectedTableId);
+  const selectedOrder = selectedParcelId
+    ? orders.find(o => o.id === selectedParcelId) || null
+    : (selectedTable?.orderId ? orders.find(o => o.id === selectedTable.orderId) : null);
+
+  // Active bill generated for the selected table / parcel
   const activeBill = useMemo(() => {
-    if (!selectedTableId || !selectedOrder) return null;
-    
-    // Check if there is already a pending bill for this table
+    if (!selectedOrder) return null;
+
+    const isParcel = !!selectedParcelId;
+
+    // Check if there is already a pending bill for this order
     const existing = bills.find(b => b.orderId === selectedOrder.id && b.paymentStatus === 'Pending');
 
     const baseBill = existing || {
       id: `preview-${Date.now()}`,
       orderId: selectedOrder.id,
-      tableId: selectedTableId,
+      tableId: isParcel ? 0 : selectedTableId,
+      isParcel,
       paymentStatus: 'Pending' as const,
       timestamp: new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true }),
       date: new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: '2-digit', year: 'numeric' })
@@ -73,7 +81,7 @@ const Billing: React.FC = () => {
       discountPct,
       grandTotal,
     };
-  }, [selectedTableId, selectedOrder, discountPct, customGstPct, bills, settings?.gstEnabled]);
+  }, [selectedTableId, selectedParcelId, selectedOrder, discountPct, customGstPct, bills]);
 
   // UPI payment string generator
   const upiString = useMemo(() => {
@@ -81,18 +89,22 @@ const Billing: React.FC = () => {
     const amount = activeBill.grandTotal;
     const upiId = settings?.upiId || 'restaurant@upi';
     const restName = encodeURIComponent(settings?.restaurantName || 'PaunikarSaoji');
-    return `upi://pay?pa=${upiId}&pn=${restName}&am=${amount}&cu=INR&tn=Table${activeBill.tableId}Order`;
-  }, [activeBill, settings]);
+    const note = selectedParcelId ? `Parcel${activeBill.orderId}` : `Table${activeBill.tableId}Order`;
+    return `upi://pay?pa=${upiId}&pn=${restName}&am=${amount}&cu=INR&tn=${note}`;
+  }, [activeBill, settings, selectedParcelId]);
 
   // Submit payment
   const handleProcessPayment = async () => {
-    if (!selectedTableId || !selectedOrder) {
-      toast.error('Select an active table to checkout');
+    if (!selectedOrder) {
+      toast.error('Select an active order to checkout');
       return;
     }
 
     try {
-      const finalBill = await generateBill(selectedTableId, Math.round(selectedOrder.grandTotal * (discountPct / 100) * 100) / 100, customGstPct);
+      const discountAmt = Math.round(selectedOrder.grandTotal * (discountPct / 100) * 100) / 100;
+      const finalBill = selectedParcelId
+        ? await generateParcelBill(selectedOrder.id, discountAmt, customGstPct)
+        : await generateBill(selectedTableId!, discountAmt, customGstPct);
       const waiterName = users.find(u => u.id === selectedOrder.waiterId)?.name || 'Staff';
 
       // Record the payment BEFORE triggering the printer so the receipt reflects
@@ -109,9 +121,15 @@ const Billing: React.FC = () => {
       } catch {}
       
       // Trigger browser print dialog automatically
-      handlePrintReceipt({ ...finalBill, paymentMethod: paymentMethod || 'Cash' }, selectedOrder.items, waiterName);
+      handlePrintReceipt(
+        { ...finalBill, paymentMethod: paymentMethod || 'Cash' },
+        selectedOrder.items,
+        waiterName,
+        selectedParcelId ? selectedOrder.customerName : undefined
+      );
 
       setSelectedTableId(null);
+      setSelectedParcelId(null);
       setDiscountPct(0);
       setCustomGstPct(18);
     } catch (err: any) {
@@ -121,13 +139,15 @@ const Billing: React.FC = () => {
 
   // Standalone Printer Trigger (Print Bill without checking out)
   const handlePrintOnly = async () => {
-    if (!selectedTableId || !selectedOrder || !activeBill) {
-      toast.error('Select an active table to print bill');
+    if (!selectedOrder || !activeBill) {
+      toast.error('Select an active order to print bill');
       return;
     }
     try {
       const discountAmt = Math.round(selectedOrder.grandTotal * (discountPct / 100) * 100) / 100;
-      const finalBill = await generateBill(selectedTableId, discountAmt, customGstPct);
+      const finalBill = selectedParcelId
+        ? await generateParcelBill(selectedOrder.id, discountAmt, customGstPct)
+        : await generateBill(selectedTableId!, discountAmt, customGstPct);
       const waiterName = users.find(u => u.id === selectedOrder.waiterId)?.name || 'Staff';
 
       // Trigger ESC/POS network printer via backend
@@ -139,7 +159,12 @@ const Billing: React.FC = () => {
         });
       } catch {}
 
-      handlePrintReceipt(finalBill, selectedOrder.items, waiterName);
+      handlePrintReceipt(
+        finalBill,
+        selectedOrder.items,
+        waiterName,
+        selectedParcelId ? selectedOrder.customerName : undefined
+      );
       toast.success('Bill print triggered!');
     } catch (err: any) {
       toast.error(err.message || 'Failed to print bill');
@@ -147,11 +172,12 @@ const Billing: React.FC = () => {
   };
 
   // Printer trigger
-  const handlePrintReceipt = (bill: Bill, orderItems: any[], waiterName: string) => {
+  const handlePrintReceipt = (bill: Bill, orderItems: any[], waiterName: string, customerName?: string) => {
     setPrintBillData({
       bill,
       orderItems,
-      waiterName
+      waiterName,
+      customerName
     });
     setTimeout(() => {
       window.print();
@@ -212,6 +238,7 @@ const Billing: React.FC = () => {
                     key={tbl.id}
                     onClick={() => {
                       setSelectedTableId(tbl.id);
+                      setSelectedParcelId(null);
                       setDiscountPct(0);
                       setCustomGstPct(settings?.gstEnabled ? 18 : 0);
                     }}
@@ -243,15 +270,62 @@ const Billing: React.FC = () => {
               })}
             </div>
           )}
+
+          {/* Parcel / Takeaway Orders */}
+          <h3 className="text-xs font-black uppercase tracking-wider text-slate-500 mt-5">Parcel / Takeaway Orders</h3>
+          {activeParcels.length === 0 ? (
+            <div className="p-5 text-center rounded-3xl bg-white border border-slate-200 text-slate-400 text-xs shadow-sm">
+              No active parcel orders currently require billing.
+            </div>
+          ) : (
+            <div className="space-y-2 max-h-[450px] overflow-y-auto pr-1">
+              {activeParcels.map(o => {
+                const isSelected = selectedParcelId === o.id;
+                return (
+                  <div
+                    key={o.id}
+                    onClick={() => {
+                      setSelectedParcelId(o.id);
+                      setSelectedTableId(null);
+                      setDiscountPct(0);
+                      setCustomGstPct(settings?.gstEnabled ? 18 : 0);
+                    }}
+                    className={`p-4 rounded-2xl border transition duration-300 flex justify-between items-center cursor-pointer ${
+                      isSelected
+                        ? 'bg-emerald-500/10 border-emerald-500 text-slate-900 shadow-sm'
+                        : 'bg-white border-slate-200 text-slate-700 shadow-sm hover:border-slate-350'
+                    }`}
+                  >
+                    <div className="min-w-0">
+                      <span className="text-xs font-bold font-mono flex items-center gap-1.5">
+                        <PackageCheck size={12} className="text-indigo-500" /> #{o.id.substring(4, 10).toUpperCase()}
+                      </span>
+                      {o.customerName && (
+                        <p className="text-[10px] text-slate-500 font-bold truncate mt-1">{o.customerName}</p>
+                      )}
+                      <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mt-0.5">{o.items.length} items</p>
+                    </div>
+
+                    <div className="text-right shrink-0">
+                      <div className="text-xs font-bold text-slate-800 font-mono">₹{o.grandTotal}</div>
+                      <span className="text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded border mt-1.5 inline-block bg-indigo-100 border-indigo-200 text-indigo-700">
+                        {o.status}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Center/Right Column: Checkout Details and Invoice breakdown */}
         <div className="lg:col-span-2 space-y-4">
           
           <AnimatePresence mode="wait">
-            {selectedTable && selectedOrder && activeBill ? (
+            {selectedOrder && activeBill ? (
               <motion.div
-                key={selectedTableId}
+                key={selectedParcelId || `table-${selectedTableId}`}
                 initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 15 }}
@@ -260,7 +334,9 @@ const Billing: React.FC = () => {
                 {/* Order Summary & Item list */}
                 <div className="space-y-4">
                   <div className="flex justify-between items-center pb-3 border-b border-slate-100">
-                    <span className="text-xs font-black text-slate-800 uppercase font-mono">Table {selectedTableId} Summary</span>
+                    <span className="text-xs font-black text-slate-800 uppercase font-mono">
+                      {selectedParcelId ? 'Parcel Order Summary' : `Table ${selectedTableId} Summary`}
+                    </span>
                     <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">#{selectedOrder.id.substring(4,8)}</span>
                   </div>
 
@@ -432,7 +508,7 @@ const Billing: React.FC = () => {
             ) : (
               <div className="text-center py-20 p-6 rounded-3xl bg-white border border-slate-200 shadow-sm flex flex-col items-center gap-2">
                 <Receipt size={42} className="text-slate-450 animate-pulse" />
-                <p className="text-xs text-slate-500 font-medium">Select an active table on the left to begin invoicing.</p>
+                <p className="text-xs text-slate-500 font-medium">Select an active table or parcel order on the left to begin invoicing.</p>
               </div>
             )}
           </AnimatePresence>
@@ -467,9 +543,17 @@ const Billing: React.FC = () => {
                     <td style={{ textAlign: 'right', fontFamily: 'monospace' }}>{printBillData.bill.id.substring(5, 12)}</td>
                   </tr>
                   <tr>
-                    <td>Table:</td>
-                    <td style={{ textAlign: 'right', fontWeight: 'bold' }}>Table {printBillData.bill.tableId}</td>
+                    <td>{printBillData.bill.isParcel ? 'Order Type:' : 'Table:'}</td>
+                    <td style={{ textAlign: 'right', fontWeight: 'bold' }}>
+                      {printBillData.bill.isParcel ? 'PARCEL' : `Table ${printBillData.bill.tableId}`}
+                    </td>
                   </tr>
+                  {printBillData.bill.isParcel && printBillData.customerName && (
+                    <tr>
+                      <td>Customer:</td>
+                      <td style={{ textAlign: 'right' }}>{printBillData.customerName}</td>
+                    </tr>
+                  )}
                   <tr>
                     <td>Waiter:</td>
                     <td style={{ textAlign: 'right' }}>{printBillData.waiterName}</td>
