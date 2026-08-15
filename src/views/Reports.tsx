@@ -442,11 +442,11 @@ const Reports: React.FC = () => {
                             {bill ? (
                               bill.paymentStatus === 'Paid' ? (
                                 <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase border bg-emerald-100 border-emerald-250 text-emerald-700">
-                                  {language === 'en' ? 'Paid' : 'भरले'} ({bill.paymentMethod})
+                                  {language === 'en' ? 'Paid' : 'भरले'}{bill.paymentMethod ? ` (${bill.paymentMethod})` : ''}
                                 </span>
                               ) : (
                                 <select
-                                  value="Pending"
+                                  value={bill.paymentStatus}
                                   onChange={async (e) => {
                                     const val = e.target.value;
                                     if (val !== 'Pending') {

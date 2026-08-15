@@ -32,11 +32,13 @@ const Attendance: React.FC = () => {
   };
 
   const handleMarkPresent = (empId: string, date: string = selectedDate) => {
-    saveAttendance(empId, date, 'Present', '09:00:00', '17:00:00');
+    const emp = users.find(u => u.id === empId);
+    saveAttendance(empId, date, 'Present', emp?.shiftStart || '09:00:00', emp?.shiftEnd || '17:00:00');
   };
 
   const handleMarkLate = (empId: string, date: string = selectedDate) => {
-    saveAttendance(empId, date, 'Late', '10:15:00', '17:00:00');
+    const emp = users.find(u => u.id === empId);
+    saveAttendance(empId, date, 'Late', emp?.shiftStart || '09:00:00', emp?.shiftEnd || '17:00:00');
   };
 
   const handleMarkAbsent = (empId: string, date: string = selectedDate) => {
@@ -279,8 +281,8 @@ const Attendance: React.FC = () => {
                                     setEditingEmpId(null);
                                   } else {
                                     setEditingEmpId(emp.id);
-                                    setCustomClockIn(record.clockIn || '09:00:00');
-                                    setCustomClockOut(record.clockOut || '17:00:00');
+                                    setCustomClockIn(record.clockIn || emp.shiftStart || '09:00:00');
+                                    setCustomClockOut(record.clockOut || emp.shiftEnd || '17:00:00');
                                   }
                                 }}
                                 className="px-2 py-1 rounded bg-slate-50 border border-slate-250 hover:bg-slate-100 text-slate-600 font-bold text-[10px] uppercase cursor-pointer transition"

@@ -95,6 +95,10 @@ const Billing: React.FC = () => {
       const finalBill = await generateBill(selectedTableId, Math.round(selectedOrder.grandTotal * (discountPct / 100) * 100) / 100, customGstPct);
       const waiterName = users.find(u => u.id === selectedOrder.waiterId)?.name || 'Staff';
 
+      // Record the payment BEFORE triggering the printer so the receipt reflects
+      // the actual payment method (Cash / UPI / Card) instead of defaulting to Cash.
+      await payBill(finalBill.id, paymentMethod || 'Cash');
+
       // Trigger ESC/POS network printer via backend if available
       try {
         const token = localStorage.getItem('rms_token');
@@ -103,8 +107,6 @@ const Billing: React.FC = () => {
           headers: { 'Authorization': `Bearer ${token}` }
         });
       } catch {}
-
-      await payBill(finalBill.id, paymentMethod || 'Cash');
       
       // Trigger browser print dialog automatically
       handlePrintReceipt({ ...finalBill, paymentMethod: paymentMethod || 'Cash' }, selectedOrder.items, waiterName);
@@ -212,7 +214,6 @@ const Billing: React.FC = () => {
                       setSelectedTableId(tbl.id);
                       setDiscountPct(0);
                       setCustomGstPct(settings?.gstEnabled ? 18 : 0);
-                      setPaymentMethod('Cash');
                     }}
                     className={`p-4 rounded-2xl border transition duration-300 flex justify-between items-center cursor-pointer ${
                       isSelected 

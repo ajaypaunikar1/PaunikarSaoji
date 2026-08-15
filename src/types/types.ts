@@ -34,6 +34,8 @@ export interface User {
   salary: number;
   performance: number; // rating 1 to 5
   overtimeHours: number;
+  shiftStart?: string; // HH:MM:SS assigned shift start time
+  shiftEnd?: string;   // HH:MM:SS assigned shift end time
   password?: string;
   isFirstLogin?: boolean;
 }

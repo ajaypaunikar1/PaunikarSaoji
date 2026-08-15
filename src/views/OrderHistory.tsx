@@ -39,6 +39,20 @@ const OrderHistory: React.FC = () => {
     }
   };
 
+  // API orders carry the date under createdAt (ISO string); fall back to the
+  // order.date field used by the local fallback mode, and never render empty.
+  const getOrderDate = (order: Order): string => {
+    if (order.date) return order.date;
+    const createdAt = (order as any).createdAt;
+    if (createdAt) {
+      const d = new Date(createdAt);
+      if (!isNaN(d.getTime())) {
+        return new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', day: '2-digit', month: '2-digit', year: 'numeric' }).format(d);
+      }
+    }
+    return '—';
+  };
+
   return (
     <div className="space-y-6">
       
@@ -118,7 +132,7 @@ const OrderHistory: React.FC = () => {
                       <td className="p-4 pl-6 font-mono font-bold text-slate-600">#{order.id.substring(4, 12)}</td>
                       <td className="p-4 font-bold text-slate-800">Table {order.tableId}</td>
                       <td className="p-4 text-slate-605 font-medium">{waiterName}</td>
-                      <td className="p-4 text-slate-500 font-mono text-[10px]">{order.date || '—'}</td>
+                      <td className="p-4 text-slate-500 font-mono text-[10px]">{getOrderDate(order)}</td>
                       <td className="p-4 text-slate-505 font-mono">{order.timestamp}</td>
                       <td className="p-4">
                         <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase border ${getStatusColor(order.status)}`}>
@@ -181,7 +195,7 @@ const OrderHistory: React.FC = () => {
                 </div>
                 <div className="mt-2">
                   <span className="text-slate-450 text-[10px] block">Date</span>
-                  <span className="font-mono font-bold text-slate-700">{selectedOrder.date || '—'}</span>
+                  <span className="font-mono font-bold text-slate-700">{getOrderDate(selectedOrder)}</span>
                 </div>
                 <div className="mt-2">
                   <span className="text-slate-450 text-[10px] block">Time</span>

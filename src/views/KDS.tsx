@@ -384,7 +384,7 @@ const KDS: React.FC = () => {
                   </div>
 
                   <div className="border-t border-dashed border-slate-300 pt-3 text-center text-[8px] text-slate-400">
-                    Generated via POS &bull; {new Date().toLocaleDateString()}
+                    Generated via POS &bull; {new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: '2-digit', year: 'numeric' })}
                   </div>
                 </div>
               </div>

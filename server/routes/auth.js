@@ -53,6 +53,8 @@ router.post('/login', async (req, res) => {
         salary: user.salary,
         performance: user.performance,
         overtimeHours: user.overtimeHours,
+        shiftStart: user.shiftStart,
+        shiftEnd: user.shiftEnd,
         isFirstLogin: user.isFirstLogin
       }
     });

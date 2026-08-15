@@ -10,20 +10,22 @@ datasource db {
 }
 
 model User {
-  id             String   @id @default(uuid())
-  name           String
-  username       String   @unique
-  password       String
-  role           String
-  status         String   @default("Active")
-  zone           String   @default("All")
-  salary         Float
-  performance    Float    @default(5)
-  overtimeHours  Float    @default(0)
-  isFirstLogin   Boolean  @default(true)
-  branchId       String   @default("branch-main")
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id            String   @id @default(uuid())
+  name          String
+  username      String   @unique
+  password      String
+  role          String
+  status        String   @default("Active")
+  zone          String   @default("All")
+  salary        Float
+  performance   Float    @default(5)
+  overtimeHours Float    @default(0)
+  shiftStart    String   @default("09:00:00")
+  shiftEnd      String   @default("17:00:00")
+  isFirstLogin  Boolean  @default(true)
+  branchId      String   @default("branch-main")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
 
 model Table {

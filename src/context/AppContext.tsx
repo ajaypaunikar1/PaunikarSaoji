@@ -548,7 +548,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           });
           socket.on('menu_changed', (data: MenuItem) => {
             if (isAborted) return;
-            setMenuItems(prev => prev.map(m => m.id === data.id ? data : m));
+            setMenuItems(prev => {
+              const exists = prev.some(m => m.id === data.id);
+              return exists ? prev.map(m => m.id === data.id ? data : m) : [...prev, data];
+            });
           });
           socket.on('leave_requested', (data: LeaveRequest) => {
             if (isAborted) return;
@@ -1584,9 +1587,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         method: 'POST',
         headers: getHeaders(),
         body: JSON.stringify(item)
-      }).then(() => {
-        toast.success(`${item.name} added to menu`);
-        loadDatabaseData();
+      }).then(async (res) => {
+        const json = await res.json().catch(() => ({}));
+        if (res.ok && json.success) {
+          toast.success(`${item.name} added to menu`);
+          loadDatabaseData();
+        } else {
+          toast.error(json.message || 'Failed to add menu item');
+        }
+      }).catch(() => {
+        toast.error('Failed to add menu item');
       });
     } else {
       const newItem: MenuItem = { ...item, id: `m-${Date.now()}` };
@@ -1602,9 +1612,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         method: 'PUT',
         headers: getHeaders(),
         body: JSON.stringify(updates)
-      }).then(() => {
-        toast.success('Menu item updated');
-        loadDatabaseData();
+      }).then(async (res) => {
+        const json = await res.json().catch(() => ({}));
+        if (res.ok && json.success) {
+          toast.success('Menu item updated');
+          loadDatabaseData();
+        } else {
+          toast.error(json.message || 'Failed to update menu item');
+        }
+      }).catch(() => {
+        toast.error('Failed to update menu item');
       });
     } else {
       setMenuItems(prev => prev.map(m => m.id === itemId ? { ...m, ...updates } : m));

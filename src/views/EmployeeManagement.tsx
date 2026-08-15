@@ -13,7 +13,8 @@ const EmployeeManagement: React.FC = () => {
   const { 
     users, addEmployee, updateEmployee, leaves, approveLeave, rejectLeave,
     cancellationRequests, approveCancellation, rejectCancellation,
-    attendance, payroll, language, deleteEmployee, zones
+    attendance, payroll, language, deleteEmployee, zones,
+    settings, updateSettings
   } = useApp();
   const t = translations[language];
 
@@ -34,7 +35,8 @@ const EmployeeManagement: React.FC = () => {
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<UserRole>('Waiter');
+  const [role, setRole] = useState<UserRole | '__custom__'>('Waiter');
+  const [customRoleName, setCustomRoleName] = useState('');
   const [zone, setZone] = useState<Zone>('A');
   const [salary, setSalary] = useState<number>(18000);
 
@@ -46,11 +48,15 @@ const EmployeeManagement: React.FC = () => {
   // Edit Employee State
   const [editName, setEditName] = useState('');
   const [editSalary, setEditSalary] = useState(0);
+  const [editShiftStart, setEditShiftStart] = useState('09:00:00');
+  const [editShiftEnd, setEditShiftEnd] = useState('17:00:00');
 
   useEffect(() => {
     if (selectedUser) {
       setEditName(selectedUser.name);
       setEditSalary(selectedUser.salary || 0);
+      setEditShiftStart(selectedUser.shiftStart || '09:00:00');
+      setEditShiftEnd(selectedUser.shiftEnd || '17:00:00');
       setCustomOvertimePay(selectedUser.overtimeHours * 150);
       setCustomDeductions(0);
     }
@@ -60,13 +66,22 @@ const EmployeeManagement: React.FC = () => {
     if (selectedUser) {
       updateEmployee(selectedUser.id, { 
         name: editName,
-        salary: editSalary 
+        salary: editSalary,
+        shiftStart: editShiftStart,
+        shiftEnd: editShiftEnd
       });
       toast.success('Employee details saved successfully');
     }
   };
 
-  const handleCreateEmployee = (e: React.FormEvent) => {
+  const DEFAULT_ROLES = ['SuperAdmin', 'Manager', 'Cashier', 'Chef', 'Waiter'];
+
+  // Custom roles are persisted as keys in the settings RBAC config.
+  const customRoles = Object.keys(settings?.rbac || {})
+    .filter(r => !DEFAULT_ROLES.includes(r))
+    .sort();
+
+  const handleCreateEmployee = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !username.trim() || !password.trim()) {
       toast.error('Please fill all fields');
@@ -77,11 +92,26 @@ const EmployeeManagement: React.FC = () => {
       return;
     }
 
+    let finalRole: string = role;
+    if (role === '__custom__') {
+      const trimmed = customRoleName.trim();
+      if (!trimmed) {
+        toast.error('Please enter a name for the custom role');
+        return;
+      }
+      finalRole = trimmed;
+      // Register the custom role in the RBAC config with a sensible default feature set.
+      const currentRbac = settings?.rbac && Object.keys(settings.rbac).length ? settings.rbac : {};
+      if (!currentRbac[trimmed]) {
+        await updateSettings({ rbac: { ...currentRbac, [trimmed]: ['dashboard', 'orders'] } });
+      }
+    }
+
     addEmployee({
       name,
       username,
       password,
-      role,
+      role: finalRole as UserRole,
       status: 'Active',
       zone,
       salary
@@ -92,6 +122,7 @@ const EmployeeManagement: React.FC = () => {
     setUsername('');
     setPassword('');
     setRole('Waiter');
+    setCustomRoleName('');
     setZone('A');
     setSalary(18000);
   };
@@ -335,11 +366,42 @@ const EmployeeManagement: React.FC = () => {
                         ))}
                       </div>
                     </div>
+
+                    {/* Assigned Shift Timings */}
+                    <div>
+                      <span className="text-[10px] font-bold text-slate-450 uppercase block tracking-wider mb-2">Assigned Shift Timings</span>
+                      <div className="grid grid-cols-2 gap-2">
+                        <label className="p-2 rounded-xl bg-slate-50 border border-slate-200">
+                          <span className="text-[10px] text-slate-500 block mb-1">Shift Start</span>
+                          <input
+                            type="time"
+                            value={editShiftStart}
+                            onChange={e => setEditShiftStart(e.target.value)}
+                            className="w-full font-mono text-xs font-bold text-slate-800 bg-transparent focus:outline-none focus:ring-1 focus:ring-emerald-500 px-1 py-0.5 rounded border border-slate-200"
+                          />
+                        </label>
+                        <label className="p-2 rounded-xl bg-slate-50 border border-slate-200">
+                          <span className="text-[10px] text-slate-500 block mb-1">Shift End</span>
+                          <input
+                            type="time"
+                            value={editShiftEnd}
+                            onChange={e => setEditShiftEnd(e.target.value)}
+                            className="w-full font-mono text-xs font-bold text-slate-800 bg-transparent focus:outline-none focus:ring-1 focus:ring-emerald-500 px-1 py-0.5 rounded border border-slate-200"
+                          />
+                        </label>
+                      </div>
+                      <p className="text-[10px] text-slate-400 mt-1.5">Used as defaults when marking attendance &amp; for the clock-in/out timetable.</p>
+                    </div>
                   </div>
 
                   {/* Clock-ins history */}
                   <div className="space-y-3">
-                    <span className="text-[10px] font-bold text-slate-450 uppercase block tracking-wider">Recent Clock Logs</span>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-slate-450 uppercase block tracking-wider">Recent Clock Logs</span>
+                      <span className="text-[10px] font-mono text-emerald-600 font-bold">
+                        Shift {selectedUser.shiftStart || '09:00:00'} – {selectedUser.shiftEnd || '17:00:00'}
+                      </span>
+                    </div>
                     
                     <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
                       {selectedUserAttendance.length === 0 ? (
@@ -592,15 +654,26 @@ const EmployeeManagement: React.FC = () => {
                     <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">Role</label>
                     <select
                       value={role}
-                      onChange={e => setRole(e.target.value as UserRole)}
+                      onChange={e => setRole(e.target.value as UserRole | '__custom__')}
                       className="w-full p-2 bg-slate-50 border border-slate-200 text-xs rounded-xl focus:outline-none text-slate-800"
                     >
-                      <option value="SuperAdmin">SuperAdmin</option>
-                      <option value="Manager">Manager</option>
-                      <option value="Cashier">Cashier</option>
-                      <option value="Chef">Chef</option>
-                      <option value="Waiter">Waiter</option>
+                      {DEFAULT_ROLES.map(r => (
+                        <option key={r} value={r}>{r}</option>
+                      ))}
+                      {customRoles.map(r => (
+                        <option key={r} value={r}>{r}</option>
+                      ))}
+                      <option value="__custom__">＋ Custom Role...</option>
                     </select>
+                    {role === '__custom__' && (
+                      <input
+                        type="text"
+                        value={customRoleName}
+                        onChange={e => setCustomRoleName(e.target.value)}
+                        placeholder="e.g. Steward"
+                        className="mt-1.5 w-full p-2 bg-indigo-50 border border-indigo-200 text-xs rounded-xl focus:outline-none text-slate-800"
+                      />
+                    )}
                   </div>
 
                   <div>

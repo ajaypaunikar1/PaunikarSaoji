@@ -94,10 +94,16 @@ const Dashboard: React.FC = () => {
     return slots;
   }, [bills]);
 
-  // Top Selling Items calculated from orders history
+  // Top Selling Items calculated from orders history.
+  // Filtered to today's orders so the widget uses the SAME date range as the
+  // "Today" (daily) default on the detailed Product Performance report, and all
+  // variants/portions (Single/Half/Full) of an item are summed together.
   const topItems = useMemo(() => {
+    const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
     const itemCounts: { [key: string]: number } = {};
     orders.forEach(ord => {
+      const orderDateStr = (ord as any).createdAt ? (ord as any).createdAt.split('T')[0] : todayStr;
+      if (orderDateStr !== todayStr) return;
       if (ord.items && Array.isArray(ord.items)) {
         ord.items.forEach(item => {
           itemCounts[item.name] = (itemCounts[item.name] || 0) + item.quantity;
@@ -314,10 +320,10 @@ const Dashboard: React.FC = () => {
           <div className="mt-8 pt-4 border-t border-slate-100 flex items-center justify-between text-xs">
             <span className="text-slate-450 font-bold uppercase text-[9px] tracking-wider">Want full product reports?</span>
             <button 
-              onClick={() => { window.location.href = '/admin/menu'; }}
+              onClick={() => { window.location.href = '/admin/reports'; }}
               className="text-emerald-600 hover:text-emerald-700 font-black tracking-wide uppercase text-[10px] cursor-pointer flex items-center gap-0.5"
             >
-              View Menu <ChevronRight size={12} />
+              View Reports <ChevronRight size={12} />
             </button>
           </div>
         </div>

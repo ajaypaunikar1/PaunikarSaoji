@@ -98,6 +98,7 @@ router.post('/', protect, async (req, res) => {
 
       const orderId = `ord-${Date.now()}`;
       const timestamp = new Date().toLocaleTimeString();
+      const date = new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date());
 
       // Calculate Grand Total
       const orderItems = items.map((item, idx) => ({
@@ -115,6 +116,7 @@ router.post('/', protect, async (req, res) => {
           status: 'Pending',
           notes,
           timestamp,
+          date,
           grandTotal
         }
       });

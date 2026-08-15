@@ -20,6 +20,8 @@ router.get('/', protect, async (req, res) => {
         salary: true,
         performance: true,
         overtimeHours: true,
+        shiftStart: true,
+        shiftEnd: true,
         createdAt: true,
         updatedAt: true
       }
@@ -33,7 +35,7 @@ router.get('/', protect, async (req, res) => {
 // @route   POST /api/staff
 // @desc    Add new staff member (Admin/Manager)
 router.post('/', protect, authorize('SuperAdmin', 'Manager'), async (req, res) => {
-  const { name, username, password, role, zone, salary } = req.body;
+  const { name, username, password, role, zone, salary, shiftStart, shiftEnd } = req.body;
 
   try {
     const exist = await prisma.user.findUnique({
@@ -55,7 +57,9 @@ router.post('/', protect, authorize('SuperAdmin', 'Manager'), async (req, res) =
         zone,
         salary: Number(salary) || 0,
         performance: 5,
-        overtimeHours: 0
+        overtimeHours: 0,
+        shiftStart: shiftStart || '09:00:00',
+        shiftEnd: shiftEnd || '17:00:00'
       }
     });
 
@@ -76,7 +80,7 @@ router.put('/:id', protect, async (req, res) => {
       return res.status(404).json({ success: false, message: 'Staff member not found' });
     }
 
-    const { name, role, zone, salary, status, performance, overtimeHours } = req.body;
+    const { name, role, zone, salary, status, performance, overtimeHours, shiftStart, shiftEnd } = req.body;
 
     const data = {};
     if (name) data.name = name;
@@ -86,6 +90,8 @@ router.put('/:id', protect, async (req, res) => {
     if (status) data.status = status;
     if (performance !== undefined) data.performance = Number(performance);
     if (overtimeHours !== undefined) data.overtimeHours = Number(overtimeHours);
+    if (shiftStart !== undefined) data.shiftStart = shiftStart;
+    if (shiftEnd !== undefined) data.shiftEnd = shiftEnd;
 
     const updated = await prisma.user.update({
       where: { id: req.params.id },
