@@ -88,7 +88,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   if (!currentUser) return null;
 
-  const rbacObj = settings?.rbac && Object.keys(settings.rbac).length > 0 ? settings.rbac : defaultRbac;
+  const savedRbac = settings?.rbac && Object.keys(settings.rbac).length > 0 ? settings.rbac : null;
+  const rbacObj: Record<string, string[]> = {};
+  const allRoles = Array.from(new Set([...Object.keys(defaultRbac), ...(savedRbac ? Object.keys(savedRbac) : [])]));
+  allRoles.forEach(role => {
+    rbacObj[role] = Array.from(new Set([...(defaultRbac[role] || []), ...(savedRbac?.[role] || [])]));
+  });
   const userFeatures = rbacObj[currentUser.role] || [];
 
   const navLinks = [
@@ -121,14 +126,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <Link
                 key={link.path}
                 href={link.path}
-                title={link.label}
-                className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-200 cursor-pointer ${
+                className={`group relative w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-200 cursor-pointer ${
                   isActive
                     ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/40'
                     : 'text-slate-400 hover:bg-white/10 hover:text-white'
                 }`}
               >
                 <Icon size={18} />
+                <span className="absolute left-12 top-1/2 -translate-y-1/2 whitespace-nowrap bg-[#2D2D44] text-white text-[11px] font-semibold px-2.5 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none z-50 shadow-lg">
+                  {link.label}
+                </span>
               </Link>
             );
           })}
