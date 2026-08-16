@@ -40,10 +40,10 @@ const Profile: React.FC = () => {
 
   // RBAC Defaults
   const defaultRbac = {
-    SuperAdmin: ['dashboard', 'tables', 'billing', 'menu', 'employees', 'attendance', 'orders', 'reports', 'kds', 'profile'],
-    Admin: ['dashboard', 'tables', 'billing', 'menu', 'employees', 'attendance', 'orders', 'reports', 'kds', 'profile'],
-    Manager: ['dashboard', 'tables', 'billing', 'menu', 'employees', 'attendance', 'orders', 'reports', 'kds'],
-    Cashier: ['dashboard', 'tables', 'billing', 'orders'],
+    SuperAdmin: ['dashboard', 'tables', 'billing', 'menu', 'parcel', 'employees', 'attendance', 'orders', 'reports', 'kds', 'profile'],
+    Admin: ['dashboard', 'tables', 'billing', 'menu', 'parcel', 'employees', 'attendance', 'orders', 'reports', 'kds', 'profile'],
+    Manager: ['dashboard', 'tables', 'billing', 'menu', 'parcel', 'employees', 'attendance', 'orders', 'reports', 'kds'],
+    Cashier: ['dashboard', 'tables', 'billing', 'parcel', 'orders'],
     Waiter: ['tables', 'attendance'],
     Chef: ['kds', 'attendance']
   };
@@ -62,6 +62,7 @@ const Profile: React.FC = () => {
     { id: 'tables', label: 'Table Management' },
     { id: 'billing', label: 'Billing & Invoicing' },
     { id: 'menu', label: 'Menu Management' },
+    { id: 'parcel', label: 'Parcel' },
     { id: 'employees', label: 'Employees' },
     { id: 'attendance', label: 'Attendance' },
     { id: 'orders', label: 'Order History' },

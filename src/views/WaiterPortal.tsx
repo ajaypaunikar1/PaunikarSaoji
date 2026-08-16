@@ -906,23 +906,6 @@ const WaiterPortal: React.FC = () => {
                 </div>
               </div>
 
-              {/* Waiter Statistics Cards */}
-              <div className="p-4 rounded-2xl bg-white border border-slate-200 space-y-3 shadow-sm">
-                <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t.mySalesPerformance}</h4>
-                
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
-                    <span className="text-slate-500 text-[10px] block mb-0.5">{t.ordersTaken}</span>
-                    <span className="font-bold text-slate-800 font-mono">{waiterStats.totalOrdersCount} {language === 'en' ? 'Orders' : 'ऑर्डर्स'}</span>
-                  </div>
-                  
-                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
-                    <span className="text-slate-500 text-[10px] block mb-0.5">{t.salesGenerated}</span>
-                    <span className="font-bold text-indigo-600 font-mono">₹{waiterStats.totalRevenueGenerated}</span>
-                  </div>
-                </div>
-              </div>
-
               {/* Payroll stats */}
               <div className="p-4 rounded-2xl bg-white border border-slate-200 space-y-3 shadow-sm">
                 <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Salary & Payroll Status</h4>
