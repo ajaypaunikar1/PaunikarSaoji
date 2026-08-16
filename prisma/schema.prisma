@@ -130,6 +130,7 @@ model Bill {
   subtotal      Float
   gst           Float
   discount      Float    @default(0)
+  containerCharge Float  @default(0)
   grandTotal    Float
   isParcel      Boolean  @default(false)
   paymentMethod String?

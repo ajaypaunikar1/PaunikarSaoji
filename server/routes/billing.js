@@ -32,7 +32,7 @@ router.get('/pending-bills', async (req, res) => {
 // @route   POST /api/billing/generate
 // @desc    Generate tax invoice bill
 router.post('/generate', protect, async (req, res) => {
-  const { tableId, discount, gstPct = 5, orderId, isParcel } = req.body;
+  const { tableId, discount, gstPct = 5, orderId, isParcel, containerCharge } = req.body;
 
   try {
     const parcel = !!isParcel;
@@ -62,9 +62,10 @@ router.post('/generate', protect, async (req, res) => {
 
     // Calculations
     const discountVal = Number(discount) || 0;
+    const containerVal = parcel ? (Number(containerCharge) || 0) : 0;
     const subtotal = order.grandTotal;
     const gst = Math.round(subtotal * (Number(gstPct) / 100) * 100) / 100;
-    const grandTotal = Math.round((subtotal + gst - discountVal) * 100) / 100;
+    const grandTotal = Math.round((subtotal + gst - discountVal + containerVal) * 100) / 100;
 
     // Check for existing pending bill
     const existing = await prisma.bill.findFirst({
@@ -79,6 +80,7 @@ router.post('/generate', protect, async (req, res) => {
           subtotal,
           gst,
           discount: discountVal,
+          containerCharge: containerVal,
           grandTotal,
           timestamp: new Date().toLocaleTimeString()
         }
@@ -92,6 +94,7 @@ router.post('/generate', protect, async (req, res) => {
           subtotal,
           gst,
           discount: discountVal,
+          containerCharge: containerVal,
           grandTotal,
           isParcel: parcel,
           paymentStatus: 'Pending',
@@ -319,7 +322,7 @@ router.put('/cancel-requests/:id', protect, async (req, res) => {
         });
         if (pendingBill) {
           const newGst = Math.round(grandTotal * 0.05 * 100) / 100;
-          const newGrandTotal = Math.round((grandTotal + newGst - pendingBill.discount) * 100) / 100;
+          const newGrandTotal = Math.round((grandTotal + newGst - pendingBill.discount + (pendingBill.containerCharge || 0)) * 100) / 100;
           
           const updatedBill = await prisma.bill.update({
             where: { id: pendingBill.id },

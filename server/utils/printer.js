@@ -139,6 +139,9 @@ export async function printBillReceipt(bill, order) {
       const discLabel = bill.discountPct ? `Discount (${bill.discountPct}%)` : 'Discount';
       receipt += `${discLabel}: -Rs.${bill.discount}\n`;
     }
+    if (bill.containerCharge > 0) {
+      receipt += `Container Charge: Rs.${bill.containerCharge}\n`;
+    }
     receipt += CHARS.TEXT_BOLD_ON;
     receipt += `GRAND TOTAL: Rs.${bill.grandTotal}\n`;
     receipt += CHARS.TEXT_BOLD_OFF;

@@ -116,7 +116,9 @@ const Parcel: React.FC = () => {
   const subtotal = cart.reduce((sum, c) => sum + c.price * c.quantity, 0);
   const gst = Math.round(subtotal * (gstPct / 100) * 100) / 100;
   const discountAmt = Math.round(subtotal * (discountPct / 100) * 100) / 100;
-  const grandTotal = Math.max(0, Math.round((subtotal + gst - discountAmt) * 100) / 100);
+  const totalPlates = cart.reduce((sum, c) => sum + c.quantity, 0);
+  const containerCharge = totalPlates * 10;
+  const grandTotal = Math.max(0, Math.round((subtotal + gst - discountAmt + containerCharge) * 100) / 100);
 
   const placeOrder = (): { orderId: string; items: OrderItem[] } | null => {
     if (cart.length === 0) {
@@ -151,7 +153,7 @@ const Parcel: React.FC = () => {
     }
     try {
       if (editingOrderId) {
-        const bill = await generateParcelBill(editingOrderId, discountAmt, gstPct);
+        const bill = await generateParcelBill(editingOrderId, discountAmt, gstPct, containerCharge);
         await payBill(bill.id, paymentMethod);
         const editingOrder = orders.find(o => o.id === editingOrderId);
         const waiterName = users.find(u => u.id === currentUser?.id)?.name || 'Staff';
@@ -168,7 +170,7 @@ const Parcel: React.FC = () => {
       }
       const placed = placeOrder();
       if (!placed) return;
-      const bill = await generateParcelBill(placed.orderId, discountAmt, gstPct);
+      const bill = await generateParcelBill(placed.orderId, discountAmt, gstPct, containerCharge);
       await payBill(bill.id, paymentMethod);
       const waiterName = users.find(u => u.id === currentUser?.id)?.name || 'Staff';
       setPrintData({
@@ -366,6 +368,12 @@ const Parcel: React.FC = () => {
               <span className="text-slate-500">GST ({gstPct}%)</span>
               <span className="font-mono font-bold text-slate-800">₹{gst.toFixed(2)}</span>
             </div>
+            {containerCharge > 0 && (
+              <div className="flex justify-between text-xs items-center gap-2">
+                <span className="text-slate-500">Container Charge (₹10/plate)</span>
+                <span className="font-mono font-bold text-slate-800">₹{containerCharge.toFixed(2)}</span>
+              </div>
+            )}
             <div className="flex justify-between text-xs items-center gap-2">
               <span className="text-slate-500">Discount (%)</span>
               <input
@@ -552,6 +560,12 @@ const Parcel: React.FC = () => {
                     <tr>
                       <td>Discount:</td>
                       <td style={{ textAlign: 'right' }}>-₹{printData.bill.discount.toFixed(2)}</td>
+                    </tr>
+                  )}
+                  {printData.bill.containerCharge > 0 && (
+                    <tr>
+                      <td>Container Charge:</td>
+                      <td style={{ textAlign: 'right' }}>₹{printData.bill.containerCharge.toFixed(2)}</td>
                     </tr>
                   )}
                   <tr style={{ fontWeight: 'bold', fontSize: '12px', borderTop: '1px solid black' }}>

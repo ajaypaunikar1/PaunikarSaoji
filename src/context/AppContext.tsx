@@ -63,7 +63,7 @@ interface AppContextType {
   logout: () => void;
   addOrder: (tableId: number, items: Omit<Order['items'][0], 'id'>[], notes?: string) => Order;
   addParcelOrder: (items: Omit<Order['items'][0], 'id'>[], notes?: string, customerName?: string) => Order;
-  generateParcelBill: (orderId: string, discount?: number, gstPct?: number) => Promise<Bill>;
+  generateParcelBill: (orderId: string, discount?: number, gstPct?: number, containerCharge?: number) => Promise<Bill>;
   updateOrder: (orderId: string, updates: Partial<Order>) => void;
   updateOrderStatus: (orderId: string, status: Order['status']) => void;
   mergeTables: (sourceIds: number[], destinationId: number) => void;
@@ -926,13 +926,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return newOrder;
   };
 
-  const generateParcelBill = async (orderId: string, discount: number = 0, gstPct: number = 18): Promise<Bill> => {
+  const generateParcelBill = async (orderId: string, discount: number = 0, gstPct: number = 18, containerCharge: number = 0): Promise<Bill> => {
     const order = orders.find(o => o.id === orderId);
     if (!order) throw new Error("Order not found");
 
     const subtotal = order.grandTotal;
     const gst = Math.round(subtotal * (gstPct / 100) * 100) / 100;
-    const grandTotal = Math.round((subtotal + gst - discount) * 100) / 100;
+    const grandTotal = Math.round((subtotal + gst - discount + containerCharge) * 100) / 100;
     const discountPct = subtotal > 0 ? Math.round((discount / subtotal) * 100 * 100) / 100 : 0;
 
     const newBill: Bill = {
@@ -945,6 +945,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       gstPct,
       discount,
       discountPct,
+      containerCharge,
       grandTotal,
       paymentStatus: 'Pending',
       timestamp: getISTTime(),
@@ -955,7 +956,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const res = await fetch(`${API_BASE}/billing/generate`, {
         method: 'POST',
         headers: getHeaders(),
-        body: JSON.stringify({ orderId, isParcel: true, discount, gstPct })
+        body: JSON.stringify({ orderId, isParcel: true, discount, gstPct, containerCharge })
       }).then(r => r.json());
       if (res.success) {
         loadDatabaseData();
@@ -968,7 +969,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const newNotif: Notification = {
         id: `notif-${Date.now()}`,
         title: 'Parcel Bill Generated',
-        message: `Total: ₹${grandTotal} (Subtotal: ₹${subtotal}, GST: ₹${gst})`,
+        message: `Total: ₹${grandTotal} (Subtotal: ₹${subtotal}, GST: ₹${gst}${containerCharge ? `, Container: ₹${containerCharge}` : ''})`,
         type: 'Billing',
         timestamp: getISTTime(),
         read: false
