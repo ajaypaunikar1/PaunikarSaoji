@@ -121,7 +121,7 @@ export const PrinterProvider: React.FC<{ children: ReactNode }> = ({ children })
         return false;
       }
       try {
-        await webSerialPrinter.print(generateTestPrint(settings));
+        await webSerialPrinter.print(await generateTestPrint(settings));
         toast.success('Test print sent successfully!');
         return true;
       } catch (err: any) {
@@ -141,7 +141,7 @@ export const PrinterProvider: React.FC<{ children: ReactNode }> = ({ children })
         return false;
       }
       try {
-        await webSerialPrinter.print(generateKOT(order, settings));
+        await webSerialPrinter.print(await generateKOT(order, settings));
         toast.success(`KOT #${order.id.substring(4, 10)} printed`);
         return true;
       } catch (err: any) {
@@ -161,7 +161,7 @@ export const PrinterProvider: React.FC<{ children: ReactNode }> = ({ children })
         return false;
       }
       try {
-        await webSerialPrinter.print(generateBillReceipt(bill, order, settings));
+        await webSerialPrinter.print(await generateBillReceipt(bill, order, settings));
         toast.success(`Bill #${bill.id.substring(5, 12)} printed`);
         return true;
       } catch (err: any) {
