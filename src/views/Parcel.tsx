@@ -5,7 +5,7 @@ import {
   Wallet, CreditCard, Smartphone, PackageCheck, UserRound, Pencil, X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import type { MenuItem, PortionType, OrderItem, PaymentMethod, SpiceLevel } from '../types/types';
+import type { MenuItem, PortionType, OrderItem, Order, PaymentMethod, SpiceLevel } from '../types/types';
 import { toast } from 'sonner';
 
 const CATEGORIES = ['All', 'Vegetarian', 'Egg Curry', 'Breads', 'Rice', 'Papad', 'Starters', 'Curries', 'Handi Dishes'] as const;
@@ -32,7 +32,7 @@ const Parcel: React.FC = () => {
   const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
 
   // Checkout state
-  const [gstPct, setGstPct] = useState<number>(settings?.gstEnabled === false ? 0 : 18);
+  const [gstPct, setGstPct] = useState<number>(settings?.gstEnabled === false ? 0 : (settings?.gstPct ?? 18));
   const [discountPct, setDiscountPct] = useState<number>(0);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
   const [enableContainerCharge, setEnableContainerCharge] = useState<boolean>(true);
@@ -126,16 +126,16 @@ const Parcel: React.FC = () => {
   const containerCharge = enableContainerCharge ? totalPlates * 10 : 0;
   const grandTotal = Math.max(0, Math.round((subtotal + gst - discountAmt + containerCharge) * 100) / 100);
 
-  const placeOrder = (): { orderId: string; items: OrderItem[] } | null => {
+  const placeOrder = async (): Promise<Order | null> => {
     if (cart.length === 0) {
       toast.error('Add at least one item to the parcel');
       return null;
     }
-    const order = addParcelOrder(cart, notes || undefined, customerName || undefined);
-    return { orderId: order.id, items: order.items };
+    const order = await addParcelOrder(cart, notes || undefined, customerName || undefined);
+    return order;
   };
 
-  const handleSendToKitchen = () => {
+  const handleSendToKitchen = async () => {
     if (editingOrderId) {
       if (cart.length === 0) {
         toast.error('Add at least one item to the parcel');
@@ -146,9 +146,9 @@ const Parcel: React.FC = () => {
       clearCart();
       return;
     }
-    const placed = placeOrder();
+    const placed = await placeOrder();
     if (!placed) return;
-    toast.success(`Parcel order sent to kitchen (${placed.orderId.substring(4, 10).toUpperCase()})`);
+    toast.success(`Parcel order sent to kitchen (${placed.id.substring(4, 10).toUpperCase()})`);
     clearCart();
   };
 
@@ -174,9 +174,9 @@ const Parcel: React.FC = () => {
         clearCart();
         return;
       }
-      const placed = placeOrder();
+      const placed = await placeOrder();
       if (!placed) return;
-      const bill = await generateParcelBill(placed.orderId, discountAmt, gstPct, containerCharge);
+      const bill = await generateParcelBill(placed, discountAmt, gstPct, containerCharge);
       await payBill(bill.id, paymentMethod);
       const waiterName = users.find(u => u.id === currentUser?.id)?.name || 'Staff';
       setPrintData({

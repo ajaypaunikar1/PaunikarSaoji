@@ -11,7 +11,7 @@ import type { PaymentMethod } from '../types/types';
 const Reports: React.FC = () => {
   const { 
     orders, bills, users, attendance, language, 
-    payBill, generateBill, resetAllOrders, currentUser 
+    payBill, generateBill, resetAllOrders, currentUser, settings 
   } = useApp();
   const t = translations[language];
 
@@ -110,14 +110,14 @@ const Reports: React.FC = () => {
       } else {
         if (ord.status === 'Served') {
           totalRevenue += ord.grandTotal;
-          totalGST += ord.grandTotal * 0.05;
+          totalGST += ord.grandTotal * ((settings?.gstPct ?? 18) / 100);
         }
       }
     });
 
     const avgOrderValue = totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0;
     return { totalRevenue, totalGST, totalDiscount, totalOrders, avgOrderValue };
-  }, [filteredOrders, bills]);
+  }, [filteredOrders, bills, settings]);
 
   // Product Metrics
   const productMetrics = useMemo(() => {
@@ -169,7 +169,7 @@ const Reports: React.FC = () => {
       const itemsList = ord.items.map(i => `${i.name} (${i.portion} x${i.quantity})`).join(' | ').replace(/,/g, '');
       
       const subtotal = bill ? bill.subtotal : ord.grandTotal;
-      const gst = bill ? bill.gst : Math.round(ord.grandTotal * 0.05 * 100) / 100;
+      const gst = bill ? bill.gst : Math.round(ord.grandTotal * ((settings?.gstPct ?? 18) / 100) * 100) / 100;
       const discount = bill ? bill.discount : 0;
       const grandTotal = bill ? bill.grandTotal : ord.grandTotal + gst;
       const paymentMethod = bill && bill.paymentMethod ? bill.paymentMethod : '-';
@@ -410,7 +410,7 @@ const Reports: React.FC = () => {
                     filteredOrders.map(ord => {
                       const bill = bills.find(b => b.orderId === ord.id);
                       const subtotal = bill ? bill.subtotal : ord.grandTotal;
-                      const gst = bill ? bill.gst : Math.round(ord.grandTotal * 0.05 * 100) / 100;
+                      const gst = bill ? bill.gst : Math.round(ord.grandTotal * ((settings?.gstPct ?? 18) / 100) * 100) / 100;
                       const discount = bill ? bill.discount : 0;
                       const grandTotal = bill ? bill.grandTotal : ord.grandTotal + gst;
                       const dateStr = (ord as any).createdAt ? new Date((ord as any).createdAt).toLocaleString() : ord.timestamp;

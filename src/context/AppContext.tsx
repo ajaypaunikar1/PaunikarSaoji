@@ -61,9 +61,9 @@ interface AppContextType {
   zones: string[];
   login: (username: string, password?: string, role?: UserRole) => boolean;
   logout: () => void;
-  addOrder: (tableId: number, items: Omit<Order['items'][0], 'id'>[], notes?: string) => Order;
-  addParcelOrder: (items: Omit<Order['items'][0], 'id'>[], notes?: string, customerName?: string) => Order;
-  generateParcelBill: (orderId: string, discount?: number, gstPct?: number, containerCharge?: number) => Promise<Bill>;
+  addOrder: (tableId: number, items: Omit<Order['items'][0], 'id'>[], notes?: string) => Promise<Order>;
+  addParcelOrder: (items: Omit<Order['items'][0], 'id'>[], notes?: string, customerName?: string) => Promise<Order>;
+  generateParcelBill: (order: string | Order, discount?: number, gstPct?: number, containerCharge?: number) => Promise<Bill>;
   updateOrder: (orderId: string, updates: Partial<Order>) => void;
   updateOrderStatus: (orderId: string, status: Order['status']) => void;
   mergeTables: (sourceIds: number[], destinationId: number) => void;
@@ -809,7 +809,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
-  const addOrder = (tableId: number, items: Omit<Order['items'][0], 'id'>[], notes?: string): Order => {
+  const addOrder = async (tableId: number, items: Omit<Order['items'][0], 'id'>[], notes?: string): Promise<Order> => {
     const waiterId = currentUser?.id || 'u5';
     const orderId = `ord-${Date.now()}`;
     const timestamp = getISTTime();
@@ -836,14 +836,25 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     };
 
     if (isBackendMode) {
-      fetch(`${API_BASE}/orders`, {
-        method: 'POST',
-        headers: getHeaders(),
-        body: JSON.stringify({ tableId, items, notes })
-      }).then(() => {
-        toast.success(`Order sent to kitchen for Table ${tableId}`);
-        loadDatabaseData();
-      });
+      try {
+        const res = await fetch(`${API_BASE}/orders`, {
+          method: 'POST',
+          headers: getHeaders(),
+          body: JSON.stringify({ tableId, items, notes })
+        }).then(r => r.json());
+        if (res.success && res.data) {
+          const serverOrder = res.data as Order;
+          setOrders(prev => [...prev, serverOrder]);
+          toast.success(`Order sent to kitchen for Table ${tableId}`);
+          loadDatabaseData();
+          return serverOrder;
+        }
+        throw new Error(res.message || 'Failed to create order');
+      } catch (e: any) {
+        toast.error(e.message || 'Failed to create order');
+        setOrders(prev => [...prev, newOrder]);
+        return newOrder;
+      }
     } else {
       setOrders(prev => [...prev, newOrder]);
       setTables(prev => prev.map(t => t.id === tableId ? {
@@ -870,7 +881,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return newOrder;
   };
 
-  const addParcelOrder = (items: Omit<Order['items'][0], 'id'>[], notes?: string, customerName?: string): Order => {
+  const addParcelOrder = async (items: Omit<Order['items'][0], 'id'>[], notes?: string, customerName?: string): Promise<Order> => {
     const waiterId = currentUser?.id || 'u5';
     const orderId = `ord-${Date.now()}`;
     const timestamp = getISTTime();
@@ -899,14 +910,25 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     };
 
     if (isBackendMode) {
-      fetch(`${API_BASE}/orders`, {
-        method: 'POST',
-        headers: getHeaders(),
-        body: JSON.stringify({ isParcel: true, items, notes, customerName })
-      }).then(() => {
-        toast.success('Parcel order sent to kitchen');
-        loadDatabaseData();
-      });
+      try {
+        const res = await fetch(`${API_BASE}/orders`, {
+          method: 'POST',
+          headers: getHeaders(),
+          body: JSON.stringify({ isParcel: true, items, notes, customerName })
+        }).then(r => r.json());
+        if (res.success && res.data) {
+          const serverOrder = res.data as Order;
+          setOrders(prev => [...prev, serverOrder]);
+          toast.success('Parcel order sent to kitchen');
+          loadDatabaseData();
+          return serverOrder;
+        }
+        throw new Error(res.message || 'Failed to create parcel order');
+      } catch (e: any) {
+        toast.error(e.message || 'Failed to create parcel order');
+        setOrders(prev => [...prev, newOrder]);
+        return newOrder;
+      }
     } else {
       setOrders(prev => [...prev, newOrder]);
 
@@ -926,18 +948,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return newOrder;
   };
 
-  const generateParcelBill = async (orderId: string, discount: number = 0, gstPct: number = 18, containerCharge: number = 0): Promise<Bill> => {
-    const order = orders.find(o => o.id === orderId);
-    if (!order) throw new Error("Order not found");
+  const generateParcelBill = async (order: string | Order, discount: number = 0, gstPct: number = 18, containerCharge: number = 0): Promise<Bill> => {
+    const orderObj = typeof order === 'string' ? orders.find(o => o.id === order) : order;
+    if (!orderObj) throw new Error("Order not found");
 
-    const subtotal = order.grandTotal;
+    const subtotal = orderObj.grandTotal;
     const gst = Math.round(subtotal * (gstPct / 100) * 100) / 100;
     const grandTotal = Math.round((subtotal + gst - discount + containerCharge) * 100) / 100;
     const discountPct = subtotal > 0 ? Math.round((discount / subtotal) * 100 * 100) / 100 : 0;
 
     const newBill: Bill = {
       id: `bill-${Date.now()}`,
-      orderId: order.id,
+      orderId: orderObj.id,
       tableId: 0,
       isParcel: true,
       subtotal,
@@ -956,7 +978,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const res = await fetch(`${API_BASE}/billing/generate`, {
         method: 'POST',
         headers: getHeaders(),
-        body: JSON.stringify({ orderId, isParcel: true, discount, gstPct, containerCharge })
+        body: JSON.stringify({ orderId: orderObj.id, isParcel: true, discount, gstPct, containerCharge })
       }).then(r => r.json());
       if (res.success) {
         loadDatabaseData();

@@ -77,11 +77,14 @@ app.get('/api/settings', async (req, res) => {
           upiId: 'restaurant@upi',
           zones: ['A', 'B', 'C'],
           mergedGroups: [],
+          gstEnabled: true,
+          gstPct: 18,
           kitchenPrinterIp: '127.0.0.1',
           billingPrinterIp: '127.0.0.1'
         }
       });
     }
+    if (settings.gstPct == null) settings.gstPct = 18;
     res.json({ success: true, data: settings });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -103,6 +106,8 @@ app.put('/api/settings', async (req, res) => {
         upiId: updates.upiId || 'restaurant@upi',
         zones: updates.zones || ['A', 'B', 'C'],
         mergedGroups: updates.mergedGroups || [],
+        gstEnabled: updates.gstEnabled ?? true,
+        gstPct: updates.gstPct ?? 18,
         kitchenPrinterIp: updates.kitchenPrinterIp || '127.0.0.1',
         billingPrinterIp: updates.billingPrinterIp || '127.0.0.1'
       }
@@ -283,7 +288,9 @@ const seedDatabase = async () => {
           gstNumber: '27AAAAA1111A1Z1',
           upiId: 'restaurant@upi',
           zones: ['A', 'B', 'C'],
-          mergedGroups: []
+          mergedGroups: [],
+          gstEnabled: true,
+          gstPct: 18
         }
       });
       console.log('Settings seeded successfully!');

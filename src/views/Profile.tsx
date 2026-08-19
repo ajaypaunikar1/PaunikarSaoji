@@ -9,6 +9,7 @@ const Profile: React.FC = () => {
   // Settings States
   const [cancellationApproval, setCancellationApproval] = useState(settings?.cancellationApproval || false);
   const [gstEnabled, setGstEnabled] = useState(settings?.gstEnabled || false);
+  const [gstPct, setGstPct] = useState<number>(settings?.gstPct ?? 18);
 
   // Restaurant Info States (from DB settings, fully editable)
   const [restaurantName, setRestaurantName] = useState(settings?.restaurantName || '');
@@ -27,6 +28,7 @@ const Profile: React.FC = () => {
       setUpiId(settings.upiId || '');
       setCancellationApproval(settings.cancellationApproval || false);
       setGstEnabled(settings.gstEnabled || false);
+      setGstPct(settings.gstPct ?? 18);
     }
   }, [settings]);
 
@@ -91,6 +93,7 @@ const Profile: React.FC = () => {
         upiId,
         cancellationApproval,
         gstEnabled,
+        gstPct,
         rbac: rbacConfig
       });
       toast.success('Settings saved successfully');
@@ -335,18 +338,34 @@ const Profile: React.FC = () => {
                     />
                   </label>
 
-                  <label className="flex items-center justify-between p-3 bg-slate-50 border border-slate-100 rounded-xl cursor-pointer hover:border-indigo-200 transition">
-                    <div>
-                      <span className="text-xs font-bold text-slate-800 block">Enable 18% GST on Billing</span>
-                      <span className="text-[10px] text-slate-500">Automatically calculate and append 18% GST (CGST 9% + SGST 9%) to invoices.</span>
+                  <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl">
+                    <div className="flex items-center justify-between">
+                      <div className="pr-3">
+                        <span className="text-xs font-bold text-slate-800 block">GST on Billing</span>
+                        <span className="text-[10px] text-slate-500">Apply GST to invoices. Set the rate to 0% to disable. The rate is split evenly into CGST + SGST on the printed bill.</span>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={gstEnabled}
+                        onChange={e => setGstEnabled(e.target.checked)}
+                        className="w-4 h-4 accent-indigo-600 shrink-0"
+                      />
                     </div>
-                    <input 
-                      type="checkbox" 
-                      checked={gstEnabled} 
-                      onChange={e => setGstEnabled(e.target.checked)} 
-                      className="w-4 h-4 accent-indigo-600"
-                    />
-                  </label>
+                    <div className="flex items-center gap-2 mt-3">
+                      <span className="text-[10px] font-bold text-slate-500">Rate</span>
+                      <input
+                        type="number"
+                        min={0}
+                        max={40}
+                        step={0.5}
+                        value={gstPct}
+                        disabled={!gstEnabled}
+                        onChange={e => setGstPct(Math.max(0, Math.min(40, parseFloat(e.target.value) || 0)))}
+                        className="w-24 px-2 py-1.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
+                      />
+                      <span className="text-xs font-bold text-slate-500">%</span>
+                    </div>
+                  </div>
                 </div>
               </div>
 

@@ -25,6 +25,7 @@ const Billing: React.FC = () => {
   const [selectedParcelId, setSelectedParcelId] = useState<string | null>(null);
   const [discountPct, setDiscountPct] = useState<number>(0);   // Discount in %
   const [customGstPct, setCustomGstPct] = useState<number>(18); // Default 18%
+  const [containerChargeEnabled, setContainerChargeEnabled] = useState<boolean>(true); // ₹10/plate for parcels
   const [cancelReason, setCancelReason] = useState<string>('');
   const [activeCancelItemId, setActiveCancelItemId] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
@@ -73,7 +74,10 @@ const Billing: React.FC = () => {
     // Discount is now a percentage
     const discountAmt = Math.round(subtotal * (discountPct / 100) * 100) / 100;
     const discount = Math.min(discountAmt, subtotal + gst);
-    const grandTotal = Math.max(0, Math.round((subtotal + gst - discount) * 100) / 100);
+    const containerCharge = isParcel && containerChargeEnabled
+      ? selectedOrder.items.reduce((s: number, i: any) => s + i.quantity, 0) * 10
+      : 0;
+    const grandTotal = Math.max(0, Math.round((subtotal + gst - discount + containerCharge) * 100) / 100);
 
     return {
       ...baseBill,
@@ -82,9 +86,10 @@ const Billing: React.FC = () => {
       gstPct: customGstPct,
       discount,
       discountPct,
+      containerCharge,
       grandTotal,
     };
-  }, [selectedTableId, selectedParcelId, selectedOrder, discountPct, customGstPct, bills]);
+  }, [selectedTableId, selectedParcelId, selectedOrder, discountPct, customGstPct, containerChargeEnabled, bills]);
 
   // UPI payment string generator
   const upiString = useMemo(() => {
@@ -105,8 +110,11 @@ const Billing: React.FC = () => {
 
     try {
       const discountAmt = Math.round(selectedOrder.grandTotal * (discountPct / 100) * 100) / 100;
+      const containerCharge = selectedParcelId
+        ? (containerChargeEnabled ? selectedOrder.items.reduce((s: number, i: any) => s + i.quantity, 0) * 10 : 0)
+        : 0;
       const finalBill = selectedParcelId
-        ? await generateParcelBill(selectedOrder.id, discountAmt, customGstPct)
+        ? await generateParcelBill(selectedOrder.id, discountAmt, customGstPct, containerCharge)
         : await generateBill(selectedTableId!, discountAmt, customGstPct);
       const waiterName = users.find(u => u.id === selectedOrder.waiterId)?.name || 'Staff';
 
@@ -131,7 +139,7 @@ const Billing: React.FC = () => {
       setSelectedTableId(null);
       setSelectedParcelId(null);
       setDiscountPct(0);
-      setCustomGstPct(18);
+      setCustomGstPct(settings?.gstEnabled ? (settings?.gstPct ?? 18) : 0);
     } catch (err: any) {
       toast.error(err.message || 'Payment processing failed');
     }
@@ -145,8 +153,11 @@ const Billing: React.FC = () => {
     }
     try {
       const discountAmt = Math.round(selectedOrder.grandTotal * (discountPct / 100) * 100) / 100;
+      const containerCharge = selectedParcelId
+        ? (containerChargeEnabled ? selectedOrder.items.reduce((s: number, i: any) => s + i.quantity, 0) * 10 : 0)
+        : 0;
       const finalBill = selectedParcelId
-        ? await generateParcelBill(selectedOrder.id, discountAmt, customGstPct)
+        ? await generateParcelBill(selectedOrder.id, discountAmt, customGstPct, containerCharge)
         : await generateBill(selectedTableId!, discountAmt, customGstPct);
       const waiterName = users.find(u => u.id === selectedOrder.waiterId)?.name || 'Staff';
 
@@ -242,7 +253,7 @@ const Billing: React.FC = () => {
                       setSelectedTableId(tbl.id);
                       setSelectedParcelId(null);
                       setDiscountPct(0);
-                      setCustomGstPct(settings?.gstEnabled ? 18 : 0);
+                      setCustomGstPct(settings?.gstEnabled ? (settings?.gstPct ?? 18) : 0);
                     }}
                     className={`p-4 rounded-2xl border transition duration-300 flex justify-between items-center cursor-pointer ${
                       isSelected 
@@ -290,7 +301,7 @@ const Billing: React.FC = () => {
                       setSelectedParcelId(o.id);
                       setSelectedTableId(null);
                       setDiscountPct(0);
-                      setCustomGstPct(settings?.gstEnabled ? 18 : 0);
+                      setCustomGstPct(settings?.gstEnabled ? (settings?.gstPct ?? 18) : 0);
                     }}
                     className={`p-4 rounded-2xl border transition duration-300 flex justify-between items-center cursor-pointer ${
                       isSelected
@@ -441,6 +452,21 @@ const Billing: React.FC = () => {
                         <span className="font-mono text-slate-800 w-16 text-right">-₹{activeBill.discount.toFixed(2)}</span>
                       </div>
                     </div>
+
+                    {selectedParcelId && (
+                      <div className="flex justify-between items-center py-1">
+                        <span className="flex items-center gap-1 font-bold text-slate-700">
+                          <input
+                            type="checkbox"
+                            checked={containerChargeEnabled}
+                            onChange={e => setContainerChargeEnabled(e.target.checked)}
+                            className="w-3.5 h-3.5 accent-emerald-600"
+                          />
+                          Container Charge (₹10/plate)
+                        </span>
+                        <span className="font-mono text-slate-800 w-16 text-right">₹{activeBill.containerCharge.toFixed(2)}</span>
+                      </div>
+                    )}
                     
                     <div className="pt-3 border-t border-slate-100 flex justify-between items-center text-sm font-black">
                       <span className="text-slate-850 uppercase tracking-wider">{t.grandTotal}</span>
@@ -669,6 +695,12 @@ const Billing: React.FC = () => {
                     <tr style={{ color: 'green' }}>
                       <td>Discount{printBillData.bill.discountPct ? ` (${printBillData.bill.discountPct}%)` : ''}:</td>
                       <td style={{ textAlign: 'right' }}>-₹{printBillData.bill.discount.toFixed(2)}</td>
+                    </tr>
+                  )}
+                  {(printBillData.bill.containerCharge || 0) > 0 && (
+                    <tr>
+                      <td>Container Charge:</td>
+                      <td style={{ textAlign: 'right' }}>₹{(printBillData.bill.containerCharge || 0).toFixed(2)}</td>
                     </tr>
                   )}
                   <tr style={{ fontSize: '12px', fontWeight: 'bold', borderTop: '1px solid black' }}>

@@ -176,6 +176,7 @@ model Settings {
   mergedGroups                         Json     @default("[]")
   cancellationApproval                 Boolean  @default(false)
   gstEnabled                           Boolean  @default(true)
+  gstPct                               Float    @default(18)
   rbac                                 Json     @default("{}")
   branchId                             String   @default("branch-main")
   // @deprecated Thermal printing now uses the browser Web Serial API.
