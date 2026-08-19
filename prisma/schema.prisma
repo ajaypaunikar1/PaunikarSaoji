@@ -178,6 +178,9 @@ model Settings {
   gstEnabled                           Boolean  @default(true)
   rbac                                 Json     @default("{}")
   branchId                             String   @default("branch-main")
+  // @deprecated Thermal printing now uses the browser Web Serial API.
+  // These fields are kept only for backward compatibility and are no longer
+  // read by any active printing code. Safe to drop after a data migration.
   kitchenPrinterIp                     String   @default("127.0.0.1")
   billingPrinterIp                     String   @default("127.0.0.1")
   createdAt                            DateTime @default(now())

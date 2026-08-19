@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
+import { usePrinter } from '../context/PrinterContext';
 import { translations } from '../translations/translations';
 import { 
-  ChefHat, Play, CheckCheck, Printer, Clock, Sparkles, X
+  ChefHat, Play, CheckCheck, Printer, Clock, Sparkles, X, Zap
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import type { Order, OrderStatus } from '../types/types';
+import type { Order, OrderStatus, OrderItem } from '../types/types';
 
 // Component: Kitchen Order Card Timer
 const OrderTimer: React.FC<{ timestamp: string }> = ({ timestamp }) => {
@@ -52,20 +53,76 @@ const OrderTimer: React.FC<{ timestamp: string }> = ({ timestamp }) => {
 };
 
 const KDS: React.FC = () => {
-  const { orders, users, updateOrderStatus, updateOrder, language } = useApp();
+  const { orders, users, updateOrderStatus, updateOrder, language, settings } = useApp();
+  const { printKOT: printKOTThermal, connected, connect } = usePrinter();
+  const [connectLoading, setConnectLoading] = useState(false);
   const t = translations[language];
 
   const [printKOTData, setPrintKOTData] = useState<Order | null>(null);
 
   const activeOrders = orders.filter(o => o.status !== 'Served');
 
-  const handlePrintKOT = (order: Order) => {
+  // Auto-print KOT for brand new / appended orders via Web Serial.
+  // Mirrors the previous server-side auto-print, now driven by the socket
+  // synced `orders` list in this KDS screen.
+  const initializedRef = useRef<boolean>(false);
+  const mountedAtRef = useRef<number>(Date.now());
+  const prevItemsMap = useRef<Map<string, OrderItem[]>>(new Map());
+
+  const computePendingItems = (order: Order) => {
     const pendingItems = order.items.filter(item => item.status === 'Pending');
-    const itemsToPrint = pendingItems.length > 0 
-      ? pendingItems 
+    return pendingItems.length > 0
+      ? pendingItems
       : order.items.filter(item => item.status !== 'Served');
-    setPrintKOTData({ ...order, items: itemsToPrint });
-    setTimeout(() => window.print(), 150);
+  };
+
+  useEffect(() => {
+    if (!initializedRef.current) {
+      orders.forEach(o => prevItemsMap.current.set(o.id, o.items));
+      initializedRef.current = true;
+      return;
+    }
+
+    // Grace period: orders that appear during the initial bulk load on page
+    // mount must not trigger duplicate KOT prints.
+    const isWithinGrace = Date.now() - mountedAtRef.current < 3000;
+
+    orders.forEach(order => {
+      const prevItems = prevItemsMap.current.get(order.id);
+      prevItemsMap.current.set(order.id, order.items);
+
+      if (isWithinGrace) return;
+
+      if (!prevItems) {
+        // Brand new order
+        if (order.status === 'Pending') {
+          printKOTThermal({ ...order, items: computePendingItems(order) }, settings);
+        }
+        return;
+      }
+
+      // Items appended to an existing order
+      const newlyAdded: OrderItem[] = [];
+      order.items.forEach(item => {
+        const existing = prevItems.find(i => i.name === item.name && i.portion === item.portion);
+        if (!existing) {
+          newlyAdded.push(item);
+        } else if (item.quantity > existing.quantity) {
+          newlyAdded.push({ ...item, quantity: item.quantity - existing.quantity });
+        }
+      });
+
+      if (newlyAdded.length > 0) {
+        printKOTThermal({ ...order, items: newlyAdded }, settings);
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orders]);
+
+  const handlePrintKOT = (order: Order) => {
+    const printableOrder = { ...order, items: computePendingItems(order) };
+    setPrintKOTData(printableOrder);
+    printKOTThermal(printableOrder, settings);
   };
 
   const getStatusActionLabel = (status: OrderStatus) => {
@@ -131,9 +188,32 @@ const KDS: React.FC = () => {
           <h2 className="text-xl font-extrabold text-slate-800 m-0 tracking-tight">{t.kitchen}</h2>
           <p className="text-xs text-slate-500 font-medium mt-1">Live active preparation queue and order ticket router.</p>
         </div>
-        <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs shadow-sm">
-          <ChefHat size={16} className="text-emerald-500" />
-          <span className="font-bold text-slate-850">{activeOrders.length} {t.liveOrders}</span>
+        <div className="flex items-center gap-2">
+          {/* Thermal Printer Status / Connect */}
+          {connected ? (
+            <div className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-1.5 text-xs shadow-sm">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="font-bold text-emerald-700">Printer</span>
+            </div>
+          ) : (
+            <button
+              onClick={async () => {
+                setConnectLoading(true);
+                await connect();
+                setConnectLoading(false);
+              }}
+              disabled={connectLoading}
+              className="flex items-center gap-1.5 bg-rose-50 border border-rose-200 rounded-xl px-3 py-1.5 text-xs shadow-sm cursor-pointer hover:bg-rose-100 transition disabled:opacity-50"
+              title="Connect thermal printer via Web Serial"
+            >
+              <span className="w-2 h-2 rounded-full bg-rose-500" />
+              <span className="font-bold text-rose-700">{connectLoading ? 'Connecting...' : 'Connect Printer'}</span>
+            </button>
+          )}
+          <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs shadow-sm">
+            <ChefHat size={16} className="text-emerald-500" />
+            <span className="font-bold text-slate-850">{activeOrders.length} {t.liveOrders}</span>
+          </div>
         </div>
       </div>
 
@@ -401,6 +481,16 @@ const KDS: React.FC = () => {
                   className="flex-1 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 font-bold text-xs uppercase tracking-wider cursor-pointer transition text-center"
                 >
                   {language === 'en' ? 'Close' : 'बंद करा'}
+                </button>
+                <button
+                  onClick={() => {
+                    if (printKOTData) {
+                      printKOTThermal(printKOTData, settings);
+                    }
+                  }}
+                  className="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs uppercase tracking-wider cursor-pointer shadow-md transition text-center flex items-center justify-center gap-1.5"
+                >
+                  <Zap size={13} /> {language === 'en' ? 'Thermal Print' : 'थर्मल प्रिंट'}
                 </button>
                 <button
                   onClick={() => {

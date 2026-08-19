@@ -1,7 +1,6 @@
 import express from 'express';
 import prisma from '../config/db.js';
 import { protect } from '../middleware/auth.js';
-import { printBillReceipt } from '../utils/printer.js';
 
 const router = express.Router();
 
@@ -103,8 +102,8 @@ router.post('/generate', protect, async (req, res) => {
       });
     }
 
-    // Print Receipt to Counter Printer
-    printBillReceipt(newBill, order);
+    // Bill thermal printing now happens client-side via Web Serial
+    // (the Billing screen prints from the returned bill data).
 
     if (!parcel) {
       // Set Table status to Billing
@@ -189,7 +188,9 @@ router.post('/:id/pay', protect, async (req, res) => {
 });
 
 // @route   POST /api/billing/:id/print
-// @desc    Manually trigger thermal printing of a bill to network printer
+// @desc    Bill data / print-intent endpoint. Physical printing is performed
+//          client-side via Web Serial; this endpoint only returns the bill and
+//          its order so the frontend can generate the ESC/POS receipt.
 router.post('/:id/print', protect, async (req, res) => {
   try {
     let bill = await prisma.bill.findUnique({ where: { id: req.params.id } });
@@ -204,8 +205,11 @@ router.post('/:id/print', protect, async (req, res) => {
       return res.status(404).json({ success: false, message: 'Order not found' });
     }
 
-    printBillReceipt(bill, order);
-    res.json({ success: true, message: 'Receipt sent to network printer' });
+    res.json({
+      success: true,
+      data: { bill, order },
+      message: 'Print the receipt from the browser using Web Serial.'
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

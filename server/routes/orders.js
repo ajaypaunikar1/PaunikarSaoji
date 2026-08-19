@@ -1,7 +1,6 @@
 import express from 'express';
 import prisma from '../config/db.js';
 import { protect } from '../middleware/auth.js';
-import { printKOT } from '../utils/printer.js';
 
 const router = express.Router();
 
@@ -128,8 +127,8 @@ router.post('/', protect, async (req, res) => {
         }
       });
 
-      // Print KOT to Kitchen
-      printKOT(newOrder);
+      // KOT thermal printing now happens client-side via Web Serial
+      // (KDS screen auto-prints when it receives the order_created socket event).
 
       if (!parcel) {
         // Link table
@@ -217,7 +216,8 @@ router.put('/:id', protect, async (req, res) => {
         });
 
         if (newlyAddedItems.length > 0) {
-          printKOT({ ...finalOrder, items: newlyAddedItems });
+          // KOT for newly added items is printed client-side via Web Serial
+          // (KDS auto-prints when it receives the order_updated socket event).
         }
       } else if (req.body.status) {
         finalOrder = await prisma.order.update({

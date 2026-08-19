@@ -1,9 +1,10 @@
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
+import { usePrinter } from '../context/PrinterContext';
 import { translations } from '../translations/translations';
 import { 
   Receipt, CreditCard, Wallet, Smartphone,
-  Printer, Percent, Calculator, PackageCheck
+  Printer, Percent, Calculator, PackageCheck, FileText
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -15,6 +16,8 @@ const Billing: React.FC = () => {
     tables, orders, generateBill, generateParcelBill, payBill, bills, language,
     requestCancellation, users, settings, currentUser, updateOrder
   } = useApp();
+  const { printBill: printBillThermal, connected, connect } = usePrinter();
+  const [connectLoading, setConnectLoading] = useState(false);
   const t = translations[language];
 
   // Billing screen state
@@ -111,18 +114,15 @@ const Billing: React.FC = () => {
       // the actual payment method (Cash / UPI / Card) instead of defaulting to Cash.
       await payBill(finalBill.id, paymentMethod || 'Cash');
 
-      // Trigger ESC/POS network printer via backend if available
-      try {
-        const token = localStorage.getItem('rms_token');
-        await fetch(`http://localhost:5000/api/billing/${finalBill.id}/print`, {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-      } catch {}
-      
-      // Trigger browser print dialog automatically
-      handlePrintReceipt(
-        { ...finalBill, paymentMethod: paymentMethod || 'Cash' },
+      const paidBill = { ...finalBill, paymentMethod: paymentMethod || 'Cash' };
+
+      // Physical thermal printing via Web Serial (performed on this device).
+      // Browser PDF copy remains available via the "Browser Print" button.
+      await printBillThermal(paidBill, selectedOrder, settings);
+
+      // Keep the print data so a PDF/browser copy can be printed if required.
+      handleSetPrintData(
+        paidBill,
         selectedOrder.items,
         waiterName,
         selectedParcelId ? selectedOrder.customerName : undefined
@@ -150,16 +150,10 @@ const Billing: React.FC = () => {
         : await generateBill(selectedTableId!, discountAmt, customGstPct);
       const waiterName = users.find(u => u.id === selectedOrder.waiterId)?.name || 'Staff';
 
-      // Trigger ESC/POS network printer via backend
-      try {
-        const token = localStorage.getItem('rms_token');
-        await fetch(`http://localhost:5000/api/billing/${finalBill.id}/print`, {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-      } catch {}
+      // Physical thermal printing via Web Serial (performed on this device).
+      await printBillThermal(finalBill, selectedOrder, settings);
 
-      handlePrintReceipt(
+      handleSetPrintData(
         finalBill,
         selectedOrder.items,
         waiterName,
@@ -171,14 +165,22 @@ const Billing: React.FC = () => {
     }
   };
 
-  // Printer trigger
-  const handlePrintReceipt = (bill: Bill, orderItems: any[], waiterName: string, customerName?: string) => {
+  // Store the bill for the browser PDF print path
+  const handleSetPrintData = (bill: Bill, orderItems: any[], waiterName: string, customerName?: string) => {
     setPrintBillData({
       bill,
       orderItems,
       waiterName,
       customerName
     });
+  };
+
+  // Browser PDF print (window.print) - independent of thermal printing
+  const handleBrowserPrint = () => {
+    if (!printBillData) {
+      toast.error('Generate a bill first before using browser print');
+      return;
+    }
     setTimeout(() => {
       window.print();
     }, 200);
@@ -493,6 +495,7 @@ const Billing: React.FC = () => {
                   <button
                     onClick={handlePrintOnly}
                     className="py-3.5 bg-slate-800 hover:bg-slate-900 text-white font-black text-xs uppercase tracking-wider rounded-xl cursor-pointer transition shadow-md flex items-center justify-center gap-1.5"
+                    title={connected ? 'Thermal print via Web Serial' : 'Printer not connected - connect in Dashboard settings'}
                   >
                     <Printer size={15} /> Print Bill
                   </button>
@@ -503,6 +506,31 @@ const Billing: React.FC = () => {
                   >
                     <Receipt size={15} /> Pay & Checkout & Print
                   </button>
+                </div>
+
+                <div className="flex items-center justify-between pt-1">
+                  <button
+                    onClick={handleBrowserPrint}
+                    disabled={!printBillData}
+                    className="text-[10px] font-bold uppercase tracking-wider text-slate-400 hover:text-emerald-600 cursor-pointer transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1"
+                  >
+                    <FileText size={12} /> Browser Print (PDF)
+                  </button>
+                  <span className={`text-[9px] font-bold uppercase tracking-wider ${connected ? 'text-emerald-600' : 'text-rose-500'}`}>
+                    {connected ? 'Thermal: Connected' : (
+                      <button
+                        onClick={async () => {
+                          setConnectLoading(true);
+                          await connect();
+                          setConnectLoading(false);
+                        }}
+                        disabled={connectLoading}
+                        className="text-rose-500 hover:text-rose-700 cursor-pointer disabled:opacity-50"
+                      >
+                        {connectLoading ? 'Connecting...' : 'Thermal: Not Connected - Connect'}
+                      </button>
+                    )}
+                  </span>
                 </div>
               </motion.div>
             ) : (

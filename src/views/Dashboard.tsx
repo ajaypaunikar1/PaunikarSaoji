@@ -1,9 +1,11 @@
 import React, { useMemo, useState } from 'react';
 import { useApp } from '../context/AppContext';
+import { usePrinter } from '../context/PrinterContext';
 import { translations } from '../translations/translations';
 import { 
   IndianRupee, Percent, Clock, Users, Activity, 
-  TrendingUp, ChevronRight, Award, Settings as SettingsIcon
+  TrendingUp, ChevronRight, Award, Settings as SettingsIcon,
+  Printer, Plug, Unplug, FlaskConical
 } from 'lucide-react';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, 
@@ -15,6 +17,7 @@ const Dashboard: React.FC = () => {
   const { 
     orders, tables, attendance, bills, language, auditLogs, settings, updateSettings, currentUser
   } = useApp();
+  const { supported, connected, printerName, printing, error, connect, disconnect, testPrint } = usePrinter();
   const t = translations[language];
 
   // Settings form states
@@ -23,8 +26,8 @@ const Dashboard: React.FC = () => {
   const [formAddress, setFormAddress] = useState('');
   const [formGst, setFormGst] = useState('');
   const [formUpi, setFormUpi] = useState('');
-  const [formKitchenIp, setFormKitchenIp] = useState('127.0.0.1');
-  const [formBillingIp, setFormBillingIp] = useState('127.0.0.1');
+  const [connectLoading, setConnectLoading] = useState(false);
+  const [testLoading, setTestLoading] = useState(false);
 
   // Calculations
   const metrics = useMemo(() => {
@@ -160,8 +163,6 @@ const Dashboard: React.FC = () => {
                   setFormAddress(settings.address || '');
                   setFormGst(settings.gstNumber || '');
                   setFormUpi(settings.upiId || '');
-                  setFormKitchenIp(settings.kitchenPrinterIp || '127.0.0.1');
-                  setFormBillingIp(settings.billingPrinterIp || '127.0.0.1');
                 }
                 setIsSettingsOpen(true);
               }}
@@ -358,9 +359,7 @@ const Dashboard: React.FC = () => {
                   restaurantName: formRestName,
                   address: formAddress,
                   gstNumber: formGst,
-                  upiId: formUpi,
-                  kitchenPrinterIp: formKitchenIp,
-                  billingPrinterIp: formBillingIp
+                  upiId: formUpi
                 });
                 setIsSettingsOpen(false);
               }} className="p-6 space-y-4 overflow-y-auto">
@@ -417,35 +416,79 @@ const Dashboard: React.FC = () => {
 
                 <div className="border-b border-slate-100" />
 
-                {/* Section 2: Printers Network IPs */}
+                {/* Section 2: Thermal Printer (Web Serial) */}
                 <div className="space-y-3">
-                  <h4 className="text-[10px] font-black uppercase text-slate-450 tracking-wider">Printer Network Configurations</h4>
-                  <p className="text-[10px] text-slate-500 leading-tight">Configure printer IP addresses. Direct raw printing on port 9100 will target these router IPs.</p>
+                  <h4 className="text-[10px] font-black uppercase text-slate-450 tracking-wider">Thermal Printer (Web Serial)</h4>
+                  <p className="text-[10px] text-slate-500 leading-tight">Print KOT &amp; bills directly from this device via the Web Serial API (KPC307-UEWB-6178, 9600 baud).</p>
 
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <label className="text-[9px] uppercase font-bold text-slate-500">Kitchen KOT Printer IP</label>
-                      <input 
-                        type="text" 
-                        value={formKitchenIp} 
-                        onChange={e => setFormKitchenIp(e.target.value)} 
-                        className="w-full text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-850 font-mono focus:outline-none focus:ring-1 focus:ring-emerald-500" 
-                        placeholder="192.168.1.100"
-                        required
-                      />
+                  {!supported ? (
+                    <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-[10px] text-amber-800 font-semibold">
+                      Web Serial is not supported on this browser. Please use Chrome on Android or desktop.
                     </div>
-                    <div className="space-y-1">
-                      <label className="text-[9px] uppercase font-bold text-slate-500">Billing Counter Printer IP</label>
-                      <input 
-                        type="text" 
-                        value={formBillingIp} 
-                        onChange={e => setFormBillingIp(e.target.value)} 
-                        className="w-full text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-850 font-mono focus:outline-none focus:ring-1 focus:ring-emerald-500" 
-                        placeholder="192.168.1.101"
-                        required
-                      />
+                  ) : (
+                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className={`w-2.5 h-2.5 rounded-full ${connected ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
+                          <span className="text-xs font-black uppercase tracking-wider text-slate-700">
+                            {connected ? 'Connected' : 'Not Connected'}
+                          </span>
+                        </div>
+                        <Printer size={16} className={connected ? 'text-emerald-600' : 'text-slate-400'} />
+                      </div>
+
+                      {connected && (
+                        <div className="text-[10px] font-bold text-slate-600 font-mono">
+                          Printer: {printerName || 'KPC307-UEWB-6178'}
+                        </div>
+                      )}
+
+                      {error && (
+                        <div className="text-[10px] text-rose-600 font-semibold">{error}</div>
+                      )}
+
+                      <div className="grid grid-cols-2 gap-2">
+                        {!connected ? (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              setConnectLoading(true);
+                              await connect();
+                              setConnectLoading(false);
+                            }}
+                            disabled={connectLoading}
+                            className="col-span-2 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs uppercase tracking-wider cursor-pointer transition flex items-center justify-center gap-1.5 disabled:opacity-50"
+                          >
+                            <Plug size={14} /> {connectLoading ? 'Connecting...' : 'Connect Printer'}
+                          </button>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                setTestLoading(true);
+                                await testPrint(settings);
+                                setTestLoading(false);
+                              }}
+                              disabled={testLoading || printing}
+                              className="py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-wider cursor-pointer transition flex items-center justify-center gap-1.5 disabled:opacity-50"
+                            >
+                              <FlaskConical size={14} /> {testLoading || printing ? 'Printing...' : 'Test Print'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                await disconnect();
+                              }}
+                              className="py-2.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs uppercase tracking-wider cursor-pointer transition flex items-center justify-center gap-1.5"
+                            >
+                              <Unplug size={14} /> Disconnect
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
 
                 {/* Action buttons */}

@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
+import { usePrinter } from '../context/PrinterContext';
 import { translations } from '../translations/translations';
 import { 
   Users, CheckCircle2, ShoppingBag, Plus, Trash2,
@@ -23,8 +24,9 @@ const TableManagement: React.FC = () => {
     tables, orders, menuItems, language, mergedGroups, zones,
     addOrder, updateOrder, mergeTables, splitTables, 
     transferTable, generateBill, setTableStatus, users, assignWaiter,
-    addTable, removeTable, addZone, removeZone, unmergeTables
+    addTable, removeTable, addZone, removeZone, unmergeTables, settings
   } = useApp();
+  const { printBill: printBillThermal } = usePrinter();
   const t = translations[language];
 
   // UI state
@@ -448,13 +450,10 @@ const TableManagement: React.FC = () => {
                       {activeOrder && (
                         <button onClick={async () => {
                           const bill = await generateBill(selectedTable.id, 0);
-                          try {
-                            const token = localStorage.getItem('rms_token');
-                            await fetch(`http://localhost:5000/api/billing/${bill.id}/print`, {
-                              method: 'POST',
-                              headers: { 'Authorization': `Bearer ${token}` }
-                            });
-                          } catch {}
+                          const order = orders.find(o => o.id === bill.orderId);
+                          if (order) {
+                            await printBillThermal(bill, order, settings);
+                          }
                           toast.success('Bill sent to printer! You can also manage payment on Billing tab.');
                         }}
                           className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer">

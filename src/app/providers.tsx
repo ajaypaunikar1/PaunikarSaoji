@@ -1,6 +1,7 @@
 "use client";
 import React, { useState } from 'react';
 import { AppProvider, useApp } from '../context/AppContext';
+import { PrinterProvider } from '../context/PrinterContext';
 import { Toaster, toast } from 'sonner';
 import { Key, Eye, EyeOff, Lock } from 'lucide-react';
 
@@ -144,9 +145,11 @@ function ForcePasswordResetGuard({ children }: { children: React.ReactNode }) {
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <AppProvider>
-      <ForcePasswordResetGuard>
-        {children}
-      </ForcePasswordResetGuard>
+      <PrinterProvider>
+        <ForcePasswordResetGuard>
+          {children}
+        </ForcePasswordResetGuard>
+      </PrinterProvider>
       <Toaster richColors position="top-right" theme="dark" />
     </AppProvider>
   );
