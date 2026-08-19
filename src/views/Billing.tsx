@@ -552,9 +552,9 @@ const Billing: React.FC = () => {
             {/* 1. COUNTER BILL (CUSTOMER RECEIPT) */}
             <div style={{ width: '80mm', padding: '5px', boxSizing: 'border-box', fontFamily: 'Arial, sans-serif' }}>
               <div style={{ textAlign: 'center', borderBottom: '1px dashed black', paddingBottom: '10px', marginBottom: '10px' }}>
-                {/* Restaurant Logo */}
+                {/* Restaurant monogram (no Vite logo) */}
                 <div style={{ marginBottom: '6px' }}>
-                  <img src="/favicon.svg" alt="Logo" style={{ width: '40px', height: '40px', margin: '0 auto', display: 'block' }} />
+                  <span style={{ display: 'inline-block', width: '36px', height: '36px', lineHeight: '36px', borderRadius: '50%', backgroundColor: '#0f172a', color: '#fff', fontSize: '13px', fontWeight: 'bold', letterSpacing: '0.5px' }}>PS</span>
                 </div>
                 <h1 style={{ margin: '0', fontSize: '15px', fontWeight: 'bold', letterSpacing: '0.5px' }}>{settings?.restaurantName || 'Paunikar Saoji Restaurant'}</h1>
                 <p style={{ margin: '3px 0 0 0', fontSize: '9px', lineHeight: '1.4', whiteSpace: 'pre-line' }}>{settings?.address || ''}</p>
