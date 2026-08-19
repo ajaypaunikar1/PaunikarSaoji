@@ -383,6 +383,11 @@ const KDS: React.FC = () => {
                       <span style={{ fontSize: '9px', display: 'block', textTransform: 'uppercase' }}>
                         Portion: {item.portion}
                       </span>
+                      {item.spiceLevel && item.spiceLevel !== 'normal' && (
+                        <span style={{ fontSize: '9px', display: 'block', color: '#b91c1c', textTransform: 'uppercase', fontWeight: 'bold' }}>
+                          Spice: {item.spiceLevel}
+                        </span>
+                      )}
                       {item.specialNotes && (
                         <span style={{ fontSize: '9px', fontStyle: 'italic', color: '#333', display: 'block' }}>
                           * Note: "{item.specialNotes}"

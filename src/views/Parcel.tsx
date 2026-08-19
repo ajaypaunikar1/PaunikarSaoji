@@ -5,7 +5,7 @@ import {
   Wallet, CreditCard, Smartphone, PackageCheck, UserRound, Pencil, X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import type { MenuItem, PortionType, OrderItem, PaymentMethod } from '../types/types';
+import type { MenuItem, PortionType, OrderItem, PaymentMethod, SpiceLevel } from '../types/types';
 import { toast } from 'sonner';
 
 const CATEGORIES = ['All', 'Vegetarian', 'Egg Curry', 'Breads', 'Rice', 'Papad', 'Starters', 'Curries', 'Handi Dishes'] as const;
@@ -35,6 +35,7 @@ const Parcel: React.FC = () => {
   const [gstPct, setGstPct] = useState<number>(settings?.gstEnabled === false ? 0 : 18);
   const [discountPct, setDiscountPct] = useState<number>(0);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
+  const [enableContainerCharge, setEnableContainerCharge] = useState<boolean>(true);
   const [printData, setPrintData] = useState<{
     bill: any;
     orderItems: any[];
@@ -75,9 +76,14 @@ const Parcel: React.FC = () => {
         quantity: 1,
         portion,
         price,
+        spiceLevel: 'normal',
         status: 'Pending'
       }];
     });
+  };
+
+  const updateSpice = (idx: number, level: SpiceLevel) => {
+    setCart(prev => prev.map((c, i) => i === idx ? { ...c, spiceLevel: level } : c));
   };
 
   const updateQty = (idx: number, amt: number) => {
@@ -117,7 +123,7 @@ const Parcel: React.FC = () => {
   const gst = Math.round(subtotal * (gstPct / 100) * 100) / 100;
   const discountAmt = Math.round(subtotal * (discountPct / 100) * 100) / 100;
   const totalPlates = cart.reduce((sum, c) => sum + c.quantity, 0);
-  const containerCharge = totalPlates * 10;
+  const containerCharge = enableContainerCharge ? totalPlates * 10 : 0;
   const grandTotal = Math.max(0, Math.round((subtotal + gst - discountAmt + containerCharge) * 100) / 100);
 
   const placeOrder = (): { orderId: string; items: OrderItem[] } | null => {
@@ -333,16 +339,38 @@ const Parcel: React.FC = () => {
             ) : (
               <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
                 {cart.map((c, idx) => (
-                  <div key={c.id} className="p-2 rounded-xl bg-emerald-50/60 border border-emerald-100 flex justify-between items-center text-xs">
-                    <div className="min-w-0">
-                      <span className="font-bold text-slate-800 block truncate">{c.name}</span>
-                      <span className="text-[9px] text-emerald-700 font-bold capitalize">{c.portion} · ₹{c.price}</span>
+                  <div key={c.id} className="p-2 rounded-xl bg-emerald-50/60 border border-emerald-100 text-xs">
+                    <div className="flex justify-between items-center">
+                      <div className="min-w-0">
+                        <span className="font-bold text-slate-800 block truncate">{c.name}</span>
+                        <span className="text-[9px] text-emerald-700 font-bold capitalize">{c.portion} · ₹{c.price}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <button onClick={() => updateQty(idx, -1)} className="w-5 h-5 rounded bg-white border border-emerald-200 flex items-center justify-center text-slate-700 cursor-pointer"><Minus size={10} /></button>
+                        <span className="font-mono font-bold w-5 text-center">{c.quantity}</span>
+                        <button onClick={() => updateQty(idx, 1)} className="w-5 h-5 rounded bg-white border border-emerald-200 flex items-center justify-center text-slate-700 cursor-pointer"><Plus size={10} /></button>
+                        <button onClick={() => removeFromCart(idx)} className="ml-1 text-rose-400 hover:text-rose-600 cursor-pointer"><Trash2 size={12} /></button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <button onClick={() => updateQty(idx, -1)} className="w-5 h-5 rounded bg-white border border-emerald-200 flex items-center justify-center text-slate-700 cursor-pointer"><Minus size={10} /></button>
-                      <span className="font-mono font-bold w-5 text-center">{c.quantity}</span>
-                      <button onClick={() => updateQty(idx, 1)} className="w-5 h-5 rounded bg-white border border-emerald-200 flex items-center justify-center text-slate-700 cursor-pointer"><Plus size={10} /></button>
-                      <button onClick={() => removeFromCart(idx)} className="ml-1 text-rose-400 hover:text-rose-600 cursor-pointer"><Trash2 size={12} /></button>
+                    <div className="flex items-center gap-1 mt-1.5">
+                      <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 mr-0.5">Spice</span>
+                      {(['normal', 'medium', 'spicy'] as SpiceLevel[]).map(level => (
+                        <button
+                          key={level}
+                          onClick={() => updateSpice(idx, level)}
+                          className={`px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wide cursor-pointer transition ${
+                            (c.spiceLevel || 'normal') === level
+                              ? level === 'spicy'
+                                ? 'bg-rose-600 text-white'
+                                : level === 'medium'
+                                  ? 'bg-amber-500 text-white'
+                                  : 'bg-emerald-600 text-white'
+                              : 'bg-white border border-slate-200 text-slate-500 hover:bg-slate-100'
+                          }`}
+                        >
+                          {level}
+                        </button>
+                      ))}
                     </div>
                   </div>
                 ))}
@@ -368,9 +396,17 @@ const Parcel: React.FC = () => {
               <span className="text-slate-500">GST ({gstPct}%)</span>
               <span className="font-mono font-bold text-slate-800">₹{gst.toFixed(2)}</span>
             </div>
-            {containerCharge > 0 && (
+            {totalPlates > 0 && (
               <div className="flex justify-between text-xs items-center gap-2">
-                <span className="text-slate-500">Container Charge (₹10/plate)</span>
+                <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={enableContainerCharge}
+                    onChange={e => setEnableContainerCharge(e.target.checked)}
+                    className="w-3.5 h-3.5 accent-emerald-600 cursor-pointer"
+                  />
+                  <span className="text-slate-500">Container Charge (₹10/plate)</span>
+                </label>
                 <span className="font-mono font-bold text-slate-800">₹{containerCharge.toFixed(2)}</span>
               </div>
             )}
@@ -534,6 +570,11 @@ const Parcel: React.FC = () => {
                       <td style={{ padding: '4px 0' }}>
                         {item.name}
                         <span style={{ fontSize: '8px', display: 'block', color: '#444' }}>({item.portion})</span>
+                        {item.spiceLevel && item.spiceLevel !== 'normal' && (
+                          <span style={{ fontSize: '8px', display: 'block', color: '#b91c1c', textTransform: 'uppercase' }}>
+                            Spice: {item.spiceLevel}
+                          </span>
+                        )}
                       </td>
                       <td style={{ textAlign: 'center', padding: '4px 0', fontFamily: 'monospace' }}>{item.quantity}</td>
                       <td style={{ textAlign: 'right', padding: '4px 0', fontFamily: 'monospace' }}>{item.price}</td>

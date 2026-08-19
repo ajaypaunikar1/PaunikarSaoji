@@ -6,6 +6,7 @@ export type PaymentMethod = 'Cash' | 'Card' | 'UPI';
 export type PayrollStatus = 'Paid' | 'Unpaid';
 export type Zone = string;
 export type PortionType = 'Half' | 'Full' | 'Single';
+export type SpiceLevel = 'normal' | 'medium' | 'spicy';
 
 export interface MenuItemVariant {
   name: string;
@@ -60,6 +61,7 @@ export interface OrderItem {
   specialNotes?: string;
   status?: OrderStatus;
   isParcel?: boolean;
+  spiceLevel?: SpiceLevel;
 }
 
 export interface Order {

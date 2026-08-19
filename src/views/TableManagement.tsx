@@ -43,6 +43,7 @@ const TableManagement: React.FC = () => {
   const [splitTarget, setSplitTarget] = useState<number | null>(null);
   const [splitItemsCheck, setSplitItemsCheck] = useState<{ id: string; portion: PortionType; price: number; name: string; quantity: number }[]>([]);
   const [orderItemsList, setOrderItemsList] = useState<{ id: string; name: string; portion: PortionType; price: number; quantity: number; specialNotes: string; isParcel?: boolean }[]>([]);
+  const [addCategory, setAddCategory] = useState<string>('All');
   const [guestCount, setGuestCount] = useState<number>(2);
 
   // Active order for selected table
@@ -569,24 +570,50 @@ const TableManagement: React.FC = () => {
                 {activeAction === 'addItems' && (
                   <div className="space-y-4">
                     <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Select Menu Items</h4>
-                    <div className="max-h-48 overflow-y-auto space-y-2 border border-gray-100 rounded-xl p-2 bg-gray-50">
-                      {menuItems.filter(m => m.isAvailable).map(item => (
-                        <div key={item.id} className="p-2 border-b border-gray-100 last:border-b-0 flex justify-between items-center text-xs">
+
+                    {/* Category tabs */}
+                    <div className="flex gap-1.5 overflow-x-auto pb-1.5 no-scrollbar">
+                      {(['All', ...Array.from(new Set(menuItems.filter(m => m.isAvailable).map(i => i.category)))] as string[]).map(cat => (
+                        <button
+                          key={cat}
+                          onClick={() => setAddCategory(cat)}
+                          className={`px-2.5 py-1 text-[10px] rounded-lg font-bold border transition whitespace-nowrap cursor-pointer ${
+                            addCategory === cat
+                              ? 'bg-indigo-600 border-indigo-600 text-white'
+                              : 'bg-white border-slate-200 text-slate-500'
+                          }`}
+                        >
+                          {cat}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Item cards */}
+                    <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto p-1">
+                      {menuItems.filter(m => m.isAvailable && (addCategory === 'All' || m.category === addCategory)).map(item => (
+                        <div key={item.id} className="bg-white border border-slate-200 rounded-xl p-3 flex flex-col justify-between hover:border-indigo-400 transition shadow-xs gap-2 min-h-24">
                           <div>
-                            <span className="font-bold text-gray-800">{item.name}</span>
-                            <p className="text-[9px] text-gray-400 m-0">{item.category}</p>
+                            <span className="text-[8px] font-bold uppercase text-slate-400 block">{item.category}</span>
+                            <span className="font-bold text-slate-800 text-xs line-clamp-2 leading-tight">{item.name}</span>
                           </div>
-                          <div className="flex gap-1.5">
+                          <div className="flex flex-col gap-1 mt-1">
                             {item.portionMode === 'Variant' ? (
-                              item.variants.map((v, vIdx) => (
-                                <button key={vIdx} onClick={() => handleAddToOrder(item, v.name as PortionType)}
-                                  className="px-2 py-1 rounded bg-white border border-gray-200 hover:border-indigo-400 text-[9px] font-bold text-gray-700 cursor-pointer shadow-xs">
-                                  {v.name} (₹{v.price})
-                                </button>
-                              ))
+                              <div className="flex flex-col gap-1">
+                                {item.variants.map((v, vIdx) => (
+                                  <button
+                                    key={vIdx}
+                                    onClick={() => handleAddToOrder(item, v.name as PortionType)}
+                                    className="w-full py-1 px-1 bg-slate-50 border border-slate-200 rounded text-[9px] font-bold text-indigo-600 cursor-pointer text-center hover:bg-indigo-50 hover:border-indigo-200 transition"
+                                  >
+                                    {v.name} (₹{v.price})
+                                  </button>
+                                ))}
+                              </div>
                             ) : (
-                              <button onClick={() => handleAddToOrder(item, 'Single')}
-                                className="px-2 py-1 rounded bg-white border border-gray-200 hover:border-indigo-400 text-[9px] font-bold text-gray-700 cursor-pointer shadow-xs">
+                              <button
+                                onClick={() => handleAddToOrder(item, 'Single')}
+                                className="w-full py-1 bg-slate-50 border border-slate-200 rounded text-[10px] font-bold text-indigo-600 cursor-pointer text-center hover:bg-indigo-50 hover:border-indigo-200 transition"
+                              >
                                 Add (₹{item.price})
                               </button>
                             )}

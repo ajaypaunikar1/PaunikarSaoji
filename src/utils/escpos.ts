@@ -56,6 +56,9 @@ export function generateKOT(order: Order, settings?: ReceiptSettings): Uint8Arra
   order.items.forEach(item => {
     kot += `${item.name}\n`;
     kot += `  Qty: ${item.quantity} (${item.portion})\n`;
+    if (item.spiceLevel && item.spiceLevel !== 'normal') {
+      kot += `  Spice: ${item.spiceLevel}\n`;
+    }
     if (item.specialNotes) {
       kot += `  * Notes: ${item.specialNotes}\n`;
     }
@@ -108,6 +111,9 @@ export function generateBillReceipt(
     const lineTotal = item.price * item.quantity;
     receipt += `${item.name}\n`;
     receipt += `  ${item.quantity} x Rs.${item.price} = Rs.${lineTotal}\n`;
+    if (item.spiceLevel && item.spiceLevel !== 'normal') {
+      receipt += `  Spice: ${item.spiceLevel}\n`;
+    }
   });
   receipt += '--------------------------------\n';
 

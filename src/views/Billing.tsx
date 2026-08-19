@@ -625,6 +625,11 @@ const Billing: React.FC = () => {
                       <td style={{ padding: '4px 0' }}>
                         {item.name}
                         <span style={{ fontSize: '8px', display: 'block', color: '#444' }}>({item.portion})</span>
+                        {item.spiceLevel && item.spiceLevel !== 'normal' && (
+                          <span style={{ fontSize: '8px', display: 'block', color: '#b91c1c', textTransform: 'uppercase' }}>
+                            Spice: {item.spiceLevel}
+                          </span>
+                        )}
                       </td>
                       <td style={{ textAlign: 'center', padding: '4px 0', fontFamily: 'monospace' }}>{item.quantity}</td>
                       <td style={{ textAlign: 'right', padding: '4px 0', fontFamily: 'monospace' }}>{item.price}</td>
