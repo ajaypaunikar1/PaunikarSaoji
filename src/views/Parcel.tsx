@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
+import { usePrinter } from '../context/PrinterContext';
 import {
   ShoppingBag, Plus, Minus, Trash2, Search, Send, Printer,
   Wallet, CreditCard, Smartphone, PackageCheck, UserRound, Pencil, X
@@ -15,6 +16,8 @@ const Parcel: React.FC = () => {
     menuItems, orders, addParcelOrder, updateOrder, generateParcelBill, payBill,
     settings, currentUser, users
   } = useApp();
+  const { printBill: printBillThermal, connected, connect } = usePrinter();
+  const [connectLoading, setConnectLoading] = useState(false);
 
   // Menu picker state
   const [category, setCategory] = useState<string>('All');
@@ -163,6 +166,9 @@ const Parcel: React.FC = () => {
         await payBill(bill.id, paymentMethod);
         const editingOrder = orders.find(o => o.id === editingOrderId);
         const waiterName = users.find(u => u.id === currentUser?.id)?.name || 'Staff';
+        if (connected && editingOrder) {
+          await printBillThermal({ ...bill, paymentMethod }, editingOrder, settings);
+        }
         setPrintData({
           bill: { ...bill, paymentMethod },
           orderItems: editingOrder?.items || cart,
@@ -179,6 +185,9 @@ const Parcel: React.FC = () => {
       const bill = await generateParcelBill(placed, discountAmt, gstPct, containerCharge);
       await payBill(bill.id, paymentMethod);
       const waiterName = users.find(u => u.id === currentUser?.id)?.name || 'Staff';
+      if (connected) {
+        await printBillThermal({ ...bill, paymentMethod }, placed, settings);
+      }
       setPrintData({
         bill: { ...bill, paymentMethod },
         orderItems: placed.items,
@@ -212,9 +221,34 @@ const Parcel: React.FC = () => {
           <h2 className="text-xl font-extrabold text-slate-800 m-0 tracking-tight">Parcel / Takeaway</h2>
           <p className="text-xs text-slate-500 font-medium mt-1">Set up takeaway orders and collect payments without a table.</p>
         </div>
-        <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl">
-          <PackageCheck size={14} className="text-emerald-600" />
-          <span className="text-[10px] uppercase font-bold tracking-widest text-emerald-700">Parcel Counter</span>
+        <div className="flex items-center gap-2">
+          <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[10px] font-bold uppercase tracking-widest transition ${
+            connected
+              ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+              : 'bg-rose-50 border-rose-200 text-rose-600'
+          }`}>
+            {connected ? (
+              <>
+                <Printer size={13} className="text-emerald-600" /> Thermal: Connected
+              </>
+            ) : (
+              <button
+                onClick={async () => {
+                  setConnectLoading(true);
+                  await connect();
+                  setConnectLoading(false);
+                }}
+                disabled={connectLoading}
+                className="flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                <Printer size={13} /> {connectLoading ? 'Connecting...' : 'Thermal: Not Connected - Connect'}
+              </button>
+            )}
+          </div>
+          <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl">
+            <PackageCheck size={14} className="text-emerald-600" />
+            <span className="text-[10px] uppercase font-bold tracking-widest text-emerald-700">Parcel Counter</span>
+          </div>
         </div>
       </div>
 
