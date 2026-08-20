@@ -41,14 +41,32 @@ export const PrinterProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   const connectedRef = useRef<boolean>(false);
 
-  // Keep a polling loop that reflects connection state changes on every screen
-  // (e.g. when the user plugs/unplugs the printer).
+  // Auto-reconnect on mount: try previously authorized ports, then keep polling.
   useEffect(() => {
     const supported = webSerialPrinter.isSupported();
     setSupported(supported);
     if (!supported) return;
 
     const serial = navigator.serial as Serial | undefined;
+
+    // Attempt auto-reconnect to the last authorized port (no device chooser).
+    const autoReconnect = async () => {
+      try {
+        const ports = await webSerialPrinter.getAuthorizedPorts();
+        if (ports.length > 0 && !webSerialPrinter.isConnected()) {
+          await webSerialPrinter.connectToPort(ports[0]);
+          connectedRef.current = true;
+          setConnected(true);
+          const info = ports[0]?.getInfo?.();
+          setPrinterName(info?.usbVendorId ? 'KPC307-UEWB-6178' : 'Thermal Printer');
+          setError(null);
+        }
+      } catch {
+        // Auto-reconnect failed silently; user can reconnect manually from Dashboard settings.
+      }
+    };
+
+    autoReconnect();
 
     const refresh = async () => {
       const isConnected = webSerialPrinter.isConnected();
@@ -72,10 +90,9 @@ export const PrinterProvider: React.FC<{ children: ReactNode }> = ({ children })
       connectedRef.current = false;
       setConnected(false);
       setPrinterName('');
-      setError('Printer disconnected. Reconnect the printer and try again.');
+      setError('Printer disconnected. Reconnect from Dashboard Settings.');
     };
 
-    refresh();
     const interval = setInterval(refresh, 1500);
     serial?.addEventListener?.('disconnect', handleDisconnect);
     return () => {

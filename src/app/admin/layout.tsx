@@ -3,11 +3,12 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useApp } from '../../context/AppContext';
+import { usePrinter } from '../../context/PrinterContext';
 import { translations } from '../../translations/translations';
 import { 
   LayoutDashboard, UtensilsCrossed, ChefHat, Receipt, 
   MenuSquare, Users, Bell, ClipboardList, 
-  UserCheck, TrendingUp, Settings, LogOut, Search, Menu, ShoppingBag
+  UserCheck, TrendingUp, Settings, LogOut, Search, Menu, ShoppingBag, Printer
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 
@@ -72,6 +73,7 @@ const NotificationCenter: React.FC = () => {
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { currentUser, logout, language, changeLanguage, systemStatus, settings } = useApp();
+  const { connected: printerConnected } = usePrinter();
   const router = useRouter();
   const pathname = usePathname();
   const t = translations[language];
@@ -272,6 +274,19 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <span className={`w-1.5 h-1.5 rounded-full ${systemStatus.database === 'connected' ? 'bg-emerald-500' : 'bg-red-500'} animate-pulse`} />
               <span>{systemStatus.database === 'connected' ? 'DB' : 'DB Offline'}</span>
             </div>
+            <Link
+              href="/admin/dashboard"
+              className={`hidden md:flex items-center gap-1.5 text-[11px] font-medium rounded-lg px-2.5 py-1 border transition cursor-pointer ${
+                printerConnected
+                  ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+                  : 'text-rose-600 bg-rose-50 border-rose-200 hover:bg-rose-100'
+              }`}
+              title={printerConnected ? 'Printer connected via Dashboard Settings' : 'Connect printer from Dashboard Settings'}
+            >
+              <Printer size={12} />
+              <span className={`w-1.5 h-1.5 rounded-full ${printerConnected ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
+              <span>{printerConnected ? 'Printer' : 'Printer Off'}</span>
+            </Link>
             <NotificationCenter />
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white font-bold text-xs">

@@ -51,6 +51,29 @@ class WebSerialPrinter {
     return (navigator.serial as Serial).getPorts();
   }
 
+  /** Connect to an already-authorized port (no device chooser). Used for auto-reconnect. */
+  async connectToPort(port: SerialPort): Promise<SerialPort> {
+    if (this.connected && this.port) {
+      return this.port;
+    }
+    try {
+      await port.open({ baudRate: BAUD_RATE });
+    } catch (err) {
+      const name = (err as DOMException)?.name || '';
+      if (name === 'InvalidStateError') {
+        throw new WebSerialPrinterError(
+          'ALREADY_OPEN',
+          'The printer is already open in this tab. Disconnect first, then reconnect.'
+        );
+      }
+      throw new WebSerialPrinterError('OPEN_FAILED', (err as Error)?.message || 'Failed to open serial port.');
+    }
+    this.port = port;
+    this.writer = port.writable ? port.writable.getWriter() : null;
+    this.connected = true;
+    return port;
+  }
+
   /** Open the browser's serial device chooser and connect to the printer. */
   async connect(): Promise<SerialPort> {
     if (!this.isSupported()) {

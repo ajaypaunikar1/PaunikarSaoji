@@ -16,8 +16,7 @@ const Billing: React.FC = () => {
     tables, orders, generateBill, generateParcelBill, payBill, bills, language,
     requestCancellation, users, settings, currentUser, updateOrder
   } = useApp();
-  const { printBill: printBillThermal, connected, connect } = usePrinter();
-  const [connectLoading, setConnectLoading] = useState(false);
+  const { printBill: printBillThermal, connected } = usePrinter();
   const t = translations[language];
 
   // Billing screen state
@@ -543,19 +542,7 @@ const Billing: React.FC = () => {
                     <FileText size={12} /> Browser Print (PDF)
                   </button>
                   <span className={`text-[9px] font-bold uppercase tracking-wider ${connected ? 'text-emerald-600' : 'text-rose-500'}`}>
-                    {connected ? 'Thermal: Connected' : (
-                      <button
-                        onClick={async () => {
-                          setConnectLoading(true);
-                          await connect();
-                          setConnectLoading(false);
-                        }}
-                        disabled={connectLoading}
-                        className="text-rose-500 hover:text-rose-700 cursor-pointer disabled:opacity-50"
-                      >
-                        {connectLoading ? 'Connecting...' : 'Thermal: Not Connected - Connect'}
-                      </button>
-                    )}
+                    {connected ? 'Thermal: Connected' : 'Thermal: Offline'}
                   </span>
                 </div>
               </motion.div>
