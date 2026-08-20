@@ -125,7 +125,7 @@ export interface Bill {
   gstPct?: number; // GST percentage used
   discount: number;
   discountPct?: number; // discount percentage used
-  containerCharge?: number; // parcel container charge (₹10 per plate)
+  containerCharge?: number; // parcel container charge (flat ₹10 per order)
   grandTotal: number;
   isParcel?: boolean;
   paymentMethod?: PaymentMethod;

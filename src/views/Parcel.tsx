@@ -124,8 +124,7 @@ const Parcel: React.FC = () => {
   const subtotal = cart.reduce((sum, c) => sum + c.price * c.quantity, 0);
   const gst = Math.round(subtotal * (gstPct / 100) * 100) / 100;
   const discountAmt = Math.round(subtotal * (discountPct / 100) * 100) / 100;
-  const totalPlates = cart.reduce((sum, c) => sum + c.quantity, 0);
-  const containerCharge = enableContainerCharge ? totalPlates * 10 : 0;
+  const containerCharge = enableContainerCharge ? 10 : 0;
   const grandTotal = Math.max(0, Math.round((subtotal + gst - discountAmt + containerCharge) * 100) / 100);
 
   const placeOrder = async (): Promise<Order | null> => {
@@ -413,7 +412,7 @@ const Parcel: React.FC = () => {
               <span className="text-slate-500">GST ({gstPct}%)</span>
               <span className="font-mono font-bold text-slate-800">₹{gst.toFixed(2)}</span>
             </div>
-            {totalPlates > 0 && (
+            {cart.length > 0 && (
               <div className="flex justify-between text-xs items-center gap-2">
                 <label className="flex items-center gap-1.5 cursor-pointer select-none">
                   <input
@@ -422,7 +421,7 @@ const Parcel: React.FC = () => {
                     onChange={e => setEnableContainerCharge(e.target.checked)}
                     className="w-3.5 h-3.5 accent-emerald-600 cursor-pointer"
                   />
-                  <span className="text-slate-500">Container Charge (₹10/plate)</span>
+                  <span className="text-slate-500">Container Charge (flat ₹10/order)</span>
                 </label>
                 <span className="font-mono font-bold text-slate-800">₹{containerCharge.toFixed(2)}</span>
               </div>

@@ -121,12 +121,12 @@ const Reports: React.FC = () => {
 
   // Product Metrics
   const productMetrics = useMemo(() => {
-    const counts: { [key: string]: { name: string, quantity: number, revenue: number, category: string } } = {};
+    const counts: { [key: string]: { name: string, quantity: number, revenue: number } } = {};
     filteredOrders.forEach(ord => {
       ord.items.forEach(item => {
         const key = `${item.id}-${item.portion}`;
         if (!counts[key]) {
-          counts[key] = { name: `${item.name} (${item.portion})`, quantity: 0, revenue: 0, category: item.category };
+          counts[key] = { name: `${item.name} (${item.portion})`, quantity: 0, revenue: 0 };
         }
         counts[key].quantity += item.quantity;
         counts[key].revenue += (item.quantity * item.price);
@@ -212,9 +212,9 @@ const Reports: React.FC = () => {
   };
 
   const handleExportProductsCSV = () => {
-    let csv = 'Product Name,Category,Quantity Sold,Revenue\n';
+    let csv = 'Product Name,Quantity Sold,Revenue\n';
     productMetrics.forEach(prod => {
-      csv += `"${prod.name}","${prod.category}",${prod.quantity},${prod.revenue}\n`;
+      csv += `"${prod.name}",${prod.quantity},${prod.revenue}\n`;
     });
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -617,7 +617,6 @@ const Reports: React.FC = () => {
                 <thead>
                   <tr className="border-b border-slate-100 bg-slate-50 text-[10px] font-black uppercase text-slate-550 tracking-wider">
                     <th className="p-4 pl-6">Product Name (Portion)</th>
-                    <th className="p-4">Category</th>
                     <th className="p-4 text-center">Quantity Sold</th>
                     <th className="p-4 text-right pr-6">Total Revenue</th>
                   </tr>
@@ -625,13 +624,12 @@ const Reports: React.FC = () => {
                 <tbody>
                   {productMetrics.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="p-8 text-center text-slate-400 font-medium text-xs">No products sold in this date range.</td>
+                      <td colSpan={3} className="p-8 text-center text-slate-400 font-medium text-xs">No products sold in this date range.</td>
                     </tr>
                   ) : (
                     productMetrics.map((prod, idx) => (
                       <tr key={idx} className="border-b border-slate-50 hover:bg-slate-50/50 transition text-xs font-medium">
                         <td className="p-4 pl-6 font-bold text-slate-800">{prod.name}</td>
-                        <td className="p-4 text-slate-600 capitalize">{prod.category}</td>
                         <td className="p-4 text-center font-bold text-slate-700">{prod.quantity}</td>
                         <td className="p-4 text-right pr-6 font-mono text-emerald-700 font-bold">₹{prod.revenue}</td>
                       </tr>

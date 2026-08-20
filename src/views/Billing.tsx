@@ -73,9 +73,7 @@ const Billing: React.FC = () => {
     // Discount is now a percentage
     const discountAmt = Math.round(subtotal * (discountPct / 100) * 100) / 100;
     const discount = Math.min(discountAmt, subtotal + gst);
-    const containerCharge = isParcel && containerChargeEnabled
-      ? selectedOrder.items.reduce((s: number, i: any) => s + i.quantity, 0) * 10
-      : 0;
+    const containerCharge = isParcel && containerChargeEnabled ? 10 : 0;
     const grandTotal = Math.max(0, Math.round((subtotal + gst - discount + containerCharge) * 100) / 100);
 
     return {
@@ -109,9 +107,7 @@ const Billing: React.FC = () => {
 
     try {
       const discountAmt = Math.round(selectedOrder.grandTotal * (discountPct / 100) * 100) / 100;
-      const containerCharge = selectedParcelId
-        ? (containerChargeEnabled ? selectedOrder.items.reduce((s: number, i: any) => s + i.quantity, 0) * 10 : 0)
-        : 0;
+      const containerCharge = selectedParcelId && containerChargeEnabled ? 10 : 0;
       const finalBill = selectedParcelId
         ? await generateParcelBill(selectedOrder.id, discountAmt, customGstPct, containerCharge)
         : await generateBill(selectedTableId!, discountAmt, customGstPct);
@@ -139,6 +135,8 @@ const Billing: React.FC = () => {
       setSelectedParcelId(null);
       setDiscountPct(0);
       setCustomGstPct(settings?.gstEnabled ? (settings?.gstPct ?? 18) : 0);
+      setPaymentMethod(null);
+      setPrintBillData(null);
     } catch (err: any) {
       toast.error(err.message || 'Payment processing failed');
     }
@@ -152,9 +150,7 @@ const Billing: React.FC = () => {
     }
     try {
       const discountAmt = Math.round(selectedOrder.grandTotal * (discountPct / 100) * 100) / 100;
-      const containerCharge = selectedParcelId
-        ? (containerChargeEnabled ? selectedOrder.items.reduce((s: number, i: any) => s + i.quantity, 0) * 10 : 0)
-        : 0;
+      const containerCharge = selectedParcelId && containerChargeEnabled ? 10 : 0;
       const finalBill = selectedParcelId
         ? await generateParcelBill(selectedOrder.id, discountAmt, customGstPct, containerCharge)
         : await generateBill(selectedTableId!, discountAmt, customGstPct);
@@ -461,7 +457,7 @@ const Billing: React.FC = () => {
                             onChange={e => setContainerChargeEnabled(e.target.checked)}
                             className="w-3.5 h-3.5 accent-emerald-600"
                           />
-                          Container Charge (₹10/plate)
+                          Container Charge (flat ₹10/order)
                         </span>
                         <span className="font-mono text-slate-800 w-16 text-right">₹{activeBill.containerCharge.toFixed(2)}</span>
                       </div>
