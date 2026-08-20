@@ -37,7 +37,7 @@ const Parcel: React.FC = () => {
   const [gstPct, setGstPct] = useState<number>(settings?.gstEnabled === false ? 0 : (settings?.gstPct ?? 18));
   const [discountPct, setDiscountPct] = useState<number>(0);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
-  const [enableContainerCharge, setEnableContainerCharge] = useState<boolean>(true);
+  const [containerCount, setContainerCount] = useState<number>(0);
   const [printData, setPrintData] = useState<{
     bill: any;
     orderItems: any[];
@@ -106,6 +106,7 @@ const Parcel: React.FC = () => {
     setDiscountPct(0);
     setPaymentMethod(null);
     setEditingOrderId(null);
+    setContainerCount(0);
   };
 
   const startEditing = (orderId: string) => {
@@ -124,7 +125,7 @@ const Parcel: React.FC = () => {
   const subtotal = cart.reduce((sum, c) => sum + c.price * c.quantity, 0);
   const gst = Math.round(subtotal * (gstPct / 100) * 100) / 100;
   const discountAmt = Math.round(subtotal * (discountPct / 100) * 100) / 100;
-  const containerCharge = enableContainerCharge ? 10 : 0;
+  const containerCharge = containerCount * 10;
   const grandTotal = Math.max(0, Math.round((subtotal + gst - discountAmt + containerCharge) * 100) / 100);
 
   const placeOrder = async (): Promise<Order | null> => {
@@ -414,16 +415,20 @@ const Parcel: React.FC = () => {
             </div>
             {cart.length > 0 && (
               <div className="flex justify-between text-xs items-center gap-2">
-                <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                <span className="text-slate-500 flex items-center gap-1.5">
+                  Containers (₹10 each)
+                </span>
+                <div className="flex items-center gap-1.5">
                   <input
-                    type="checkbox"
-                    checked={enableContainerCharge}
-                    onChange={e => setEnableContainerCharge(e.target.checked)}
-                    className="w-3.5 h-3.5 accent-emerald-600 cursor-pointer"
+                    type="number"
+                    min={0}
+                    max={99}
+                    value={containerCount}
+                    onChange={e => setContainerCount(Math.max(0, Math.min(99, parseInt(e.target.value) || 0)))}
+                    className="w-12 px-1.5 py-0.5 text-right text-xs font-mono font-bold rounded-lg bg-slate-50 border border-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                   />
-                  <span className="text-slate-500">Container Charge (flat ₹10/order)</span>
-                </label>
-                <span className="font-mono font-bold text-slate-800">₹{containerCharge.toFixed(2)}</span>
+                  <span className="font-mono font-bold text-slate-800 w-14 text-right">₹{containerCharge.toFixed(2)}</span>
+                </div>
               </div>
             )}
             <div className="flex justify-between text-xs items-center gap-2">

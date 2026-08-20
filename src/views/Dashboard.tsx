@@ -398,7 +398,6 @@ const Dashboard: React.FC = () => {
                         value={formGst} 
                         onChange={e => setFormGst(e.target.value)} 
                         className="w-full text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-850 font-mono focus:outline-none focus:ring-1 focus:ring-emerald-500" 
-                        required
                       />
                     </div>
                     <div className="space-y-1">

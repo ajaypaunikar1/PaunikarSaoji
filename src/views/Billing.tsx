@@ -24,7 +24,7 @@ const Billing: React.FC = () => {
   const [selectedParcelId, setSelectedParcelId] = useState<string | null>(null);
   const [discountPct, setDiscountPct] = useState<number>(0);   // Discount in %
   const [customGstPct, setCustomGstPct] = useState<number>(18); // Default 18%
-  const [containerChargeEnabled, setContainerChargeEnabled] = useState<boolean>(true); // ₹10/plate for parcels
+  const [containerCount, setContainerCount] = useState<number>(1); // ₹10/plate for parcels
   const [cancelReason, setCancelReason] = useState<string>('');
   const [activeCancelItemId, setActiveCancelItemId] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
@@ -73,7 +73,7 @@ const Billing: React.FC = () => {
     // Discount is now a percentage
     const discountAmt = Math.round(subtotal * (discountPct / 100) * 100) / 100;
     const discount = Math.min(discountAmt, subtotal + gst);
-    const containerCharge = isParcel && containerChargeEnabled ? 10 : 0;
+    const containerCharge = isParcel ? containerCount * 10 : 0;
     const grandTotal = Math.max(0, Math.round((subtotal + gst - discount + containerCharge) * 100) / 100);
 
     return {
@@ -86,7 +86,7 @@ const Billing: React.FC = () => {
       containerCharge,
       grandTotal,
     };
-  }, [selectedTableId, selectedParcelId, selectedOrder, discountPct, customGstPct, containerChargeEnabled, bills]);
+  }, [selectedTableId, selectedParcelId, selectedOrder, discountPct, customGstPct, containerCount, bills]);
 
   // UPI payment string generator
   const upiString = useMemo(() => {
@@ -107,7 +107,7 @@ const Billing: React.FC = () => {
 
     try {
       const discountAmt = Math.round(selectedOrder.grandTotal * (discountPct / 100) * 100) / 100;
-      const containerCharge = selectedParcelId && containerChargeEnabled ? 10 : 0;
+      const containerCharge = selectedParcelId ? containerCount * 10 : 0;
       const finalBill = selectedParcelId
         ? await generateParcelBill(selectedOrder.id, discountAmt, customGstPct, containerCharge)
         : await generateBill(selectedTableId!, discountAmt, customGstPct);
@@ -150,7 +150,7 @@ const Billing: React.FC = () => {
     }
     try {
       const discountAmt = Math.round(selectedOrder.grandTotal * (discountPct / 100) * 100) / 100;
-      const containerCharge = selectedParcelId && containerChargeEnabled ? 10 : 0;
+      const containerCharge = selectedParcelId ? containerCount * 10 : 0;
       const finalBill = selectedParcelId
         ? await generateParcelBill(selectedOrder.id, discountAmt, customGstPct, containerCharge)
         : await generateBill(selectedTableId!, discountAmt, customGstPct);
@@ -368,7 +368,7 @@ const Billing: React.FC = () => {
                               setActiveCancelItemId(item.id === activeCancelItemId ? null : item.id);
                               setCancelReason('');
                             }}
-                            className="p-1 rounded bg-white border border-slate-200 text-rose-500 hover:text-rose-600 opacity-0 group-hover:opacity-100 transition cursor-pointer"
+                            className="p-1 rounded bg-white border border-slate-200 text-rose-500 hover:text-rose-600 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition cursor-pointer"
                             title="Request Cancellation"
                           >
                             ✕
@@ -450,16 +450,20 @@ const Billing: React.FC = () => {
 
                     {selectedParcelId && (
                       <div className="flex justify-between items-center py-1">
-                        <span className="flex items-center gap-1 font-bold text-slate-700">
-                          <input
-                            type="checkbox"
-                            checked={containerChargeEnabled}
-                            onChange={e => setContainerChargeEnabled(e.target.checked)}
-                            className="w-3.5 h-3.5 accent-emerald-600"
-                          />
-                          Container Charge (flat ₹10/order)
+                        <span className="flex items-center gap-1.5 font-bold text-slate-700 text-xs">
+                          Containers (₹10 each)
                         </span>
-                        <span className="font-mono text-slate-800 w-16 text-right">₹{activeBill.containerCharge.toFixed(2)}</span>
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            type="number"
+                            min={0}
+                            max={99}
+                            value={containerCount}
+                            onChange={e => setContainerCount(Math.max(0, Math.min(99, parseInt(e.target.value) || 0)))}
+                            className="w-12 px-1.5 py-0.5 text-right text-xs font-mono font-bold rounded bg-slate-50 border border-slate-200 focus:outline-none focus:border-emerald-500"
+                          />
+                          <span className="font-mono text-slate-800 w-14 text-right text-xs">₹{activeBill.containerCharge.toFixed(2)}</span>
+                        </div>
                       </div>
                     )}
                     

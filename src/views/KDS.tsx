@@ -122,6 +122,8 @@ const KDS: React.FC = () => {
     const printableOrder = { ...order, items: computePendingItems(order) };
     setPrintKOTData(printableOrder);
     printKOTThermal(printableOrder, settings);
+    // Update prevItemsMap so auto-print doesn't re-detect these items as new
+    prevItemsMap.current.set(order.id, order.items);
   };
 
   const getStatusActionLabel = (status: OrderStatus) => {
