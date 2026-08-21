@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import { usePrinter } from '../context/PrinterContext';
 import { translations } from '../translations/translations';
 import { 
-  ChefHat, Play, CheckCheck, Printer, Clock, Sparkles, X, Zap
+  ChefHat, Play, CheckCheck, Check, Printer, Clock, Sparkles, X, Zap
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Order, OrderStatus, OrderItem } from '../types/types';
@@ -61,69 +61,68 @@ const KDS: React.FC = () => {
 
   const activeOrders = orders.filter(o => o.status !== 'Served');
 
-  // Auto-print KOT for brand new / appended orders via Web Serial.
-  // Mirrors the previous server-side auto-print, now driven by the socket
-  // synced `orders` list in this KDS screen.
+  // Auto-print KOT for brand new / appended items via Web Serial.
+  // Every item carries `printedQty` — the persistent "tick" marking what was
+  // already printed on a previous KOT. Only unprinted (non-ticked) quantity
+  // is printed, then it gets ticked so it never reprints.
   const initializedRef = useRef<boolean>(false);
   const mountedAtRef = useRef<number>(Date.now());
-  const prevItemsMap = useRef<Map<string, OrderItem[]>>(new Map());
+  const printingKeysRef = useRef<Set<string>>(new Set());
 
-  const computePendingItems = (order: Order) => {
-    const pendingItems = order.items.filter(item => item.status === 'Pending');
-    return pendingItems.length > 0
-      ? pendingItems
-      : order.items.filter(item => item.status !== 'Served');
+  const itemKey = (orderId: string, item: OrderItem) => `${orderId}::${item.name}::${item.portion}`;
+
+  const collectUnprinted = (order: Order, ignoreGuard = false) => {
+    const originals = order.items.filter(item =>
+      (item.printedQty ?? 0) < item.quantity &&
+      (ignoreGuard || !printingKeysRef.current.has(itemKey(order.id, item)))
+    );
+    const printCopies = originals.map(item => ({
+      ...item,
+      quantity: item.quantity - (item.printedQty ?? 0)
+    }));
+    return { originals, printCopies };
+  };
+
+  const printAndMarkPrinted = (order: Order, ignoreGuard = false): OrderItem[] => {
+    const { originals, printCopies } = collectUnprinted(order, ignoreGuard);
+    if (printCopies.length === 0) return [];
+
+    // Guard immediately so socket/polling re-renders don't double-print
+    originals.forEach(item => printingKeysRef.current.add(itemKey(order.id, item)));
+    printKOTThermal({ ...order, items: printCopies }, settings);
+
+    // Tick the printed items and persist so they are never printed again
+    const updatedItems = order.items.map(item =>
+      originals.includes(item) ? { ...item, printedQty: item.quantity } : item
+    );
+    updateOrder(order.id, { items: updatedItems });
+    return printCopies;
   };
 
   useEffect(() => {
     if (!initializedRef.current) {
-      orders.forEach(o => prevItemsMap.current.set(o.id, o.items));
+      // Seed guard with everything present during initial bulk load so a page
+      // mount never triggers a reprint storm for existing orders. Fresh appends
+      // after mount still print because their items stay un-ticked.
+      orders.forEach(o => o.items.forEach(i => printingKeysRef.current.add(itemKey(o.id, i))));
       initializedRef.current = true;
       return;
     }
 
-    // Grace period: orders that appear during the initial bulk load on page
-    // mount must not trigger duplicate KOT prints.
-    const isWithinGrace = Date.now() - mountedAtRef.current < 3000;
+    // Grace period: suppress prints while initial data loads on mount.
+    if (Date.now() - mountedAtRef.current < 3000) return;
 
-    orders.forEach(order => {
-      const prevItems = prevItemsMap.current.get(order.id);
-      prevItemsMap.current.set(order.id, order.items);
-
-      if (isWithinGrace) return;
-
-      if (!prevItems) {
-        // Brand new order
-        if (order.status === 'Pending') {
-          printKOTThermal({ ...order, items: computePendingItems(order) }, settings);
-        }
-        return;
-      }
-
-      // Items appended to an existing order
-      const newlyAdded: OrderItem[] = [];
-      order.items.forEach(item => {
-        const existing = prevItems.find(i => i.name === item.name && i.portion === item.portion);
-        if (!existing) {
-          newlyAdded.push(item);
-        } else if (item.quantity > existing.quantity) {
-          newlyAdded.push({ ...item, quantity: item.quantity - existing.quantity });
-        }
-      });
-
-      if (newlyAdded.length > 0) {
-        printKOTThermal({ ...order, items: newlyAdded }, settings);
-      }
-    });
+    activeOrders.forEach(order => printAndMarkPrinted(order));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orders]);
 
   const handlePrintKOT = (order: Order) => {
-    const printableOrder = { ...order, items: computePendingItems(order) };
-    setPrintKOTData(printableOrder);
-    printKOTThermal(printableOrder, settings);
-    // Update prevItemsMap so auto-print doesn't re-detect these items as new
-    prevItemsMap.current.set(order.id, order.items);
+    // Manual print bypasses the in-memory guard but still respects the
+    // persisted tick — only non-ticked (never printed) items go out.
+    const printCopies = printAndMarkPrinted(order, true);
+    if (printCopies.length > 0) {
+      setPrintKOTData({ ...order, items: printCopies });
+    }
   };
 
   const getStatusActionLabel = (status: OrderStatus) => {
@@ -257,9 +256,13 @@ const KDS: React.FC = () => {
                           <div className="font-bold text-slate-800 flex items-center gap-1.5">
                             <span className="text-emerald-600 font-mono font-extrabold">{item.quantity}x</span>
                             <span>{item.name}</span>
-                            {item.status === 'Pending' && order.items.some(i => i.status !== 'Pending') && (
+                            {(item.printedQty ?? 0) < item.quantity ? (
                               <span className="text-[9px] font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded border border-amber-200 uppercase tracking-wide">
                                 (New Added)
+                              </span>
+                            ) : (
+                              <span className="text-[9px] font-bold bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded border border-emerald-200 uppercase tracking-wide flex items-center gap-0.5">
+                                <Check size={9} strokeWidth={3} /> Printed
                               </span>
                             )}
                           </div>

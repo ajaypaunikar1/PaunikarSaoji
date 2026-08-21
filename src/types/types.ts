@@ -62,6 +62,7 @@ export interface OrderItem {
   status?: OrderStatus;
   isParcel?: boolean;
   spiceLevel?: SpiceLevel;
+  printedQty?: number; // qty already printed on KOT ("ticked"); only the delta gets printed
 }
 
 export interface Order {

@@ -6,7 +6,6 @@ import {
   Receipt, CreditCard, Wallet, Smartphone,
   Printer, Percent, Calculator, PackageCheck, FileText
 } from 'lucide-react';
-import { QRCodeSVG } from 'qrcode.react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Bill, PaymentMethod } from '../types/types';
 import { toast } from 'sonner';
@@ -87,16 +86,6 @@ const Billing: React.FC = () => {
       grandTotal,
     };
   }, [selectedTableId, selectedParcelId, selectedOrder, discountPct, customGstPct, containerCount, bills]);
-
-  // UPI payment string generator
-  const upiString = useMemo(() => {
-    if (!activeBill) return '';
-    const amount = activeBill.grandTotal;
-    const upiId = settings?.upiId || 'restaurant@upi';
-    const restName = encodeURIComponent(settings?.restaurantName || 'PaunikarSaoji');
-    const note = selectedParcelId ? `Parcel${activeBill.orderId}` : `Table${activeBill.tableId}Order`;
-    return `upi://pay?pa=${upiId}&pn=${restName}&am=${amount}&cu=INR&tn=${note}`;
-  }, [activeBill, settings, selectedParcelId]);
 
   // Submit payment
   const handleProcessPayment = async () => {
@@ -503,17 +492,6 @@ const Billing: React.FC = () => {
                     </button>
                   </div>
                 </div>
-
-                {/* UPI scan QR code */}
-                {paymentMethod === 'UPI' && upiString && (
-                  <div className="p-4 rounded-2xl bg-indigo-50/40 border border-indigo-100 flex flex-col items-center gap-2.5 transition">
-                    <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-widest">Scan QR to Pay</span>
-                    <div className="bg-white p-3 rounded-2xl border border-indigo-150 shadow-inner">
-                      <QRCodeSVG value={upiString} size={110} />
-                    </div>
-                    <span className="text-xs font-black text-slate-800 font-mono">₹{activeBill.grandTotal}</span>
-                  </div>
-                )}
 
                 {/* Payment & Checkout Buttons */}
                 <div className="pt-2 grid grid-cols-2 gap-3">
