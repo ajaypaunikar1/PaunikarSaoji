@@ -634,18 +634,18 @@ const WaiterPortal: React.FC = () => {
               <div className="flex justify-between items-center">
                 <span className="text-xs font-black uppercase tracking-wider text-slate-500">KDS Active Queue</span>
                 <span className="text-[10px] text-slate-400 font-bold">
-                  {orders.filter(o => o.status !== 'Served').length} Orders
+                  {orders.filter(o => o.status !== 'Served' && !o.isParcel).length} Orders
                 </span>
               </div>
 
-              {orders.filter(o => o.status !== 'Served').length === 0 ? (
+              {orders.filter(o => o.status !== 'Served' && !o.isParcel).length === 0 ? (
                 <div className="text-center py-10 p-6 rounded-3xl bg-white border border-slate-200 shadow-sm flex flex-col items-center gap-2">
                   <ChefHat size={36} className="text-slate-400" />
                   <p className="text-xs text-slate-505 font-medium">No active preparation orders!</p>
                 </div>
               ) : (
                 <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
-                  {orders.filter(o => o.status !== 'Served').map(order => {
+                  {orders.filter(o => o.status !== 'Served' && !o.isParcel).map(order => {
                     return (
                       <div 
                         key={order.id} 
@@ -654,7 +654,7 @@ const WaiterPortal: React.FC = () => {
                       >
                         <div className="flex justify-between items-start">
                           <div>
-                            <span className="text-xs font-black text-slate-800 font-mono">{order.isParcel ? 'PARCEL' : `Table ${order.tableId}`}</span>
+                            <span className="text-xs font-black text-slate-800 font-mono">{`Table ${order.tableId}`}</span>
                             <span className="text-[9px] font-mono text-slate-400 block mt-0.5">#{order.id.substring(4, 8)}</span>
                           </div>
                           <span className={`text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded border ${
@@ -700,7 +700,7 @@ const WaiterPortal: React.FC = () => {
                               }));
                               updateOrder(order.id, { items: updatedItems });
                               updateOrderStatus(order.id, nextStatus);
-                              toast.success(`${order.isParcel ? 'Parcel' : `Table ${order.tableId}`} marked as ${nextStatus}`);
+                              toast.success(`Table ${order.tableId} marked as ${nextStatus}`);
                             }}
                             className={`w-full py-2 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer text-white transition ${
                               order.status === 'Pending'
