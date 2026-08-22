@@ -15,7 +15,7 @@ const WaiterPortal: React.FC = () => {
   const { 
     currentUser, logout, language, changeLanguage, tables, menuItems, 
     addOrder, attendance, markAttendance, clockOut, leaves, submitLeave,
-    payroll, orders, generateBill, updateOrder, systemStatus, updateOrderStatus
+    payroll, orders, bills, generateBill, updateOrder, systemStatus, updateOrderStatus
   } = useApp();
   const router = useRouter();
   const t = translations[language];
@@ -121,6 +121,13 @@ const WaiterPortal: React.FC = () => {
 
   // Filter tables assigned to waiter zone or show all
   const filteredTables = tables.filter(tbl => currentUser?.zone === 'All' || tbl.zone === currentUser?.zone);
+
+  // Orders with a paid bill are already checked out — never show them on KDS
+  const paidOrderIds = useMemo(
+    () => new Set(bills.filter(b => b.paymentStatus === 'Paid').map(b => b.orderId)),
+    [bills]
+  );
+  const activeKitchenOrders = orders.filter(o => o.status !== 'Served' && !o.isParcel && !paidOrderIds.has(o.id));
 
   // Add Item to Order Basket
   const handleAddToBasket = (menuItem: any, portion: PortionType) => {
@@ -634,18 +641,18 @@ const WaiterPortal: React.FC = () => {
               <div className="flex justify-between items-center">
                 <span className="text-xs font-black uppercase tracking-wider text-slate-500">KDS Active Queue</span>
                 <span className="text-[10px] text-slate-400 font-bold">
-                  {orders.filter(o => o.status !== 'Served' && !o.isParcel).length} Orders
+                  {activeKitchenOrders.length} Orders
                 </span>
               </div>
 
-              {orders.filter(o => o.status !== 'Served' && !o.isParcel).length === 0 ? (
+              {activeKitchenOrders.length === 0 ? (
                 <div className="text-center py-10 p-6 rounded-3xl bg-white border border-slate-200 shadow-sm flex flex-col items-center gap-2">
                   <ChefHat size={36} className="text-slate-400" />
                   <p className="text-xs text-slate-505 font-medium">No active preparation orders!</p>
                 </div>
               ) : (
                 <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
-                  {orders.filter(o => o.status !== 'Served' && !o.isParcel).map(order => {
+                  {activeKitchenOrders.map(order => {
                     return (
                       <div 
                         key={order.id} 

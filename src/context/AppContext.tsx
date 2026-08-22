@@ -542,12 +542,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             if (isAborted) return;
             setBills(prev => [...prev.filter(b => b.id !== data.id), data]);
           });
-          socket.on('bill_paid', (data: { billId: string; method: PaymentMethod; tableId: number }) => {
+          socket.on('bill_paid', (data: { billId: string; method: PaymentMethod; tableId: number; orderId?: string }) => {
             if (isAborted) return;
             setBills(prev => prev.map(b => b.id === data.billId ? { ...b, paymentStatus: 'Paid', paymentMethod: data.method } : b));
             // Immediately set table to Available so UI refreshes instantly
             setTables(prev => prev.map(t => t.id === data.tableId ? { ...t, status: 'Available', orderId: null, waiterId: null, guests: 0 } : t));
-            toast.success(`Table ${data.tableId} checkout complete! Table is now available.`);
+            // Mark the order Served right away so KDS clears without waiting for sync
+            setOrders(prev => prev.map(o => o.id === data.orderId ? { ...o, status: 'Served' } : o));
+            if (data.tableId > 0) {
+              toast.success(`Table ${data.tableId} checkout complete! Table is now available.`);
+            }
           });
           socket.on('notification_received', (data: Notification) => {
             if (isAborted) return;
@@ -1396,6 +1400,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             ...t, status: 'Available', orderId: undefined, waiterId: undefined, guests: 0
           } : t));
           toast.success(`Table ${bill.tableId} checkout complete! Table is now available.`);
+        } else if (bill && bill.isParcel) {
+          toast.success(`Parcel checkout complete! Paid via ${method}.`);
+        }
+        if (bill && bill.orderId) {
+          // Mark order Served immediately so KDS drops the checked-out ticket
+          setOrders(prev => prev.map(o => o.id === bill.orderId ? { ...o, status: 'Served' } : o));
         }
         loadDatabaseData();
       } else {

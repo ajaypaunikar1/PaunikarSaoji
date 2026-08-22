@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { usePrinter } from '../context/PrinterContext';
 import { translations } from '../translations/translations';
@@ -53,13 +53,19 @@ const OrderTimer: React.FC<{ timestamp: string }> = ({ timestamp }) => {
 };
 
 const KDS: React.FC = () => {
-  const { orders, users, updateOrderStatus, updateOrder, language, settings } = useApp();
+  const { orders, bills, users, updateOrderStatus, updateOrder, language, settings } = useApp();
   const { printKOT: printKOTThermal, connected } = usePrinter();
   const t = translations[language];
 
   const [printKOTData, setPrintKOTData] = useState<Order | null>(null);
 
-  const activeOrders = orders.filter(o => o.status !== 'Served');
+  // Orders with a paid bill are already checked out — never show them on KDS
+  const paidOrderIds = useMemo(
+    () => new Set(bills.filter(b => b.paymentStatus === 'Paid').map(b => b.orderId)),
+    [bills]
+  );
+
+  const activeOrders = orders.filter(o => o.status !== 'Served' && !paidOrderIds.has(o.id));
 
   // Auto-print KOT for brand new / appended items via Web Serial.
   // Every item carries `printedQty` — the persistent "tick" marking what was

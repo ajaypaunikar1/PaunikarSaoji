@@ -7,6 +7,16 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { PaymentMethod } from '../types/types';
+import { getISTDateKey } from '../utils/date';
+
+const orderDateKey = (ord: any): string => {
+  if (ord?.createdAt) return getISTDateKey(ord.createdAt);
+  if (typeof ord?.date === 'string' && /^\d{2}\/\d{2}\/\d{4}$/.test(ord.date)) {
+    const [d, m, y] = ord.date.split('/');
+    return `${y}-${m}-${d}`;
+  }
+  return getISTDateKey();
+};
 
 const Reports: React.FC = () => {
   const { 
@@ -86,10 +96,7 @@ const Reports: React.FC = () => {
 
   // Filtered Orders
   const filteredOrders = useMemo(() => {
-    return orders.filter(ord => {
-      const orderDateStr = (ord as any).createdAt ? (ord as any).createdAt.split('T')[0] : new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
-      return isDateInFilter(orderDateStr);
-    });
+    return orders.filter(ord => isDateInFilter(orderDateKey(ord)));
   }, [orders, dateFilter, customStartDate, customEndDate]);
 
   // Order Metrics

@@ -177,7 +177,7 @@ router.post('/:id/pay', protect, async (req, res) => {
 
     // Broadcast
     const io = req.app.get('io');
-    io.emit('bill_paid', { billId: bill.id, method: paymentMethod, tableId: bill.tableId });
+    io.emit('bill_paid', { billId: bill.id, method: paymentMethod, tableId: bill.tableId, orderId: bill.orderId });
     io.emit('tables_sync', await prisma.table.findMany({ orderBy: { id: 'asc' } }));
     io.emit('orders_sync', await prisma.order.findMany({}));
 

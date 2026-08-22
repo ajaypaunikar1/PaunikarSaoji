@@ -12,6 +12,17 @@ import {
   Tooltip, ResponsiveContainer
 } from 'recharts';
 import { motion, AnimatePresence } from 'framer-motion';
+import { getISTDateKey, getISTHour } from '../utils/date';
+
+const istTodayDisplay = () =>
+  new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: '2-digit', year: 'numeric' });
+
+const isRecordToday = (record: any): boolean => {
+  if (!record) return false;
+  if (record.createdAt) return getISTDateKey(record.createdAt) === getISTDateKey();
+  if (record.date) return record.date === istTodayDisplay();
+  return false;
+};
 
 const Dashboard: React.FC = () => {
   const { 
@@ -35,7 +46,7 @@ const Dashboard: React.FC = () => {
 
     // Revenue: sum of paid bills for today
     const totalRevenue = bills
-      .filter(b => b.paymentStatus === 'Paid' && ((b as any).createdAt?.startsWith(todayStr) || (b as any).timestamp?.includes(new Date().toLocaleDateString())))
+      .filter(b => b.paymentStatus === 'Paid' && isRecordToday(b))
       .reduce((sum, b) => sum + b.grandTotal, 0);
 
     // Occupancy
@@ -76,13 +87,19 @@ const Dashboard: React.FC = () => {
       { hour: '10:00 PM', sales: 0 },
     ];
 
-    const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
-    const paidToday = bills.filter(b => b.paymentStatus === 'Paid' && (b as any).createdAt?.startsWith(todayStr));
+    const paidToday = bills.filter(b => b.paymentStatus === 'Paid' && isRecordToday(b));
     
     paidToday.forEach(bill => {
-      if (!(bill as any).createdAt) return;
-      const billDate = new Date((bill as any).createdAt);
-      let hourNum = billDate.getHours();
+      let hourNum: number | null = null;
+      if ((bill as any).createdAt) {
+        hourNum = getISTHour((bill as any).createdAt);
+      } else if (bill.timestamp) {
+        const match = bill.timestamp.match(/(\d+):\d+:?\d*\s*(AM|PM)/i);
+        if (match) {
+          hourNum = parseInt(match[1], 10) % 12 + (match[2].toUpperCase() === 'PM' ? 12 : 0);
+        }
+      }
+      if (hourNum === null) return;
       let ampm = hourNum >= 12 ? 'PM' : 'AM';
       let displayHour = hourNum % 12;
       displayHour = displayHour === 0 ? 12 : displayHour;
@@ -102,11 +119,9 @@ const Dashboard: React.FC = () => {
   // "Today" (daily) default on the detailed Product Performance report, and all
   // variants/portions (Single/Half/Full) of an item are summed together.
   const topItems = useMemo(() => {
-    const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
     const itemCounts: { [key: string]: number } = {};
     orders.forEach(ord => {
-      const orderDateStr = (ord as any).createdAt ? (ord as any).createdAt.split('T')[0] : todayStr;
-      if (orderDateStr !== todayStr) return;
+      if (!isRecordToday(ord)) return;
       if (ord.items && Array.isArray(ord.items)) {
         ord.items.forEach(item => {
           itemCounts[item.name] = (itemCounts[item.name] || 0) + item.quantity;
