@@ -22,12 +22,24 @@ mongoose.set('toObject', { virtuals: true });
 let connectPromise = null;
 
 const connectDatabase = () => {
+  if (!uri) {
+    return Promise.reject(new Error(
+      'MONGO_URI is not set. Add it to Vercel Project Settings -> Environment Variables.'
+    ));
+  }
   if (!connectPromise) {
-    connectPromise = mongoose.connect(uri, {
-      serverSelectionTimeoutMS: 15000,
-      socketTimeoutMS: 45000,
-      dbName: process.env.MONGO_DB_NAME || undefined
-    });
+    connectPromise = mongoose
+      .connect(uri, {
+        serverSelectionTimeoutMS: 8000,
+        socketTimeoutMS: 45000,
+        maxPoolSize: 10,
+        dbName: process.env.MONGO_DB_NAME || undefined
+      })
+      .catch((err) => {
+        // Do not cache failures - let the next serverless invocation retry.
+        connectPromise = null;
+        throw err;
+      });
   }
   return connectPromise;
 };
