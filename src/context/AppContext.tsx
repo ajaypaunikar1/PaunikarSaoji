@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { io } from 'socket.io-client';
 import {
   buildCategoryList,
+  DEFAULT_CATEGORIES,
   loadCustomCategories,
   normalizeCategoryName,
   saveCustomCategories
@@ -67,6 +68,7 @@ interface AppContextType {
   zones: string[];
   allCategories: string[];
   addCategory: (name: string) => boolean;
+  deleteCategory: (name: string) => boolean;
   login: (username: string, password?: string, role?: UserRole) => boolean;
   logout: () => void;
   addOrder: (tableId: number, items: Omit<Order['items'][0], 'id'>[], notes?: string) => Promise<Order>;
@@ -307,6 +309,26 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     saveCustomCategories(next);
     toast.success(`Category "${name}" created`);
     addAuditLog(`Created menu category ${name}`);
+    return true;
+  };
+
+  const deleteCategory = (name: string): boolean => {
+    if (DEFAULT_CATEGORIES.some(d => d.toLowerCase() === name.toLowerCase())) {
+      toast.error(`"${name}" is a built-in category and cannot be deleted`);
+      return false;
+    }
+    // A category only exists in lists while items use it or it is locally
+    // saved — refuse deletion while dishes still reference it.
+    const inUse = menuItems.filter(m => m.category && m.category.toLowerCase() === name.toLowerCase());
+    if (inUse.length > 0) {
+      toast.error(`Cannot delete "${name}" — ${inUse.length} menu item${inUse.length > 1 ? 's' : ''} still use${inUse.length > 1 ? '' : 's'} it. Move or delete those items first.`);
+      return false;
+    }
+    const next = customCategories.filter(c => c.toLowerCase() !== name.toLowerCase());
+    setCustomCategories(next);
+    saveCustomCategories(next);
+    toast.success(`Category "${name}" deleted`);
+    addAuditLog(`Deleted menu category ${name}`);
     return true;
   };
 
@@ -2142,7 +2164,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       updateMenuItem, deleteMenuItem, clearNotification, clearAllNotifications, addAuditLog, setTableStatus,
       assignWaiter, deleteEmployee, saveAttendance, addTable, removeTable, updateTableLayout,
       addZone, removeZone, unmergeTables, resetAllOrders, settings, updateSettings, systemStatus,
-      allCategories, addCategory
+      allCategories, addCategory, deleteCategory
     }}>
       {children}
     </AppContext.Provider>

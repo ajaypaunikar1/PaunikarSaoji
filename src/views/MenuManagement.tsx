@@ -7,13 +7,13 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { MenuItem, MenuItemVariant } from '../types/types';
-import { getCategoryLabel } from '../utils/categories';
+import { getCategoryLabel, DEFAULT_CATEGORIES } from '../utils/categories';
 import { toast } from 'sonner';
 
 type PortionMode = 'Single' | 'Variant';
 
 const MenuManagement: React.FC = () => {
-  const { menuItems, addMenuItem, updateMenuItem, deleteMenuItem, language, allCategories, addCategory } = useApp();
+  const { menuItems, addMenuItem, updateMenuItem, deleteMenuItem, language, allCategories, addCategory, deleteCategory } = useApp();
   const t = translations[language];
 
   // Filters state
@@ -25,6 +25,14 @@ const MenuManagement: React.FC = () => {
   const handleCreateCategory = () => {
     if (addCategory(newCategoryName)) {
       setNewCategoryName('');
+    }
+  };
+
+  const handleDeleteCategory = (cat: string) => {
+    if (window.confirm(`Delete category "${cat}"? This cannot be undone.`)) {
+      if (deleteCategory(cat) && selectedCategory === cat) {
+        setSelectedCategory('All');
+      }
     }
   };
 
@@ -156,19 +164,32 @@ const MenuManagement: React.FC = () => {
 
       {/* Category Navigation Bar */}
       <div className="flex flex-wrap items-center gap-2 pb-2 border-b border-slate-200">
-        {['All', ...allCategories].map(cat => (
-          <button
-            key={cat}
-            onClick={() => setSelectedCategory(cat)}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-              selectedCategory === cat
-                ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 shadow-sm'
-                : 'bg-white border border-slate-200 hover:border-slate-300 text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            {getCategoryLabel(cat, language)}
-          </button>
-        ))}
+        {['All', ...allCategories].map(cat => {
+          const isDeletable = cat !== 'All' && !DEFAULT_CATEGORIES.some(d => d.toLowerCase() === cat.toLowerCase());
+          return (
+            <div key={cat} className="flex items-center">
+              <button
+                onClick={() => setSelectedCategory(cat)}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  selectedCategory === cat
+                    ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 shadow-sm'
+                    : 'bg-white border border-slate-200 hover:border-slate-300 text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                {getCategoryLabel(cat, language)}
+              </button>
+              {isDeletable && (
+                <button
+                  onClick={() => handleDeleteCategory(cat)}
+                  className="ml-1 p-1 rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-rose-600 hover:border-rose-300 cursor-pointer transition"
+                  title={`Delete category "${cat}"`}
+                >
+                  <X size={11} />
+                </button>
+              )}
+            </div>
+          );
+        })}
 
         {/* Create new category inline */}
         <div className="flex items-center gap-1.5 ml-auto">
