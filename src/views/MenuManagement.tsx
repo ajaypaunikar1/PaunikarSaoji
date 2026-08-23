@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { translations } from '../translations/translations';
 import { 
-  MenuSquare, Plus, X, Edit,
+  MenuSquare, Plus, X, Edit, Trash2,
   ToggleLeft, ToggleRight
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -13,7 +13,7 @@ type PortionMode = 'Single' | 'Variant';
 type CategoryType = 'Vegetarian' | 'Egg Curry' | 'Breads' | 'Rice' | 'Papad' | 'Starters' | 'Curries' | 'Handi Dishes';
 
 const MenuManagement: React.FC = () => {
-  const { menuItems, addMenuItem, updateMenuItem, language } = useApp();
+  const { menuItems, addMenuItem, updateMenuItem, deleteMenuItem, language } = useApp();
   const t = translations[language];
 
   const getCategoryLabel = (cat: CategoryType | 'All') => {
@@ -135,6 +135,12 @@ const MenuManagement: React.FC = () => {
     toast.success(`${item.name} status set to ${!item.isAvailable ? 'In Stock' : 'Out of Stock'}`);
   };
 
+  const handleDeleteItem = (item: MenuItem) => {
+    if (window.confirm(`Delete "${item.name}" from the menu? This cannot be undone.`)) {
+      deleteMenuItem(item.id);
+    }
+  };
+
   return (
     <div className="space-y-6">
       
@@ -247,13 +253,23 @@ const MenuManagement: React.FC = () => {
                 )}
               </button>
 
-              {/* Edit button */}
-              <button
-                onClick={() => handleOpenEditModal(item)}
-                className="p-2 rounded bg-white border border-slate-200 hover:border-slate-350 text-slate-550 hover:text-slate-800 cursor-pointer transition shadow-xs"
-              >
-                <Edit size={12} />
-              </button>
+              {/* Edit + Delete buttons */}
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => handleOpenEditModal(item)}
+                  className="p-2 rounded bg-white border border-slate-200 hover:border-slate-350 text-slate-550 hover:text-slate-800 cursor-pointer transition shadow-xs"
+                  title="Edit Item"
+                >
+                  <Edit size={12} />
+                </button>
+                <button
+                  onClick={() => handleDeleteItem(item)}
+                  className="p-2 rounded bg-white border border-slate-200 hover:border-rose-300 text-slate-550 hover:text-rose-600 cursor-pointer transition shadow-xs"
+                  title="Delete Item"
+                >
+                  <Trash2 size={12} />
+                </button>
+              </div>
 
             </div>
 

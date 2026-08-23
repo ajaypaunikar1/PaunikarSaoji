@@ -85,6 +85,7 @@ interface AppContextType {
   changeLanguage: (lang: 'en' | 'mr') => void;
   addMenuItem: (item: Omit<MenuItem, 'id'>) => void;
   updateMenuItem: (itemId: string, updates: Partial<MenuItem>) => void;
+  deleteMenuItem: (itemId: string) => void;
   clearNotification: (id: string) => void;
   clearAllNotifications: () => void;
   addAuditLog: (action: string) => void;
@@ -1786,6 +1787,29 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
+  const deleteMenuItem = (itemId: string) => {
+    if (isBackendMode) {
+      fetch(`${API_BASE}/menu/${itemId}`, {
+        method: 'DELETE',
+        headers: getHeaders()
+      }).then(async (res) => {
+        const json = await res.json().catch(() => ({}));
+        if (res.ok && json.success) {
+          toast.success('Menu item deleted');
+          loadDatabaseData();
+        } else {
+          toast.error(json.message || 'Failed to delete menu item');
+        }
+      }).catch(() => {
+        toast.error('Failed to delete menu item');
+      });
+    } else {
+      setMenuItems(prev => prev.filter(m => m.id !== itemId));
+      addAuditLog(`Deleted menu item ${itemId}`);
+      toast.success('Menu item deleted');
+    }
+  };
+
   const clearNotification = (id: string) => {
     setNotifications(prev => prev.filter(n => n.id !== id));
   };
@@ -1984,7 +2008,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       splitTables, transferTable, generateBill, payBill, submitLeave, approveLeave,
       rejectLeave, markAttendance, clockOut, requestCancellation, approveCancellation,
       rejectCancellation, addEmployee, updateEmployee, changeLanguage, addMenuItem,
-      updateMenuItem, clearNotification, clearAllNotifications, addAuditLog, setTableStatus,
+      updateMenuItem, deleteMenuItem, clearNotification, clearAllNotifications, addAuditLog, setTableStatus,
       assignWaiter, deleteEmployee, saveAttendance, addTable, removeTable, updateTableLayout,
       addZone, removeZone, unmergeTables, resetAllOrders, settings, updateSettings, systemStatus
     }}>

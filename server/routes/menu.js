@@ -79,4 +79,28 @@ router.put('/:id', protect, authorize('SuperAdmin', 'Manager'), async (req, res)
   }
 });
 
+// @route   DELETE /api/menu/:id
+// @desc    Delete menu item (Admin/Manager)
+router.delete('/:id', protect, authorize('SuperAdmin', 'Manager'), async (req, res) => {
+  try {
+    const item = await prisma.menuItem.findUnique({
+      where: { id: req.params.id }
+    });
+    if (!item) {
+      return res.status(404).json({ success: false, message: 'Item not found' });
+    }
+
+    await prisma.menuItem.delete({
+      where: { id: req.params.id }
+    });
+
+    const io = req.app.get('io');
+    io.emit('menu_changed', item);
+
+    res.json({ success: true, data: item });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 export default router;
