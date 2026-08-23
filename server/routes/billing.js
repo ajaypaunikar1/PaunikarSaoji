@@ -1,5 +1,5 @@
 import express from 'express';
-import prisma from '../config/db.js';
+import { Table, Order, Bill, Notification, CancellationRequest, Settings } from '../models/index.js';
 import { protect } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -8,7 +8,7 @@ const router = express.Router();
 // @desc    Get all bills
 router.get('/', protect, async (req, res) => {
   try {
-    const list = await prisma.bill.findMany({});
+    const list = await Bill.find();
     res.json({ success: true, data: list });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -19,9 +19,7 @@ router.get('/', protect, async (req, res) => {
 // @desc    Get all unpaid bills
 router.get('/pending-bills', async (req, res) => {
   try {
-    const pending = await prisma.bill.findMany({
-      where: { paymentStatus: 'Pending' }
-    });
+    const pending = await Bill.find({ paymentStatus: 'Pending' });
     res.json({ success: true, data: pending });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -31,7 +29,10 @@ router.get('/pending-bills', async (req, res) => {
 // @route   POST /api/billing/generate
 // @desc    Generate tax invoice bill
 router.post('/generate', protect, async (req, res) => {
+  // GST % must always be supplied by the client (from Settings); the legacy
+  // default of 5 is kept only as a last-resort fallback for old clients.
   const { tableId, discount, gstPct = 5, orderId, isParcel, containerCharge } = req.body;
+  const gstPercentage = Math.max(0, Number(gstPct) || 0);
 
   try {
     const parcel = !!isParcel;
@@ -42,17 +43,17 @@ router.post('/generate', protect, async (req, res) => {
       if (!orderId) {
         return res.status(400).json({ success: false, message: 'orderId is required for parcel bills' });
       }
-      order = await prisma.order.findUnique({ where: { id: orderId } });
+      order = await Order.findById(orderId);
       if (!order) {
         return res.status(404).json({ success: false, message: 'Order not found' });
       }
       billTableId = 0;
     } else {
-      const table = await prisma.table.findUnique({ where: { id: Number(tableId) } });
+      const table = await Table.findById(Number(tableId));
       if (!table || !table.orderId) {
         return res.status(400).json({ success: false, message: 'Table has no active order' });
       }
-      order = await prisma.order.findUnique({ where: { id: table.orderId } });
+      order = await Order.findById(table.orderId);
       if (!order) {
         return res.status(404).json({ success: false, message: 'Order not found' });
       }
@@ -63,42 +64,39 @@ router.post('/generate', protect, async (req, res) => {
     const discountVal = Math.max(0, Math.min(Number(discount) || 0, order.grandTotal)); // never go negative
     const containerVal = parcel ? (Number(containerCharge) || 0) : 0;
     const subtotal = order.grandTotal;
-    const gst = Math.round(subtotal * (Number(gstPct) / 100) * 100) / 100;
+    const gst = Math.round(subtotal * (gstPercentage / 100) * 100) / 100;
     const grandTotal = Math.max(0, Math.round((subtotal + gst - discountVal + containerVal) * 100) / 100);
 
     // Check for existing pending bill
-    const existing = await prisma.bill.findFirst({
-      where: { orderId: order.id, paymentStatus: 'Pending' }
+    const existing = await Bill.findOne({
+      orderId: order.id,
+      paymentStatus: 'Pending'
     });
 
     let newBill;
     if (existing) {
-      newBill = await prisma.bill.update({
-        where: { id: existing.id },
-        data: {
-          subtotal,
-          gst,
-          discount: discountVal,
-          containerCharge: containerVal,
-          grandTotal,
-          timestamp: new Date().toLocaleTimeString()
-        }
-      });
+      existing.subtotal = subtotal;
+      existing.gst = gst;
+      existing.gstPct = gstPercentage;
+      existing.discount = discountVal;
+      existing.containerCharge = containerVal;
+      existing.grandTotal = grandTotal;
+      existing.timestamp = new Date().toLocaleTimeString();
+      newBill = await existing.save();
     } else {
-      newBill = await prisma.bill.create({
-        data: {
-          id: `bill-${Date.now()}`,
-          orderId: order.id,
-          tableId: billTableId,
-          subtotal,
-          gst,
-          discount: discountVal,
-          containerCharge: containerVal,
-          grandTotal,
-          isParcel: parcel,
-          paymentStatus: 'Pending',
-          timestamp: new Date().toLocaleTimeString()
-        }
+      newBill = await Bill.create({
+        _id: `bill-${Date.now()}`,
+        orderId: order.id,
+        tableId: billTableId,
+        subtotal,
+        gst,
+        gstPct: gstPercentage,
+        discount: discountVal,
+        containerCharge: containerVal,
+        grandTotal,
+        isParcel: parcel,
+        paymentStatus: 'Pending',
+        timestamp: new Date().toLocaleTimeString()
       });
     }
 
@@ -107,27 +105,22 @@ router.post('/generate', protect, async (req, res) => {
 
     if (!parcel) {
       // Set Table status to Billing
-      await prisma.table.update({
-        where: { id: billTableId },
-        data: { status: 'Billing' }
-      });
+      await Table.findByIdAndUpdate(billTableId, { status: 'Billing' });
     }
 
     // Create Notification
-    const notif = await prisma.notification.create({
-      data: {
-        title: parcel ? 'Parcel Bill Generated' : `Bill Generated - Table ${billTableId}`,
-        message: `Total: ₹${grandTotal} (Subtotal: ₹${subtotal}, GST: ₹${gst})`,
-        type: 'Billing',
-        timestamp: new Date().toLocaleTimeString(),
-        read: false
-      }
+    const notif = await Notification.create({
+      title: parcel ? 'Parcel Bill Generated' : `Bill Generated - Table ${billTableId}`,
+      message: `Total: ₹${grandTotal} (Subtotal: ₹${subtotal}, GST: ₹${gst})`,
+      type: 'Billing',
+      timestamp: new Date().toLocaleTimeString(),
+      read: false
     });
 
     // Broadcast
     const io = req.app.get('io');
     io.emit('bill_generated', newBill);
-    io.emit('tables_sync', await prisma.table.findMany({ orderBy: { id: 'asc' } }));
+    io.emit('tables_sync', await Table.find().sort({ _id: 1 }));
     io.emit('notification_received', notif);
 
     res.status(201).json({ success: true, data: newBill });
@@ -142,44 +135,33 @@ router.post('/:id/pay', protect, async (req, res) => {
   const { paymentMethod } = req.body;
 
   try {
-    const bill = await prisma.bill.findUnique({ where: { id: req.params.id } });
+    const bill = await Bill.findById(req.params.id);
     if (!bill) {
       return res.status(404).json({ success: false, message: 'Bill not found' });
     }
 
-    const updatedBill = await prisma.bill.update({
-      where: { id: req.params.id },
-      data: {
-        paymentStatus: 'Paid',
-        paymentMethod
-      }
-    });
+    bill.paymentStatus = 'Paid';
+    bill.paymentMethod = paymentMethod;
+    await bill.save();
 
     // Update table status to Available
-    const table = await prisma.table.findUnique({ where: { id: bill.tableId } });
+    const table = await Table.findById(bill.tableId);
     if (table && table.orderId === bill.orderId) {
-      await prisma.table.update({
-        where: { id: bill.tableId },
-        data: {
-          status: 'Available',
-          orderId: null,
-          waiterId: null,
-          guests: 0
-        }
-      });
+      table.status = 'Available';
+      table.orderId = null;
+      table.waiterId = null;
+      table.guests = 0;
+      await table.save();
     }
 
     // Set Order to Served
-    await prisma.order.update({
-      where: { id: bill.orderId },
-      data: { status: 'Served' }
-    });
+    await Order.findByIdAndUpdate(bill.orderId, { status: 'Served' });
 
     // Broadcast
     const io = req.app.get('io');
     io.emit('bill_paid', { billId: bill.id, method: paymentMethod, tableId: bill.tableId, orderId: bill.orderId });
-    io.emit('tables_sync', await prisma.table.findMany({ orderBy: { id: 'asc' } }));
-    io.emit('orders_sync', await prisma.order.findMany({}));
+    io.emit('tables_sync', await Table.find().sort({ _id: 1 }));
+    io.emit('orders_sync', await Order.find());
 
     res.json({ success: true, message: 'Checkout complete, payment processed' });
   } catch (error) {
@@ -193,14 +175,14 @@ router.post('/:id/pay', protect, async (req, res) => {
 //          its order so the frontend can generate the ESC/POS receipt.
 router.post('/:id/print', protect, async (req, res) => {
   try {
-    let bill = await prisma.bill.findUnique({ where: { id: req.params.id } });
+    let bill = await Bill.findById(req.params.id);
     if (!bill) {
-      bill = await prisma.bill.findFirst({ where: { orderId: req.params.id } });
+      bill = await Bill.findOne({ orderId: req.params.id });
     }
     if (!bill) {
       return res.status(404).json({ success: false, message: 'Bill not found' });
     }
-    const order = await prisma.order.findUnique({ where: { id: bill.orderId } });
+    const order = await Order.findById(bill.orderId);
     if (!order) {
       return res.status(404).json({ success: false, message: 'Order not found' });
     }
@@ -220,19 +202,17 @@ router.post('/:id/print', protect, async (req, res) => {
 router.post('/reset-checkout/:tableId', protect, async (req, res) => {
   try {
     const tableId = Number(req.params.tableId);
-    const table = await prisma.table.findUnique({ where: { id: tableId } });
+    const table = await Table.findById(tableId);
     if (!table) return res.status(404).json({ success: false, message: 'Table not found' });
 
     const newStatus = table.orderId ? 'Occupied' : 'Available';
-    const updatedTable = await prisma.table.update({
-      where: { id: tableId },
-      data: { status: newStatus }
-    });
+    table.status = newStatus;
+    await table.save();
 
     const io = req.app.get('io');
-    io.emit('tables_sync', await prisma.table.findMany({ orderBy: { id: 'asc' } }));
+    io.emit('tables_sync', await Table.find().sort({ _id: 1 }));
 
-    res.json({ success: true, data: updatedTable, message: `Table ${tableId} status reset to ${newStatus}` });
+    res.json({ success: true, data: table, message: `Table ${tableId} status reset to ${newStatus}` });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -244,25 +224,21 @@ router.post('/cancel-request', protect, async (req, res) => {
   const { orderId, itemText, reason } = req.body;
 
   try {
-    const newReq = await prisma.cancellationRequest.create({
-      data: {
-        orderId,
-        itemText,
-        reason,
-        requestedBy: req.user.name,
-        status: 'Pending',
-        timestamp: new Date().toLocaleTimeString()
-      }
+    const newReq = await CancellationRequest.create({
+      orderId,
+      itemText,
+      reason,
+      requestedBy: req.user.name,
+      status: 'Pending',
+      timestamp: new Date().toLocaleTimeString()
     });
 
-    const notif = await prisma.notification.create({
-      data: {
-        title: `Cancellation Request`,
-        message: `Refund/removal request for "${itemText}" in Order ${orderId.substring(4,8)}. Reason: ${reason}`,
-        type: 'Cancellation',
-        timestamp: new Date().toLocaleTimeString(),
-        read: false
-      }
+    const notif = await Notification.create({
+      title: `Cancellation Request`,
+      message: `Refund/removal request for "${itemText}" in Order ${orderId.substring(4,8)}. Reason: ${reason}`,
+      type: 'Cancellation',
+      timestamp: new Date().toLocaleTimeString(),
+      read: false
     });
 
     const io = req.app.get('io');
@@ -279,7 +255,7 @@ router.post('/cancel-request', protect, async (req, res) => {
 // @desc    Get all cancellation requests
 router.get('/cancel-requests', protect, async (req, res) => {
   try {
-    const list = await prisma.cancellationRequest.findMany({});
+    const list = await CancellationRequest.find();
     res.json({ success: true, data: list });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -292,18 +268,16 @@ router.put('/cancel-requests/:id', protect, async (req, res) => {
   const { status } = req.body;
 
   try {
-    const cancelReq = await prisma.cancellationRequest.findUnique({ where: { id: req.params.id } });
+    const cancelReq = await CancellationRequest.findById(req.params.id);
     if (!cancelReq) {
       return res.status(404).json({ success: false, message: 'Request not found' });
     }
 
-    const updatedReq = await prisma.cancellationRequest.update({
-      where: { id: req.params.id },
-      data: { status }
-    });
+    cancelReq.status = status;
+    const updatedReq = await cancelReq.save();
 
     if (status === 'Approved') {
-      const order = await prisma.order.findUnique({ where: { id: cancelReq.orderId } });
+      const order = await Order.findById(cancelReq.orderId);
       if (order && Array.isArray(order.items)) {
         // itemText format: "<name> (<portion>) x<qty>" — the x<qty> suffix is
         // optional; legacy requests without it cancel the entire line.
@@ -332,35 +306,35 @@ router.put('/cancel-requests/:id', protect, async (req, res) => {
         }
         const grandTotal = updatedItems.reduce((acc, i) => acc + (i.price * i.quantity), 0);
 
-        await prisma.order.update({
-          where: { id: order.id },
-          data: {
-            items: updatedItems,
-            grandTotal
-          }
-        });
+        order.items = updatedItems;
+        order.markModified('items');
+        order.grandTotal = grandTotal;
+        await order.save();
 
         // Update pending bill if it exists
-        const pendingBill = await prisma.bill.findFirst({
-          where: { orderId: order.id, paymentStatus: 'Pending' }
+        const pendingBill = await Bill.findOne({
+          orderId: order.id,
+          paymentStatus: 'Pending'
         });
         if (pendingBill) {
-          const billGstPct = pendingBill.gstPct || 18; // honour the bill's own GST %
+          // Honour the bill's own GST %; fall back to the restaurant setting
+          // for legacy bills created before gstPct was persisted.
+          let billGstPct = pendingBill.gstPct;
+          if (typeof billGstPct !== 'number') {
+            const settings = await Settings.findOne();
+            billGstPct = settings?.gstEnabled === false ? 0 : (settings?.gstPct ?? 18);
+          }
           const safeDiscount = Math.min(pendingBill.discount || 0, grandTotal);
           const newGst = Math.round(grandTotal * (billGstPct / 100) * 100) / 100;
           const newGrandTotal = Math.max(0,
             Math.round((grandTotal + newGst - safeDiscount + (pendingBill.containerCharge || 0)) * 100) / 100
           );
 
-          const updatedBill = await prisma.bill.update({
-            where: { id: pendingBill.id },
-            data: {
-              subtotal: grandTotal,
-              gst: newGst,
-              discount: safeDiscount,
-              grandTotal: newGrandTotal
-            }
-          });
+          pendingBill.subtotal = grandTotal;
+          pendingBill.gst = newGst;
+          pendingBill.discount = safeDiscount;
+          pendingBill.grandTotal = newGrandTotal;
+          const updatedBill = await pendingBill.save();
 
           const io = req.app.get('io');
           io.emit('bill_generated', updatedBill); // broadcast updated bill
@@ -370,7 +344,7 @@ router.put('/cancel-requests/:id', protect, async (req, res) => {
 
     const io = req.app.get('io');
     io.emit('cancel_status_updated', updatedReq);
-    io.emit('orders_sync', await prisma.order.findMany({}));
+    io.emit('orders_sync', await Order.find());
 
     res.json({ success: true, message: `Request status set to ${status}` });
   } catch (error) {

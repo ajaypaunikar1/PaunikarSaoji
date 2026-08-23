@@ -508,7 +508,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                     message: `Order #${no.id.substring(4,8)} received for Table ${no.tableId}`,
                     timestamp: new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit' }).format(new Date()),
                     read: false,
-                    type: 'order' as const
+                    type: 'Order' as const
                   };
                   toast.success(notif.message);
                   setNotifications(pn => [notif, ...pn]);
@@ -610,7 +610,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             if (isAborted) return;
             setBills(prev => prev.map(b => b.id === data.billId ? { ...b, paymentStatus: 'Paid', paymentMethod: data.method } : b));
             // Immediately set table to Available so UI refreshes instantly
-            setTables(prev => prev.map(t => t.id === data.tableId ? { ...t, status: 'Available', orderId: null, waiterId: null, guests: 0 } : t));
+            setTables(prev => prev.map(t => t.id === data.tableId ? { ...t, status: 'Available' as const, orderId: undefined, waiterId: undefined, guests: 0 } : t));
             // Mark the order Served right away so KDS clears without waiting for sync
             setOrders(prev => prev.map(o => o.id === data.orderId ? { ...o, status: 'Served' } : o));
             if (data.tableId > 0) {

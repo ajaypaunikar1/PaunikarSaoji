@@ -5,7 +5,14 @@ export type LeaveStatus = 'Pending' | 'Approved' | 'Rejected';
 export type PaymentMethod = 'Cash' | 'Card' | 'UPI';
 export type PayrollStatus = 'Paid' | 'Unpaid';
 export type Zone = string;
-export type PortionType = 'Half' | 'Full' | 'Single';
+/**
+ * Portion / variant label carried on order lines.
+ * Legacy values are 'Half' | 'Full' | 'Single', but MenuManagement lets
+ * admins define ARBITRARY variant names (e.g. 'Quarter', 'Jumbo'), so this is
+ * intentionally a plain string. 'Single' means the item has no variants and
+ * uses MenuItem.price directly.
+ */
+export type PortionType = string;
 export type SpiceLevel = 'normal' | 'medium' | 'spicy';
 
 export interface MenuItemVariant {

@@ -1,6 +1,13 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
-import prisma from '../config/db.js';
+import {
+  User,
+  Attendance,
+  LeaveRequest,
+  Payroll,
+  AuditLog,
+  Notification
+} from '../models/index.js';
 import { protect, authorize } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -9,24 +16,7 @@ const router = express.Router();
 // @desc    Get all staff members (Admin/Manager)
 router.get('/', protect, async (req, res) => {
   try {
-    const staff = await prisma.user.findMany({
-      select: {
-        id: true,
-        name: true,
-        username: true,
-        role: true,
-        status: true,
-        zone: true,
-        salary: true,
-        performance: true,
-        overtimeHours: true,
-        isFirstLogin: true,
-        shiftStart: true,
-        shiftEnd: true,
-        createdAt: true,
-        updatedAt: true
-      }
-    });
+    const staff = await User.find().select('-password');
     res.json({ success: true, data: staff });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -39,8 +29,8 @@ router.post('/', protect, authorize('SuperAdmin', 'Manager'), async (req, res) =
   const { name, username, password, role, zone, salary, shiftStart, shiftEnd } = req.body;
 
   try {
-    const exist = await prisma.user.findUnique({
-      where: { username: username.toLowerCase() }
+    const exist = await User.findOne({
+      username: username.toLowerCase()
     });
     if (exist) {
       return res.status(400).json({ success: false, message: 'Username already taken' });
@@ -49,22 +39,23 @@ router.post('/', protect, authorize('SuperAdmin', 'Manager'), async (req, res) =
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    const newUser = await prisma.user.create({
-      data: {
-        name,
-        username: username.toLowerCase(),
-        password: hashedPassword,
-        role,
-        zone,
-        salary: Number(salary) || 0,
-        performance: 5,
-        overtimeHours: 0,
-        shiftStart: shiftStart || '09:00:00',
-        shiftEnd: shiftEnd || '17:00:00'
-      }
+    const newUser = await User.create({
+      name,
+      username: username.toLowerCase(),
+      password: hashedPassword,
+      role,
+      zone,
+      salary: Number(salary) || 0,
+      performance: 5,
+      overtimeHours: 0,
+      shiftStart: shiftStart || '09:00:00',
+      shiftEnd: shiftEnd || '17:00:00'
     });
 
-    res.status(201).json({ success: true, data: newUser });
+    const safeUser = newUser.toObject();
+    delete safeUser.password;
+
+    res.status(201).json({ success: true, data: safeUser });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -74,37 +65,30 @@ router.post('/', protect, authorize('SuperAdmin', 'Manager'), async (req, res) =
 // @desc    Update staff details (Admin/Manager)
 router.put('/:id', protect, async (req, res) => {
   try {
-    const staff = await prisma.user.findUnique({
-      where: { id: req.params.id }
-    });
+    const staff = await User.findById(req.params.id);
     if (!staff) {
       return res.status(404).json({ success: false, message: 'Staff member not found' });
     }
 
     const { name, role, zone, salary, status, performance, overtimeHours, shiftStart, shiftEnd } = req.body;
 
-    const data = {};
-    if (name) data.name = name;
-    if (role) data.role = role;
-    if (zone) data.zone = zone;
-    if (salary !== undefined) data.salary = Number(salary);
-    if (status) data.status = status;
-    if (performance !== undefined) data.performance = Number(performance);
-    if (overtimeHours !== undefined) data.overtimeHours = Number(overtimeHours);
-    if (shiftStart !== undefined) data.shiftStart = shiftStart;
-    if (shiftEnd !== undefined) data.shiftEnd = shiftEnd;
-
-    const updated = await prisma.user.update({
-      where: { id: req.params.id },
-      data
-    });
+    if (name) staff.name = name;
+    if (role) staff.role = role;
+    if (zone) staff.zone = zone;
+    if (salary !== undefined) staff.salary = Number(salary);
+    if (status) staff.status = status;
+    if (performance !== undefined) staff.performance = Number(performance);
+    if (overtimeHours !== undefined) staff.overtimeHours = Number(overtimeHours);
+    if (shiftStart !== undefined) staff.shiftStart = shiftStart;
+    if (shiftEnd !== undefined) staff.shiftEnd = shiftEnd;
+    await staff.save();
 
     // Broadcast Socket Event
     const io = req.app.get('io');
-    console.log('Emitted staff_updated event:', updated.id, updated.status);
-    io.emit('staff_updated', { id: updated.id, status: updated.status, user: updated });
+    console.log('Emitted staff_updated event:', staff.id, staff.status);
+    io.emit('staff_updated', { id: staff.id, status: staff.status, user: staff.toObject() });
 
-    res.json({ success: true, data: updated });
+    res.json({ success: true, data: staff });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -116,15 +100,16 @@ router.post('/attendance/clock-in', protect, async (req, res) => {
   const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
 
   try {
-    const exist = await prisma.attendance.findFirst({
-      where: { employeeId: req.user.id, date: todayStr }
+    const exist = await Attendance.findOne({
+      employeeId: req.user.id,
+      date: todayStr
     });
     if (exist) {
       return res.status(400).json({ success: false, message: 'Already clocked in today' });
     }
 
     const clockInTime = new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Kolkata', hour12: true });
-    
+
     // Determine status (Late if after 09:15 AM in Kolkata)
     const nowKolkata = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
     let attStatus = 'Present';
@@ -132,14 +117,11 @@ router.post('/attendance/clock-in', protect, async (req, res) => {
       attStatus = 'Late';
     }
 
-    const newAtt = await prisma.attendance.create({
-      data: {
-        id: `att-${Date.now()}`,
-        employeeId: req.user.id,
-        date: todayStr,
-        clockIn: clockInTime,
-        status: attStatus
-      }
+    const newAtt = await Attendance.create({
+      employeeId: req.user.id,
+      date: todayStr,
+      clockIn: clockInTime,
+      status: attStatus
     });
 
     res.status(201).json({ success: true, data: newAtt });
@@ -154,8 +136,9 @@ router.post('/attendance/clock-out', protect, async (req, res) => {
   const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
 
   try {
-    const attendance = await prisma.attendance.findFirst({
-      where: { employeeId: req.user.id, date: todayStr }
+    const attendance = await Attendance.findOne({
+      employeeId: req.user.id,
+      date: todayStr
     });
     if (!attendance) {
       return res.status(400).json({ success: false, message: 'No clock-in record found for today' });
@@ -166,10 +149,8 @@ router.post('/attendance/clock-out', protect, async (req, res) => {
     }
 
     const clockOutTime = new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Kolkata', hour12: true });
-    const updated = await prisma.attendance.update({
-      where: { id: attendance.id },
-      data: { clockOut: clockOutTime }
-    });
+    attendance.clockOut = clockOutTime;
+    const updated = await attendance.save();
 
     res.json({ success: true, data: updated });
   } catch (error) {
@@ -181,9 +162,7 @@ router.post('/attendance/clock-out', protect, async (req, res) => {
 // @desc    Get attendance history
 router.get('/attendance', protect, async (req, res) => {
   try {
-    const list = await prisma.attendance.findMany({
-      orderBy: { createdAt: 'desc' }
-    });
+    const list = await Attendance.find().sort({ createdAt: -1 });
     res.json({ success: true, data: list });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -196,26 +175,21 @@ router.post('/leaves', protect, async (req, res) => {
   const { startDate, endDate, reason } = req.body;
 
   try {
-    const newLeave = await prisma.leaveRequest.create({
-      data: {
-        id: `leave-${Date.now()}`,
-        employeeId: req.user.id,
-        startDate,
-        endDate,
-        reason,
-        status: 'Pending'
-      }
+    const newLeave = await LeaveRequest.create({
+      employeeId: req.user.id,
+      startDate,
+      endDate,
+      reason,
+      status: 'Pending'
     });
 
     // Create Notification
-    const notif = await prisma.notification.create({
-      data: {
-        title: `Leave Request - ${req.user.name}`,
-        message: `Requested leave: ${startDate} to ${endDate}. Reason: ${reason}`,
-        type: 'Leave',
-        timestamp: new Date().toLocaleTimeString(),
-        read: false
-      }
+    const notif = await Notification.create({
+      title: `Leave Request - ${req.user.name}`,
+      message: `Requested leave: ${startDate} to ${endDate}. Reason: ${reason}`,
+      type: 'Leave',
+      timestamp: new Date().toLocaleTimeString(),
+      read: false
     });
 
     const io = req.app.get('io');
@@ -232,9 +206,7 @@ router.post('/leaves', protect, async (req, res) => {
 // @desc    Get leave requests
 router.get('/leaves', protect, async (req, res) => {
   try {
-    const list = await prisma.leaveRequest.findMany({
-      orderBy: { createdAt: 'desc' }
-    });
+    const list = await LeaveRequest.find().sort({ createdAt: -1 });
     res.json({ success: true, data: list });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -247,17 +219,13 @@ router.put('/leaves/:id', protect, authorize('SuperAdmin', 'Manager'), async (re
   const { status } = req.body;
 
   try {
-    const leave = await prisma.leaveRequest.findUnique({
-      where: { id: req.params.id }
-    });
+    const leave = await LeaveRequest.findById(req.params.id);
     if (!leave) {
       return res.status(404).json({ success: false, message: 'Leave request not found' });
     }
 
-    const updated = await prisma.leaveRequest.update({
-      where: { id: req.params.id },
-      data: { status }
-    });
+    leave.status = status;
+    const updated = await leave.save();
 
     const io = req.app.get('io');
     io.emit('leave_status_updated', updated);
@@ -272,7 +240,7 @@ router.put('/leaves/:id', protect, authorize('SuperAdmin', 'Manager'), async (re
 // @desc    Get payroll history
 router.get('/payroll', protect, async (req, res) => {
   try {
-    const list = await prisma.payroll.findMany({});
+    const list = await Payroll.find();
     res.json({ success: true, data: list });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -283,10 +251,7 @@ router.get('/payroll', protect, async (req, res) => {
 // @desc    Get operational audit logs
 router.get('/audit-logs', protect, async (req, res) => {
   try {
-    const list = await prisma.auditLog.findMany({
-      orderBy: { createdAt: 'desc' },
-      take: 100
-    });
+    const list = await AuditLog.find().sort({ createdAt: -1 }).limit(100);
     res.json({ success: true, data: list });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -299,13 +264,11 @@ router.post('/audit-logs', protect, async (req, res) => {
   const { action } = req.body;
 
   try {
-    const log = await prisma.auditLog.create({
-      data: {
-        userId: req.user.id,
-        userName: req.user.name,
-        action,
-        timestamp: new Date().toLocaleTimeString()
-      }
+    const log = await AuditLog.create({
+      userId: req.user.id,
+      userName: req.user.name,
+      action,
+      timestamp: new Date().toLocaleTimeString()
     });
 
     res.status(201).json({ success: true, data: log });
@@ -318,16 +281,12 @@ router.post('/audit-logs', protect, async (req, res) => {
 // @desc    Delete staff member (Admin/Manager)
 router.delete('/:id', protect, authorize('SuperAdmin', 'Manager'), async (req, res) => {
   try {
-    const user = await prisma.user.findUnique({
-      where: { id: req.params.id }
-    });
+    const user = await User.findById(req.params.id);
     if (!user) {
       return res.status(404).json({ success: false, message: 'Employee not found' });
     }
     const username = user.username;
-    await prisma.user.delete({
-      where: { id: req.params.id }
-    });
+    await user.deleteOne();
 
     // Broadcast Socket Event
     const io = req.app.get('io');
@@ -346,30 +305,29 @@ router.post('/attendance/manual', protect, authorize('SuperAdmin', 'Manager'), a
   const { employeeId, date, status, clockIn, clockOut } = req.body;
 
   try {
-    const existing = await prisma.attendance.findFirst({
-      where: { employeeId, date }
+    const existing = await Attendance.findOne({
+      employeeId,
+      date
     });
 
     let result;
     if (existing) {
-      result = await prisma.attendance.update({
-        where: { id: existing.id },
-        data: {
+      result = await Attendance.findByIdAndUpdate(
+        existing._id,
+        {
           status,
           clockIn: status === 'Absent' ? '' : (clockIn !== undefined ? clockIn : undefined),
           clockOut: status === 'Absent' ? '' : (clockOut !== undefined ? clockOut : undefined)
-        }
-      });
+        },
+        { new: true }
+      );
     } else {
-      result = await prisma.attendance.create({
-        data: {
-          id: `att-${Date.now()}`,
-          employeeId,
-          date,
-          clockIn: status === 'Absent' ? '' : (clockIn || '09:00:00'),
-          clockOut: status === 'Absent' ? '' : (clockOut || ''),
-          status
-        }
+      result = await Attendance.create({
+        employeeId,
+        date,
+        clockIn: status === 'Absent' ? '' : (clockIn || '09:00:00'),
+        clockOut: status === 'Absent' ? '' : (clockOut || ''),
+        status
       });
     }
 

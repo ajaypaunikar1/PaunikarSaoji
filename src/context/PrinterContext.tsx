@@ -5,191 +5,291 @@ import React, {
   useEffect,
   useState,
   useCallback,
-  useRef
+  useMemo
 } from 'react';
 import type { ReactNode } from 'react';
 import { toast } from 'sonner';
-import { webSerialPrinter } from '../services/webSerialPrinter';
+import { printerHub } from '../services/printer/multiPrinterManager';
+import { BluetoothPrinter } from '../services/printer/bluetoothPrinter';
+import type { PrinterStatusInfo } from '../services/printer/multiPrinterManager';
+import type { ReceiptOptions } from '../utils/escpos';
+import { staffErrorMessage, toStaffError } from '../services/printer/friendlyErrors';
+import type { StaffError } from '../services/printer/friendlyErrors';
 import { generateKOT, generateBillReceipt, generateTestPrint } from '../utils/escpos';
 import type { ReceiptSettings } from '../utils/escpos';
+import type { PrinterConfig } from '../services/printer/printerConfig';
 import type { Order, Bill } from '../types/types';
 
-interface PrinterState {
+/**
+ * PrinterContext - the ONLY printer API the POS views consume.
+ *
+ * Legacy single-printer surface (connect / printKOT / printBill / testPrint)
+ * is preserved verbatim so existing screens keep working. Internally every
+ * job is routed by ROLE through the multi-printer hub:
+ *
+ *   printKOT  -> KITCHEN printer
+ *   printBill -> BILLING printer (PARCEL falls back to BILLING)
+ *   testPrint -> active printer
+ */
+
+interface PrinterContextType {
+  // ----- legacy surface (unchanged signatures) -----
   supported: boolean;
   connected: boolean;
   printerName: string;
   printing: boolean;
   error: string | null;
-}
-
-interface PrinterContextType extends PrinterState {
   connect: () => Promise<boolean>;
   disconnect: () => Promise<void>;
   testPrint: (settings?: ReceiptSettings) => Promise<boolean>;
   printKOT: (order: Order, settings?: ReceiptSettings) => Promise<boolean>;
   printBill: (bill: Bill, order: Order, settings?: ReceiptSettings) => Promise<boolean>;
+  // ----- multi-printer surface -----
+  printers: PrinterStatusInfo[];
+  connectPrinter: (printerId: string) => Promise<boolean>;
+  disconnectPrinter: (printerId: string) => Promise<void>;
+  testPrintOn: (printerId: string, settings?: ReceiptSettings) => Promise<boolean>;
+  retryJob: (printerId: string, jobId: string) => void;
+  cancelJob: (printerId: string, jobId: string) => void;
+  clearFinishedJobs: () => void;
+  getDiagnostics: () => Record<string, unknown>;
+  // ----- configuration CRUD (settings page) -----
+  savePrinterConfig: (config: PrinterConfig) => void;
+  removePrinterConfig: (printerId: string) => void;
+  setActivePrinter: (printerId: string) => void;
 }
 
 const PrinterContext = createContext<PrinterContextType | undefined>(undefined);
 
 export const PrinterProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [supported, setSupported] = useState<boolean>(false);
-  const [connected, setConnected] = useState<boolean>(false);
-  const [printerName, setPrinterName] = useState<string>('');
-  const [printing, setPrinting] = useState<boolean>(false);
+  const [printers, setPrinters] = useState<PrinterStatusInfo[]>([]);
+  const [supported] = useState<boolean>(() => BluetoothPrinter.isSupported());
   const [error, setError] = useState<string | null>(null);
 
-  const connectedRef = useRef<boolean>(false);
-
-  // Auto-reconnect on mount: try previously authorized ports, then keep polling.
   useEffect(() => {
-    const supported = webSerialPrinter.isSupported();
-    setSupported(supported);
-    if (!supported) return;
+    if (typeof window === 'undefined') return;
 
-    const serial = navigator.serial as Serial | undefined;
+    printerHub.init();
 
-    // Attempt auto-reconnect to the last authorized port (no device chooser).
-    const autoReconnect = async () => {
-      try {
-        const ports = await webSerialPrinter.getAuthorizedPorts();
-        if (ports.length > 0 && !webSerialPrinter.isConnected()) {
-          await webSerialPrinter.connectToPort(ports[0]);
-          connectedRef.current = true;
-          setConnected(true);
-          const info = ports[0]?.getInfo?.();
-          setPrinterName(info?.usbVendorId ? 'KPC307-UEWB-6178' : 'Thermal Printer');
-          setError(null);
-        }
-      } catch {
-        // Auto-reconnect failed silently; user can reconnect manually from Dashboard settings.
-      }
-    };
+    // Silent launch-time reconnect to previously granted BLE devices.
+    void printerHub.autoReconnectOnLaunch().catch(() => {
+      /* no granted devices or browser refused - user connects manually */
+    });
 
-    autoReconnect();
-
-    const refresh = async () => {
-      const isConnected = webSerialPrinter.isConnected();
-      if (isConnected !== connectedRef.current) {
-        connectedRef.current = isConnected;
-        setConnected(isConnected);
-        if (isConnected) {
-          const ports = await webSerialPrinter.getAuthorizedPorts();
-          const info = ports[0]?.getInfo?.();
-          setPrinterName(info?.usbVendorId ? 'KPC307-UEWB-6178' : 'Thermal Printer');
-          setError(null);
-        } else {
-          setPrinterName('');
-        }
-      }
-      setPrinting(webSerialPrinter.isPrinting());
-    };
-
-    // Physical unplug / port revoked outside our control
-    const handleDisconnect = () => {
-      connectedRef.current = false;
-      setConnected(false);
-      setPrinterName('');
-      setError('Printer disconnected. Reconnect from Dashboard Settings.');
-    };
-
-    const interval = setInterval(refresh, 1500);
-    serial?.addEventListener?.('disconnect', handleDisconnect);
-    return () => {
-      clearInterval(interval);
-      serial?.removeEventListener?.('disconnect', handleDisconnect);
-    };
+    const unsubscribe = printerHub.onStatus(statuses => setPrinters(statuses));
+    return unsubscribe;
   }, []);
 
+  const connected = useMemo(
+    () => printers.some(p => p.enabled && p.state === 'connected'),
+    [printers]
+  );
+  const printing = useMemo(
+    () =>
+      printers.some(p => p.jobs.some(j => j.status === 'PRINTING' || j.status === 'RETRYING')),
+    [printers]
+  );
+  const printerName = useMemo(() => {
+    const active = printers.find(p => p.state === 'connected');
+    return active?.deviceName || '';
+  }, [printers]);
+  const hubError = useMemo(
+    () => printers.find(p => p.lastError)?.lastError ?? null,
+    [printers]
+  );
+
+  /** Show a staff-friendly toast for any printer failure. */
+  const reportError = useCallback((err: unknown): string => {
+    const friendly: StaffError = toStaffError(err);
+    const message = err instanceof Error ? err.message : String(err);
+    toast.error(`${friendly.title}${friendly.detail ? ` ${friendly.detail}` : ''}`);
+    return message || friendly.title;
+  }, []);
+
+  /** Receipt options (cut mode, paper width) of the printer handling `role`. */
+  const optsForRole = useCallback(
+    (role: PrinterStatusInfo['role']): ReceiptOptions => {
+      const config = printerHub.resolveForRole(role);
+      return {
+        cutMode: config?.cutMode ?? 'FULL',
+        paperWidth: config?.paperWidth ?? 80
+      };
+    },
+    []
+  );
+
+  // ----- legacy surface -----
+
   const connect = useCallback(async (): Promise<boolean> => {
-    if (!webSerialPrinter.isSupported()) {
-      toast.error('Web Serial is not supported. Please use a compatible Chromium-based browser.');
+    if (!BluetoothPrinter.isSupported()) {
+      toast.error('Web Bluetooth is not supported. Please use Chrome or Edge on a secure (https) page.');
       return false;
     }
     try {
-      await webSerialPrinter.connect();
-      connectedRef.current = true;
-      setConnected(true);
-      setError(null);
-      setPrinterName('KPC307-UEWB-6178');
+      await printerHub.connectPrinter(printerHub.getActiveConfig().id);
       toast.success('Printer connected!');
       return true;
-    } catch (err: any) {
-      const message = err?.message || 'Failed to connect to printer';
-      setError(message);
-      toast.error(message);
+    } catch (err) {
+      if ((err as { code?: string })?.code === 'USER_CANCELLED') return false;
+      setError(reportError(err));
       return false;
     }
-  }, []);
+  }, [reportError]);
 
-  const disconnect = useCallback(async () => {
-    await webSerialPrinter.disconnect();
-    connectedRef.current = false;
-    setConnected(false);
-    setPrinterName('');
-    setError(null);
-    toast.info('Printer disconnected');
-  }, []);
+  const disconnect = useCallback(async (): Promise<void> => {
+    try {
+      await printerHub.disconnectPrinter(printerHub.getActiveConfig().id);
+      toast.info('Printer disconnected');
+    } catch (err) {
+      setError(reportError(err));
+    }
+  }, [reportError]);
 
   const testPrint = useCallback(
     async (settings?: ReceiptSettings): Promise<boolean> => {
-      if (!webSerialPrinter.isConnected()) {
-        toast.error('Printer not connected. Tap "Connect Printer" first.');
-        return false;
-      }
+      const role = printerHub.getActiveConfig().role;
       try {
-        await webSerialPrinter.print(await generateTestPrint(settings));
-        toast.success('Test print sent successfully!');
-        return true;
-      } catch (err: any) {
-        const message = err?.message || 'Test print failed';
-        setError(message);
-        toast.error(message);
+        const data = await generateTestPrint(settings, optsForRole(role));
+        const printed = await printerHub.route({
+          kind: 'TEST',
+          role,
+          label: 'Test Print',
+          data
+        });
+        if (printed) toast.success('Test print sent successfully!');
+        else setError('Test print failed - see Printer Settings queue.');
+        return printed;
+      } catch (err) {
+        setError(reportError(err));
         return false;
       }
     },
-    []
+    [optsForRole, reportError]
   );
 
   const printKOT = useCallback(
     async (order: Order, settings?: ReceiptSettings): Promise<boolean> => {
-      if (!webSerialPrinter.isConnected()) {
-        toast.error('Printer not connected. Tap "Connect Printer" and select the thermal printer.');
-        return false;
-      }
       try {
-        await webSerialPrinter.print(await generateKOT(order, settings));
-        toast.success(`KOT #${order.id.substring(4, 10)} printed`);
-        return true;
-      } catch (err: any) {
-        const message = err?.message || 'KOT printing failed';
-        setError(message);
-        toast.error(message);
+        const data = await generateKOT(order, settings, optsForRole('KITCHEN'));
+        const printed = await printerHub.route({
+          kind: 'KOT',
+          role: 'KITCHEN',
+          label: `KOT #${order.id.substring(4, 10)}`,
+          data
+        });
+        if (printed) toast.success(`KOT #${order.id.substring(4, 10)} printed`);
+        return printed;
+      } catch (err) {
+        setError(reportError(err));
         return false;
       }
     },
-    []
+    [optsForRole, reportError]
   );
 
   const printBill = useCallback(
     async (bill: Bill, order: Order, settings?: ReceiptSettings): Promise<boolean> => {
-      if (!webSerialPrinter.isConnected()) {
-        toast.error('Printer not connected. Tap "Connect Printer" and select the thermal printer.');
-        return false;
-      }
       try {
-        await webSerialPrinter.print(await generateBillReceipt(bill, order, settings));
-        toast.success(`Bill #${bill.id.substring(5, 12)} printed`);
-        return true;
-      } catch (err: any) {
-        const message = err?.message || 'Bill printing failed';
-        setError(message);
-        toast.error(message);
+        const data = await generateBillReceipt(bill, order, settings, optsForRole('BILLING'));
+        const printed = await printerHub.route({
+          kind: 'BILL',
+          role: 'BILLING',
+          label: `Bill #${bill.id.substring(5, 12)}`,
+          data
+        });
+        if (printed) toast.success(`Bill #${bill.id.substring(5, 12)} printed`);
+        return printed;
+      } catch (err) {
+        setError(reportError(err));
         return false;
       }
     },
-    []
+    [optsForRole, reportError]
   );
+
+  // ----- multi-printer surface -----
+
+  const connectPrinter = useCallback(
+    async (printerId: string): Promise<boolean> => {
+      if (!BluetoothPrinter.isSupported()) {
+        toast.error('Web Bluetooth is not supported. Please use Chrome or Edge on a secure (https) page.');
+        return false;
+      }
+      try {
+        await printerHub.connectPrinter(printerId);
+        const p = printers.find(x => x.id === printerId);
+        toast.success(`${p?.name ?? 'Printer'} connected!`);
+        return true;
+      } catch (err) {
+        if ((err as { code?: string })?.code === 'USER_CANCELLED') return false;
+        setError(reportError(err));
+        return false;
+      }
+    },
+    [printers, reportError]
+  );
+
+  const disconnectPrinter = useCallback(
+    async (printerId: string): Promise<void> => {
+      try {
+        await printerHub.disconnectPrinter(printerId);
+      } catch (err) {
+        setError(reportError(err));
+      }
+    },
+    [reportError]
+  );
+
+  const testPrintOn = useCallback(
+    async (printerId: string, settings?: ReceiptSettings): Promise<boolean> => {
+      try {
+        const config = printerHub.getConfigs().find(c => c.id === printerId);
+        const data = await generateTestPrint(settings, {
+          cutMode: config?.cutMode ?? 'FULL',
+          paperWidth: config?.paperWidth ?? 80
+        });
+        const printed = await printerHub.printOn(printerId, {
+          kind: 'TEST',
+          label: 'Test Print',
+          data
+        });
+        if (printed) toast.success('Test print sent successfully!');
+        return printed;
+      } catch (err) {
+        setError(reportError(err));
+        return false;
+      }
+    },
+    [reportError]
+  );
+
+  const retryJob = useCallback((printerId: string, jobId: string) => {
+    printerHub.retryJob(printerId, jobId);
+  }, []);
+
+  const cancelJob = useCallback((printerId: string, jobId: string) => {
+    printerHub.cancelJob(printerId, jobId);
+  }, []);
+
+  const clearFinishedJobs = useCallback(() => {
+    printerHub.clearFinishedJobs();
+  }, []);
+
+  const getDiagnostics = useCallback((): Record<string, unknown> => {
+    return printerHub.diagnostics();
+  }, []);
+
+  const savePrinterConfig = useCallback((config: PrinterConfig): void => {
+    printerHub.upsertConfig(config);
+  }, []);
+
+  const removePrinterConfig = useCallback((printerId: string): void => {
+    printerHub.removeConfig(printerId);
+  }, []);
+
+  const setActivePrinter = useCallback((printerId: string): void => {
+    printerHub.setActivePrinter(printerId);
+  }, []);
 
   return (
     <PrinterContext.Provider
@@ -198,12 +298,23 @@ export const PrinterProvider: React.FC<{ children: ReactNode }> = ({ children })
         connected,
         printerName,
         printing,
-        error,
+        error: error ?? hubError,
         connect,
         disconnect,
         testPrint,
         printKOT,
-        printBill
+        printBill,
+        printers,
+        connectPrinter,
+        disconnectPrinter,
+        testPrintOn,
+        retryJob,
+        cancelJob,
+        clearFinishedJobs,
+        getDiagnostics,
+        savePrinterConfig,
+        removePrinterConfig,
+        setActivePrinter
       }}
     >
       {children}

@@ -1,5 +1,5 @@
 import express from 'express';
-import prisma from '../config/db.js';
+import { MenuItem } from '../models/index.js';
 import { protect, authorize } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -8,7 +8,7 @@ const router = express.Router();
 // @desc    Get all menu items
 router.get('/', async (req, res) => {
   try {
-    const menu = await prisma.menuItem.findMany({});
+    const menu = await MenuItem.find();
     res.json({ success: true, data: menu });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -21,17 +21,15 @@ router.post('/', protect, authorize('SuperAdmin', 'Manager'), async (req, res) =
   const { name, category, portionMode, price, variants, prepTime, isAvailable } = req.body;
 
   try {
-    const newItem = await prisma.menuItem.create({
-      data: {
-        id: `m-${Date.now()}`,
-        name,
-        category,
-        portionMode,
-        price: Number(price) || 0,
-        variants: variants || [],
-        prepTime: Number(prepTime) || 10,
-        isAvailable: isAvailable !== undefined ? isAvailable : true
-      }
+    const newItem = await MenuItem.create({
+      _id: `m-${Date.now()}`,
+      name,
+      category,
+      portionMode,
+      price: Number(price) || 0,
+      variants: variants || [],
+      prepTime: Number(prepTime) || 10,
+      isAvailable: isAvailable !== undefined ? isAvailable : true
     });
 
     const io = req.app.get('io');
@@ -47,33 +45,26 @@ router.post('/', protect, authorize('SuperAdmin', 'Manager'), async (req, res) =
 // @desc    Update menu item (Admin/Manager)
 router.put('/:id', protect, authorize('SuperAdmin', 'Manager'), async (req, res) => {
   try {
-    const item = await prisma.menuItem.findUnique({
-      where: { id: req.params.id }
-    });
+    const item = await MenuItem.findById(req.params.id);
     if (!item) {
       return res.status(404).json({ success: false, message: 'Item not found' });
     }
 
     const { name, category, portionMode, price, variants, prepTime, isAvailable } = req.body;
 
-    const data = {};
-    if (name) data.name = name;
-    if (category) data.category = category;
-    if (portionMode) data.portionMode = portionMode;
-    if (price !== undefined) data.price = Number(price);
-    if (variants) data.variants = variants;
-    if (prepTime !== undefined) data.prepTime = Number(prepTime);
-    if (isAvailable !== undefined) data.isAvailable = isAvailable;
-
-    const updated = await prisma.menuItem.update({
-      where: { id: req.params.id },
-      data
-    });
+    if (name) item.name = name;
+    if (category) item.category = category;
+    if (portionMode) item.portionMode = portionMode;
+    if (price !== undefined) item.price = Number(price);
+    if (variants) item.variants = variants;
+    if (prepTime !== undefined) item.prepTime = Number(prepTime);
+    if (isAvailable !== undefined) item.isAvailable = isAvailable;
+    await item.save();
 
     const io = req.app.get('io');
-    io.emit('menu_changed', updated);
+    io.emit('menu_changed', item);
 
-    res.json({ success: true, data: updated });
+    res.json({ success: true, data: item });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -83,16 +74,12 @@ router.put('/:id', protect, authorize('SuperAdmin', 'Manager'), async (req, res)
 // @desc    Delete menu item (Admin/Manager)
 router.delete('/:id', protect, authorize('SuperAdmin', 'Manager'), async (req, res) => {
   try {
-    const item = await prisma.menuItem.findUnique({
-      where: { id: req.params.id }
-    });
+    const item = await MenuItem.findById(req.params.id);
     if (!item) {
       return res.status(404).json({ success: false, message: 'Item not found' });
     }
 
-    await prisma.menuItem.delete({
-      where: { id: req.params.id }
-    });
+    await item.deleteOne();
 
     const io = req.app.get('io');
     // Dedicated event: clients remove the item. Do NOT emit menu_changed here

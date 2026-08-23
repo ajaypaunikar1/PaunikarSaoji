@@ -9,6 +9,8 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Table, PortionType, TableStatus } from '../types/types';
+import QtyStepper from '../components/QtyStepper';
+import { resolvePortionPrice } from '../utils/variants';
 import { toast } from 'sonner';
 
 const STATUS_STYLES: Record<TableStatus, { card: string; badge: string; badgeText: string }> = {
@@ -125,11 +127,7 @@ const TableManagement: React.FC = () => {
   };
 
   const handleAddToOrder = (menuItem: any, portion: PortionType) => {
-    const price = portion === 'Half' 
-      ? menuItem.variants.find((v: any) => v.name === 'Half')?.price || 0
-      : portion === 'Full'
-        ? menuItem.variants.find((v: any) => v.name === 'Full')?.price || 0
-        : menuItem.price;
+    const price = resolvePortionPrice(menuItem, portion);
 
     setOrderItemsList(prev => {
       const exist = prev.find(i => i.id === menuItem.id && i.portion === portion);
@@ -152,14 +150,12 @@ const TableManagement: React.FC = () => {
     }));
   };
 
-  const handleUpdateItemQty = (index: number, amt: number) => {
-    setOrderItemsList(prev => prev.map((item, idx) => {
-      if (idx === index) {
-        const newQty = item.quantity + amt;
-        return newQty > 0 ? { ...item, quantity: newQty } : item;
-      }
-      return item;
-    }).filter(i => i.quantity > 0));
+  /** Absolute quantity setter for direct numeric entry in the basket. */
+  const handleSetItemQty = (index: number, qty: number) => {
+    const clamped = Math.min(999, Math.max(1, Math.floor(qty)));
+    setOrderItemsList(prev => prev.map((item, idx) =>
+      idx === index ? { ...item, quantity: clamped } : item
+    ));
   };
 
   const handleUpdateActiveOrderItemQty = (itemIndex: number, amt: number) => {
@@ -602,7 +598,7 @@ const TableManagement: React.FC = () => {
                                 {item.variants.map((v, vIdx) => (
                                   <button
                                     key={vIdx}
-                                    onClick={() => handleAddToOrder(item, v.name as PortionType)}
+                                    onClick={() => handleAddToOrder(item, v.name)}
                                     className="w-full py-1 px-1 bg-slate-50 border border-slate-200 rounded text-[9px] font-bold text-indigo-600 cursor-pointer text-center hover:bg-indigo-50 hover:border-indigo-200 transition"
                                   >
                                     {v.name} (₹{v.price})
@@ -638,9 +634,7 @@ const TableManagement: React.FC = () => {
                                   <input type="checkbox" checked={!!item.isParcel} onChange={() => handleToggleParcel(idx)} className="w-3 h-3 accent-indigo-600" />
                                   <span className="text-[10px] text-gray-500 font-bold">Parcel</span>
                                 </label>
-                                <button onClick={() => handleUpdateItemQty(idx, -1)} className="w-5 h-5 rounded bg-white border border-gray-200 flex items-center justify-center font-bold cursor-pointer">-</button>
-                                <span className="font-mono font-bold w-4 text-center">{item.quantity}</span>
-                                <button onClick={() => handleUpdateItemQty(idx, 1)} className="w-5 h-5 rounded bg-white border border-gray-200 flex items-center justify-center font-bold cursor-pointer">+</button>
+                                <QtyStepper value={item.quantity} onChange={next => handleSetItemQty(idx, next)} />
                               </div>
                             </div>
                           ))}

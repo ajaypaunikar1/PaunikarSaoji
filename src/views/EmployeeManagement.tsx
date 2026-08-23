@@ -572,7 +572,7 @@ const EmployeeManagement: React.FC = () => {
                             <span className="font-bold text-slate-800">{p.month}</span>
                             <span className="ml-2 text-[10px] bg-emerald-100 text-emerald-700 font-black uppercase px-2 py-0.5 rounded border border-emerald-200">{p.status}</span>
                           </div>
-                          <span className="font-mono font-bold text-slate-800">₹{p.amount}</span>
+                          <span className="font-mono font-bold text-slate-800">₹{p.netSalary}</span>
                         </div>
                       ))
                     )}

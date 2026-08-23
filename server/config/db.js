@@ -1,19 +1,60 @@
 import 'dotenv/config';
-import pkg from '@prisma/client';
-const { PrismaClient } = pkg;
+import mongoose from 'mongoose';
 
-import { PrismaPg } from '@prisma/adapter-pg';
-import pg from 'pg';
-const { Pool } = pg;
+/**
+ * Database connection - MongoDB via Mongoose.
+ *
+ * Connection string resolution order:
+ *   1. MONGO_URI
+ *   2. DATABASE_URL (kept for backward compatibility with the old Prisma setup)
+ */
+const uri = process.env.MONGO_URI || process.env.DATABASE_URL;
 
-const connectionString = process.env.DATABASE_URL;
-const pool = new Pool({ connectionString });
-const adapter = new PrismaPg(pool);
+if (!uri) {
+  console.error('[DB] Missing MONGO_URI / DATABASE_URL environment variable.');
+}
 
-// Single global PrismaClient instance configured for Prisma Postgres with driver adapter
-const prisma = new PrismaClient({
-  adapter,
-  log: ['error', 'warn'],
+// Expose documents through their business id (`id` virtual mirrors _id),
+// matching the shape the old Prisma client produced.
+mongoose.set('toJSON', { virtuals: true });
+mongoose.set('toObject', { virtuals: true });
+
+let connectPromise = null;
+
+const connectDatabase = () => {
+  if (!connectPromise) {
+    connectPromise = mongoose.connect(uri, {
+      serverSelectionTimeoutMS: 15000,
+      socketTimeoutMS: 45000,
+      dbName: process.env.MONGO_DB_NAME || undefined
+    });
+  }
+  return connectPromise;
+};
+
+mongoose.connection.on('connected', () => {
+  console.log(`[DB] MongoDB connected: ${mongoose.connection.name} @ ${mongoose.connection.host}`);
 });
 
-export default prisma;
+mongoose.connection.on('error', (err) => {
+  console.error('[DB] MongoDB connection error:', err.message);
+});
+
+mongoose.connection.on('disconnected', () => {
+  console.warn('[DB] MongoDB disconnected.');
+});
+
+export const isDbConnected = () => mongoose.connection.readyState === 1;
+
+export const pingDatabase = async () => {
+  await connectDatabase();
+  await mongoose.connection.db.admin().command({ ping: 1 });
+};
+
+// Connect immediately on import (matches previous Prisma behaviour where the
+// client was ready as soon as the module was loaded).
+connectDatabase().catch((err) => {
+  console.error('[DB] Initial MongoDB connection failed:', err.message);
+});
+
+export default mongoose;

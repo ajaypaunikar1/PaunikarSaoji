@@ -1,7 +1,7 @@
 import express from 'express';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
-import prisma from '../config/db.js';
+import { User } from '../models/index.js';
 import { protect } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -12,29 +12,31 @@ router.post('/login', async (req, res) => {
   const { username, password } = req.body;
 
   try {
-    const user = await prisma.user.findUnique({
-      where: { username: username.toLowerCase() }
+    const user = await User.findOne({
+      username: username.toLowerCase()
     });
-    
+
     if (!user) {
       return res.status(400).json({ success: false, message: 'Invalid username' });
     }
 
-    if (password) {
-      const isMatch = await bcrypt.compare(password, user.password);
-      if (!isMatch) {
-        return res.status(400).json({ success: false, message: 'Invalid credentials' });
-      }
+    // Password is mandatory - never authenticate on a missing/empty password.
+    if (!password) {
+      return res.status(400).json({ success: false, message: 'Invalid credentials' });
+    }
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ success: false, message: 'Invalid credentials' });
     }
 
     // Sign JWT token
     const token = jwt.sign(
-      { 
-        id: user.id, 
-        name: user.name, 
-        username: user.username, 
-        role: user.role, 
-        zone: user.zone 
+      {
+        id: user.id,
+        name: user.name,
+        username: user.username,
+        role: user.role,
+        zone: user.zone
       },
       process.env.JWT_SECRET || 'supersecretjwtkey123!',
       { expiresIn: '30d' }
@@ -74,9 +76,7 @@ router.post('/change-password', protect, async (req, res) => {
   }
 
   try {
-    const user = await prisma.user.findUnique({
-      where: { id: req.user.id }
-    });
+    const user = await User.findById(req.user.id);
 
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
@@ -94,15 +94,14 @@ router.post('/change-password', protect, async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(newPassword, salt);
 
-    const updatedUser = await prisma.user.update({
-      where: { id: req.user.id },
-      data: { 
-        password: hashedPassword,
-        isFirstLogin: false
-      }
-    });
+    user.password = hashedPassword;
+    user.isFirstLogin = false;
+    await user.save();
 
-    res.json({ success: true, message: 'Password updated successfully', user: updatedUser });
+    const safeUser = user.toObject();
+    delete safeUser.password;
+
+    res.json({ success: true, message: 'Password updated successfully', user: safeUser });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

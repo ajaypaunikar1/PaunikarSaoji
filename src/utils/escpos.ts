@@ -1,5 +1,5 @@
 import type { Order, Bill } from '../types/types';
-import { isPlainAscii, rasterizeTextLine, PRINTER_DOTS_80 } from './rasterImage';
+import { isPlainAscii, rasterizeTextLine, PRINTER_DOTS_80, PRINTER_DOTS_58 } from './rasterImage';
 
 /**
  * ESC/POS command constants for thermal receipt printers (KPC307-UEWB-6178).
@@ -15,9 +15,40 @@ export const ESCPOS = {
   TEXT_TALL: '\x1d\x21\x01',
   TEXT_DOUBLE_SIZE: '\x1d\x21\x11',
   TEXT_BOLD_ON: '\x1b\x45\x01',
-  TEXT_BOLD_OFF: '\x1b\x45\x00',
-  FEED_AND_CUT: '\x1d\x56\x41\x03'
+  TEXT_BOLD_OFF: '\x1b\x45\x00'
 } as const;
+
+/**
+ * Paper cut commands (GS V). FULL = GS V A n, PARTIAL = GS V B n.
+ * NOTE: these are printer PAPER cuts - completely unrelated to food
+ * Half/Full portion variants.
+ */
+export function cutCommand(mode: 'FULL' | 'PARTIAL'): string {
+  return mode === 'PARTIAL' ? '\x1d\x56\x42\x03' : '\x1d\x56\x41\x03';
+}
+
+/** Per-receipt print options supplied from the target printer's config. */
+export interface ReceiptOptions {
+  /** Paper cut behaviour at receipt end. Default FULL. */
+  cutMode?: 'FULL' | 'PARTIAL';
+  /** Paper width - selects printable width AND raster glyph calibration. */
+  paperWidth?: 58 | 80;
+}
+
+/**
+ * Raster glyph calibration (canvas px ~= printer dots @ 203 dpi).
+ *
+ * Native ESC/POS Font A glyphs are 24 dots tall ("normal"), 48 dots when
+ * doubled ("tall"/"double"). These values were chosen so rasterized
+ * Devanagari ink height approximately matches the neighbouring native text
+ * instead of printing noticeably larger. They may need on-site fine-tuning
+ * against a physical KP-307.
+ */
+const RASTER_PX: Record<'normal' | 'tall' | 'double', Record<58 | 80, number>> = {
+  normal: { 80: 26, 58: 21 },
+  tall: { 80: 40, 58: 34 },
+  double: { 80: 52, 58: 44 }
+};
 
 export interface ReceiptSettings {
   restaurantName?: string;
@@ -49,7 +80,8 @@ type Seg =
  * to a monochrome bitmap and printed as a raster image, because the printer's
  * font tables cannot decode those Unicode codepoints.
  */
-async function renderSegments(segs: Seg[]): Promise<Uint8Array> {
+async function renderSegments(segs: Seg[], opts: ReceiptOptions = {}): Promise<Uint8Array> {
+  const widthDots = opts.paperWidth === 58 ? PRINTER_DOTS_58 : PRINTER_DOTS_80;
   const chunks: Uint8Array[] = [];
   const push = (str: string) => chunks.push(encoder.encode(str));
 
@@ -82,11 +114,10 @@ async function renderSegments(segs: Seg[]): Promise<Uint8Array> {
       push(ESCPOS.ALIGN_LEFT);
       chunks.push(
         await rasterizeTextLine(seg.text, {
-          widthDots: PRINTER_DOTS_80,
+          widthDots,
           align,
           bold: seg.bold,
-          fontSize:
-            seg.size === 'double' ? 52 : seg.size === 'tall' ? 40 : undefined
+          fontSize: RASTER_PX[seg.size ?? 'normal'][widthDots === PRINTER_DOTS_58 ? 58 : 80]
         })
       );
     }
@@ -108,8 +139,13 @@ async function renderSegments(segs: Seg[]): Promise<Uint8Array> {
  * Pure function - no transport side effects. Lines containing Marathi
  * (Devanagari) text are rasterized so they print correctly.
  */
-export async function generateKOT(order: Order, settings?: ReceiptSettings): Promise<Uint8Array> {
+export async function generateKOT(
+  order: Order,
+  settings?: ReceiptSettings,
+  opts?: ReceiptOptions
+): Promise<Uint8Array> {
   const restName = settings?.restaurantName || 'Paunikar Saoji Restaurant';
+  const cut = cutCommand(opts?.cutMode ?? 'FULL');
 
   const segs: Seg[] = [
     { kind: 'raw', raw: ESCPOS.INIT },
@@ -122,21 +158,23 @@ export async function generateKOT(order: Order, settings?: ReceiptSettings): Pro
       : []),
     { kind: 'text', text: '--------------------------------', align: 'center' },
     ...order.items.flatMap<Seg>(item => [
-      { kind: 'text' as const, text: item.name, bold: true, size: 'tall' },
-      { kind: 'text' as const, text: `  Qty: ${item.quantity} (${item.portion})`, size: 'tall' },
+      { kind: 'text' as const, text: `${item.quantity} x ${item.name}`, bold: true as const, size: 'tall' as const },
+      ...(item.portion && item.portion !== 'Single'
+        ? [{ kind: 'text' as const, text: `  Portion: ${item.portion.toUpperCase()}`, bold: true as const, size: 'tall' as const }]
+        : []),
       ...(item.spiceLevel && item.spiceLevel !== 'normal'
-        ? [{ kind: 'text' as const, text: `  Spice: ${item.spiceLevel}`, size: 'tall' }]
+        ? [{ kind: 'text' as const, text: `  Spice: ${item.spiceLevel}`, size: 'tall' as const }]
         : []),
       ...(item.specialNotes
-        ? [{ kind: 'text' as const, text: `  * Notes: ${item.specialNotes}`, size: 'tall' }]
+        ? [{ kind: 'text' as const, text: `  * Notes: ${item.specialNotes}`, size: 'tall' as const }]
         : [])
     ]),
     { kind: 'text', text: '--------------------------------' },
     { kind: 'text', text: `${restName} KITCHEN`, align: 'center' },
-    { kind: 'raw', raw: '\n\n\n\n' + ESCPOS.FEED_AND_CUT }
+    { kind: 'raw', raw: '\n\n\n\n' + cut }
   ];
 
-  return renderSegments(segs);
+  return renderSegments(segs, opts);
 }
 
 /**
@@ -147,7 +185,8 @@ export async function generateKOT(order: Order, settings?: ReceiptSettings): Pro
 export async function generateBillReceipt(
   bill: Bill,
   order: Order,
-  settings?: ReceiptSettings
+  settings?: ReceiptSettings,
+  opts?: ReceiptOptions
 ): Promise<Uint8Array> {
   const restName = settings?.restaurantName || 'Paunikar Saoji Restaurant';
   const address = settings?.address || '';
@@ -155,6 +194,7 @@ export async function generateBillReceipt(
   const gstPct = bill.gstPct || 18;
   const halfPct = gstPct / 2;
   const halfAmt = Math.round((bill.gst / 2) * 100) / 100;
+  const cut = cutCommand(opts?.cutMode ?? 'FULL');
 
   const segs: Seg[] = [
     { kind: 'raw', raw: ESCPOS.INIT },
@@ -176,10 +216,17 @@ export async function generateBillReceipt(
     { kind: 'text', text: `Payment: ${bill.paymentMethod || 'Cash'}` },
     { kind: 'text', text: '--------------------------------' },
     ...order.items.flatMap<Seg>(item => [
-      { kind: 'text' as const, text: item.name, bold: true, size: 'tall' },
-      { kind: 'text' as const, text: `  ${item.quantity} x Rs.${item.price} = Rs.${item.price * item.quantity}`, size: 'tall' },
+      {
+        kind: 'text' as const,
+        text:
+          item.name +
+          (item.portion && item.portion !== 'Single' ? ` (${item.portion})` : ''),
+        bold: true as const,
+        size: 'tall' as const
+      },
+      { kind: 'text' as const, text: `  ${item.quantity} x Rs.${item.price} = Rs.${item.price * item.quantity}`, size: 'tall' as const },
       ...(item.spiceLevel && item.spiceLevel !== 'normal'
-        ? [{ kind: 'text' as const, text: `  Spice: ${item.spiceLevel}`, size: 'tall' }]
+        ? [{ kind: 'text' as const, text: `  Spice: ${item.spiceLevel}`, size: 'tall' as const }]
         : [])
     ]),
     { kind: 'text', text: '--------------------------------' },
@@ -204,43 +251,46 @@ export async function generateBillReceipt(
     { kind: 'text', text: '--------------------------------', align: 'right' },
     { kind: 'text', text: 'Thank you! Visit Again.', align: 'center' },
     { kind: 'text', text: restName, align: 'center' },
-    { kind: 'raw', raw: '\n\n\n\n' + ESCPOS.FEED_AND_CUT }
+    { kind: 'raw', raw: '\n\n\n\n' + cut }
   ];
 
-  return renderSegments(segs);
+  return renderSegments(segs, opts);
 }
 
 /**
- * Generate a self-test receipt to verify the Web Serial thermal printer
+ * Generate a self-test receipt to verify a Bluetooth thermal printer
  * connection is working end-to-end. Includes a Marathi line so the Devanagari
  * raster rendering can be verified on paper.
  */
-export async function generateTestPrint(settings?: ReceiptSettings): Promise<Uint8Array> {
+export async function generateTestPrint(
+  settings?: ReceiptSettings,
+  opts?: ReceiptOptions
+): Promise<Uint8Array> {
   const restName = settings?.restaurantName || 'Paunikar Saoji Restaurant';
+  const cut = cutCommand(opts?.cutMode ?? 'FULL');
 
   const segs: Seg[] = [
     { kind: 'raw', raw: ESCPOS.INIT },
     { kind: 'text', text: 'PRINTER TEST', align: 'center', bold: true, size: 'double' },
     { kind: 'text', text: '================================', align: 'center' },
-    { kind: 'text', text: 'Printer:' },
-    { kind: 'text', text: 'KPC307-UEWB-6178' },
-    { kind: 'text', text: '' },
     { kind: 'text', text: 'Connection:' },
-    { kind: 'text', text: 'Web Serial' },
+    { kind: 'text', text: 'Bluetooth LE (Web Bluetooth)' },
     { kind: 'text', text: '' },
     { kind: 'text', text: 'Protocol:' },
     { kind: 'text', text: 'ESC/POS' },
     { kind: 'text', text: '' },
-    { kind: 'text', text: 'Baud Rate:' },
-    { kind: 'text', text: '9600' },
+    { kind: 'text', text: `Paper: ${opts?.paperWidth === 58 ? '58 mm' : '80 mm'}` },
     { kind: 'text', text: '--------------------------------' },
-    { kind: 'text', text: 'Marathi: \u092e\u0930\u093e\u0920\u0940 \u092a\u094d\u0930\u093f\u0902\u091f \u091a\u093e\u091a\u0923\u0940', align: 'center' },
+    { kind: 'text', text: 'English: Test Print 123' },
+    { kind: 'text', text: '\u0930\u0902\u0915: \u0967\u0968\u0969 \u0964 \u092e\u093e\u0925\u093e \u0938\u0924' },
+    { kind: 'text', text: 'Marathi: \u091d\u093f\u0902\u0917\u093e \u0915\u0930\u0940 - \u20b9520', align: 'center' },
+    { kind: 'text', text: '\u0916\u093f\u092e\u093e \u092e\u091f\u0923 \u0915\u0930\u0940 (\u0905\u0930\u094d\u0927\u0940)', align: 'center' },
     { kind: 'text', text: 'TEST PRINT SUCCESSFUL', align: 'center', bold: true },
     { kind: 'text', text: '--------------------------------' },
     { kind: 'text', text: `${restName} RMS`, align: 'center' },
     { kind: 'text', text: '================================', align: 'center' },
-    { kind: 'raw', raw: '\n\n\n\n' + ESCPOS.FEED_AND_CUT }
+    { kind: 'raw', raw: '\n\n\n\n' + cut }
   ];
 
-  return renderSegments(segs);
+  return renderSegments(segs, opts);
 }

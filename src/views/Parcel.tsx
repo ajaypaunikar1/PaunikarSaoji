@@ -2,11 +2,13 @@ import React, { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { usePrinter } from '../context/PrinterContext';
 import {
-  ShoppingBag, Plus, Minus, Trash2, Search, Send, Printer,
+  ShoppingBag, Plus, Trash2, Search, Send, Printer,
   Wallet, CreditCard, Smartphone, PackageCheck, UserRound, Pencil, X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { MenuItem, PortionType, OrderItem, Order, PaymentMethod, SpiceLevel } from '../types/types';
+import QtyStepper from '../components/QtyStepper';
+import { resolvePortionPrice } from '../utils/variants';
 import { toast } from 'sonner';
 
 const Parcel: React.FC = () => {
@@ -64,11 +66,13 @@ const Parcel: React.FC = () => {
   const editingOrder = editingOrderId ? orders.find(o => o.id === editingOrderId) : null;
 
   const addToCart = (item: MenuItem, portion: PortionType) => {
-    const price = portion === 'Single' ? item.price : (item.variants.find(v => v.name === portion)?.price || item.price);
+    const price = resolvePortionPrice(item, portion);
     setCart(prev => {
-      const exist = prev.find(c => c.name === item.name && c.portion === portion);
+      // Merge key must match the other POS screens (id + portion) so that two
+      // different items sharing a name never merge into one cart line.
+      const exist = prev.find(c => c.id === item.id && c.portion === portion);
       if (exist) {
-        return prev.map(c => c.name === item.name && c.portion === portion ? { ...c, quantity: c.quantity + 1 } : c);
+        return prev.map(c => c.id === item.id && c.portion === portion ? { ...c, quantity: c.quantity + 1 } : c);
       }
       return [...prev, {
         // Keep the menuItem id so Repeat/cancel lookups and KDS printedQty
@@ -89,10 +93,14 @@ const Parcel: React.FC = () => {
     setCart(prev => prev.map((c, i) => i === idx ? { ...c, spiceLevel: level } : c));
   };
 
-  const updateQty = (idx: number, amt: number) => {
-    setCart(prev => prev
-      .map((c, i) => i === idx ? { ...c, quantity: c.quantity + amt } : c)
-      .filter(c => c.quantity > 0));
+  /** Absolute quantity setter for direct numeric entry (0 removes the line). */
+  const setCartQty = (idx: number, qty: number) => {
+    const clamped = Math.min(999, Math.max(0, Math.floor(qty)));
+    if (clamped === 0) {
+      removeFromCart(idx);
+      return;
+    }
+    setCart(prev => prev.map((c, i) => i === idx ? { ...c, quantity: clamped } : c));
   };
 
   const removeFromCart = (idx: number) => {
@@ -284,7 +292,7 @@ const Parcel: React.FC = () => {
                       item.variants.map((v, vi) => (
                         <button
                           key={vi}
-                          onClick={() => addToCart(item, v.name as PortionType)}
+                          onClick={() => addToCart(item, v.name)}
                           className="px-2 py-1 rounded-lg bg-white border border-emerald-200 hover:bg-emerald-50 text-[9px] font-bold text-emerald-700 cursor-pointer"
                         >
                           {v.name} ₹{v.price}
@@ -364,9 +372,7 @@ const Parcel: React.FC = () => {
                         <span className="text-[9px] text-emerald-700 font-bold capitalize">{c.portion} · ₹{c.price}</span>
                       </div>
                       <div className="flex items-center gap-1.5">
-                        <button onClick={() => updateQty(idx, -1)} className="w-5 h-5 rounded bg-white border border-emerald-200 flex items-center justify-center text-slate-700 cursor-pointer"><Minus size={10} /></button>
-                        <span className="font-mono font-bold w-5 text-center">{c.quantity}</span>
-                        <button onClick={() => updateQty(idx, 1)} className="w-5 h-5 rounded bg-white border border-emerald-200 flex items-center justify-center text-slate-700 cursor-pointer"><Plus size={10} /></button>
+                        <QtyStepper value={c.quantity} onChange={next => setCartQty(idx, next)} />
                         <button onClick={() => removeFromCart(idx)} className="ml-1 text-rose-400 hover:text-rose-600 cursor-pointer"><Trash2 size={12} /></button>
                       </div>
                     </div>

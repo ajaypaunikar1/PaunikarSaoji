@@ -1,4 +1,4 @@
-import prisma from '../config/db.js';
+import { Settings } from '../models/index.js';
 
 /**
  * DEPRECATED TCP/IP thermal printing module.
@@ -30,7 +30,7 @@ const CHARS = {
  * Pure generation - no transport side effects.
  */
 export async function buildKOT(order) {
-  const settings = await prisma.settings.findFirst({});
+  const settings = await Settings.findOne();
   const restName = settings?.restaurantName || 'Paunikar Saoji Restaurant';
   const nowIST = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true });
 
@@ -74,7 +74,7 @@ export async function buildKOT(order) {
  * Pure generation - no transport side effects.
  */
 export async function buildBillReceipt(bill, order) {
-  const settings = await prisma.settings.findFirst({});
+  const settings = await Settings.findOne();
   const restName = settings?.restaurantName || 'Paunikar Saoji Restaurant';
   const address = settings?.address || '';
   const phone = settings?.phone || '';

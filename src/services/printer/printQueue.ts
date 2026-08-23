@@ -8,7 +8,8 @@
  *                 |-> FAILED (after max attempts)
  */
 
-export type PrintJobStatus = 'QUEUED' | 'PRINTING' | 'PRINTED' | 'FAILED' | 'RETRYING';
+export type PrintJobStatus =
+  | 'QUEUED' | 'PRINTING' | 'PRINTED' | 'FAILED' | 'RETRYING' | 'CANCELLED';
 
 export type PrintJobKind = 'KOT' | 'BILL' | 'TEST';
 
@@ -31,13 +32,18 @@ interface QueueEntry extends PrintJob {
   data: Uint8Array;
   seq: number;
   resolve: (printed: boolean) => void;
+  retryTimer: ReturnType<typeof setTimeout> | null;
 }
 
 const DEFAULT_MAX_ATTEMPTS = 3;
 const RETRY_DELAYS_MS = [1500, 4000, 8000];
 let seqCounter = 0;
 
-class PrintQueue {
+/**
+ * One queue per PHYSICAL printer. Jobs on the same printer are strictly
+ * serialized; different printers' queues run independently in parallel.
+ */
+export class PrintQueue {
   private entries: QueueEntry[] = [];
   private listeners = new Set<Listener>();
   private processing = false;
@@ -54,7 +60,7 @@ class PrintQueue {
 
   counts(): Record<PrintJobStatus, number> {
     const counts: Record<PrintJobStatus, number> = {
-      QUEUED: 0, PRINTING: 0, PRINTED: 0, FAILED: 0, RETRYING: 0
+      QUEUED: 0, PRINTING: 0, PRINTED: 0, FAILED: 0, RETRYING: 0, CANCELLED: 0
     };
     for (const e of this.entries) counts[e.status] += 1;
     return counts;
@@ -85,7 +91,8 @@ class PrintQueue {
         updatedAt: Date.now(),
         data: opts.data,
         seq: ++seqCounter,
-        resolve
+        resolve,
+        retryTimer: null
       };
       // Newest at the front for UI; processing picks from the tail (FIFO).
       this.entries.unshift(entry);
@@ -104,6 +111,21 @@ class PrintQueue {
     void this.process();
   }
 
+  /** Drop a job that has not started printing yet. */
+  cancel(jobId: string): void {
+    const entry = this.entries.find(e => e.id === jobId);
+    if (!entry) return;
+    if (entry.status !== 'QUEUED' && entry.status !== 'RETRYING') return;
+    if (entry.retryTimer) {
+      clearTimeout(entry.retryTimer);
+      entry.retryTimer = null;
+    }
+    entry.status = 'CANCELLED';
+    entry.updatedAt = Date.now();
+    entry.resolve(false);
+    this.emit();
+  }
+
   clearFinished(): void {
     this.entries = this.entries.filter(
       e => e.status === 'QUEUED' || e.status === 'PRINTING' || e.status === 'RETRYING'
@@ -117,6 +139,11 @@ class PrintQueue {
   }
 
   private touch(entry: QueueEntry, status: PrintJobStatus, error?: string): void {
+    // A cancelled job must never be revived by the runner loop.
+    if (entry.status === 'CANCELLED') {
+      entry.resolve(false);
+      return;
+    }
     entry.status = status;
     entry.updatedAt = Date.now();
     if (error !== undefined) entry.lastError = error;
@@ -152,9 +179,13 @@ class PrintQueue {
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         entry.lastError = message;
-        if (entry.attempts >= entry.maxAttempts) break;
+        if (entry.attempts >= entry.maxAttempts || entry.status === 'CANCELLED') break;
         this.touch(entry, 'RETRYING', message);
-        await this.delay(RETRY_DELAYS_MS[Math.min(entry.attempts - 1, RETRY_DELAYS_MS.length - 1)]);
+        const delayMs = RETRY_DELAYS_MS[Math.min(entry.attempts - 1, RETRY_DELAYS_MS.length - 1)];
+        await new Promise<void>(resolve => {
+          entry.retryTimer = setTimeout(resolve, delayMs);
+        });
+        entry.retryTimer = null;
       }
     }
     this.touch(entry, 'FAILED', entry.lastError);
@@ -170,10 +201,10 @@ class PrintQueue {
     if (!this.writerImpl) throw new Error('Printer is not connected.');
     return this.writerImpl(data);
   }
-
-  private delay(ms: number): Promise<void> {
-    return new Promise(r => setTimeout(r, ms));
-  }
 }
 
+/**
+ * Legacy singleton kept so any old import keeps working. The multi-printer
+ * manager creates its OWN queue per physical printer instead of using this.
+ */
 export const printQueue = new PrintQueue();

@@ -1,5 +1,5 @@
 'use client';
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { usePrinter } from '../context/PrinterContext';
 import { useApp } from '../context/AppContext';
 import {
@@ -7,18 +7,15 @@ import {
   Plus, Trash2, RefreshCw, XCircle, Stethoscope
 } from 'lucide-react';
 import { toast } from 'sonner';
-import type { PrinterConfig, PrinterRole, ConnectionType } from '../services/printer/printerConfig';
-import type { PrinterDiagnostics } from '../services/printer/PrinterManager';
+import type { PrinterConfig, PrinterRole } from '../services/printer/printerConfig';
 
 const ROLES: PrinterRole[] = ['KITCHEN', 'BILLING', 'PARCEL', 'BAR'];
 
-const STATUS_PILL: Record<string, { label: string; cls: string }> = {
+const STATE_PILL: Record<string, { label: string; cls: string }> = {
   connected: { label: 'Connected', cls: 'bg-emerald-50 border-emerald-200 text-emerald-700' },
   disconnected: { label: 'Disconnected', cls: 'bg-slate-50 border-slate-200 text-slate-600' },
-  connecting: { label: 'Connecting', cls: 'bg-amber-50 border-amber-200 text-amber-700 animate-pulse' },
+  pairing: { label: 'Pairing...', cls: 'bg-amber-50 border-amber-200 text-amber-700 animate-pulse' },
   reconnecting: { label: 'Reconnecting', cls: 'bg-amber-50 border-amber-200 text-amber-700 animate-pulse' },
-  unsupported: { label: 'Unsupported', cls: 'bg-rose-50 border-rose-200 text-rose-700' },
-  'permission-required': { label: 'Permission Required', cls: 'bg-amber-50 border-amber-200 text-amber-800' },
   error: { label: 'Connection Error', cls: 'bg-rose-50 border-rose-200 text-rose-700' }
 };
 
@@ -27,7 +24,8 @@ const JOB_BADGE: Record<string, string> = {
   PRINTING: 'bg-indigo-50 text-indigo-700 border-indigo-200 animate-pulse',
   PRINTED: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   FAILED: 'bg-rose-50 text-rose-700 border-rose-200',
-  RETRYING: 'bg-amber-50 text-amber-700 border-amber-200'
+  RETRYING: 'bg-amber-50 text-amber-700 border-amber-200',
+  CANCELLED: 'bg-slate-100 text-slate-400 border-slate-200'
 };
 
 function DiagRow({ label, value, ok }: { label: string; value: string; ok?: boolean }) {
@@ -41,43 +39,48 @@ function DiagRow({ label, value, ok }: { label: string; value: string; ok?: bool
   );
 }
 
+interface Diag {
+  browserName?: string;
+  platform?: string;
+  https?: boolean;
+  webBluetooth?: boolean;
+  warnings?: string[];
+}
+
 const PrinterSettingsPage: React.FC = () => {
   const {
-    supported, status, connected, connecting, connectionType, connectionDetail,
-    printing, error, queue,
-    printers, activePrinterId, activePrinter, connect, disconnect, testPrint,
-    savePrinterConfig, removePrinterConfig, setActivePrinter,
-    retryJob, clearFinishedJobs, getDiagnostics
+    supported, connected, printing, error, printers,
+    connectPrinter, disconnectPrinter, testPrintOn,
+    retryJob, cancelJob, clearFinishedJobs, getDiagnostics,
+    savePrinterConfig, removePrinterConfig
   } = usePrinter();
   const { settings } = useApp();
 
-  const [connectLoading, setConnectLoading] = useState(false);
-  const [testLoading, setTestLoading] = useState(false);
-  const [diag, setDiag] = useState<PrinterDiagnostics | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [diag, setDiag] = useState<Diag | null>(() => getDiagnostics() as Diag);
 
-  useEffect(() => {
-    getDiagnostics().then(setDiag).catch(() => setDiag(null));
-  }, [getDiagnostics, status]);
+  const refreshDiag = () => setDiag(getDiagnostics() as Diag);
 
-  const pill = STATUS_PILL[status] || STATUS_PILL.disconnected;
-  const printFailed = queue.counts.FAILED > 0;
+  const allJobs = printers.flatMap(p => p.jobs.map(j => ({ ...j, printerId: p.id })));
+  const failedJobs = allJobs.filter(j => j.status === 'FAILED');
 
-  const handleConnect = async () => {
-    setConnectLoading(true);
-    await connect(activePrinterId);
-    setConnectLoading(false);
+  const handleConnect = async (id: string) => {
+    setBusyId(id);
+    await connectPrinter(id);
+    refreshDiag();
+    setBusyId(null);
   };
 
-  const handleTest = async () => {
-    setTestLoading(true);
-    await testPrint(settings);
-    setTestLoading(false);
+  const handleTest = async (id: string) => {
+    setBusyId(id);
+    await testPrintOn(id, settings);
+    setBusyId(null);
   };
 
   const updateConfig = (id: string, patch: Partial<PrinterConfig>) => {
-    const current = printers.find(p => p.id === id);
-    if (!current) return;
-    savePrinterConfig({ ...current, ...patch });
+    const status = printers.find(p => p.id === id);
+    if (!status) return;
+    savePrinterConfig({ ...status.config, ...patch });
   };
 
   const addPrinter = () => {
@@ -86,14 +89,21 @@ const PrinterSettingsPage: React.FC = () => {
       id,
       name: 'KP-307',
       role: 'BILLING',
-      connectionType: 'BLUETOOTH',
+      connectionType: 'BLE',
       paperWidth: 80,
       enabled: true,
-      baudRate: 9600,
-      encodingMode: 'auto-raster'
+      encodingMode: 'auto-raster',
+      cutMode: 'FULL'
     });
-    setActivePrinter(id);
-    toast.success('Printer added - configure and connect it below.');
+    toast.success('Printer added - connect it below.');
+  };
+
+  const handleRemove = (id: string) => {
+    if (printers.length <= 1) {
+      toast.error('At least one printer must stay configured.');
+      return;
+    }
+    removePrinterConfig(id);
   };
 
   return (
@@ -104,153 +114,104 @@ const PrinterSettingsPage: React.FC = () => {
           <h2 className="text-lg font-black text-slate-800 flex items-center gap-2 m-0">
             <Printer size={20} /> Printer Settings
           </h2>
-          <p className="text-[11px] text-slate-500 mt-0.5">KP-307 thermal printer over Bluetooth (Web Serial first, BLE fallback).</p>
+          <p className="text-[11px] text-slate-500 mt-0.5">
+            KP-307 thermal printers over Bluetooth LE (Web Bluetooth). Each printer connects independently.
+          </p>
         </div>
       </div>
 
-      {/* Connection card */}
-      <div className="p-4 rounded-2xl bg-white border border-slate-200 space-y-3 shadow-sm">
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <div className="flex items-center gap-2">
-            <span className={`w-2.5 h-2.5 rounded-full ${connected ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
-            <span className={`text-xs font-black uppercase tracking-wider px-2 py-0.5 rounded-full border ${pill.cls}`}>
-              {pill.label}
-            </span>
-            {printFailed && (
-              <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border bg-rose-50 border-rose-200 text-rose-700">
-                Print Failed ({queue.counts.FAILED})
-              </span>
-            )}
-          </div>
-          <Printer size={16} className={connected ? 'text-emerald-600' : 'text-slate-400'} />
+      {!supported && (
+        <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-[10px] text-amber-800 font-semibold space-y-1">
+          <p>This browser cannot reach Bluetooth printers.</p>
+          <p>Open the POS in Chrome or Edge on a secure (https) page. Web Bluetooth requires a Chromium browser with Bluetooth permission.</p>
         </div>
+      )}
 
-        {activePrinter && (
-          <div className="text-[11px] font-bold text-slate-700">
-            {activePrinter.name}
-            <span className="ml-2 text-[10px] font-mono text-slate-400">{activePrinter.connectionType === 'BLE' ? 'Bluetooth LE' : 'Bluetooth'} &middot; {activePrinter.paperWidth}mm</span>
-          </div>
-        )}
-        {connectionDetail && connectionDetail !== 'Not connected' && (
-          <div className="text-[10px] font-semibold text-slate-500">
-            Connection: <span className="font-bold text-slate-700">{connectionType || '—'}</span>
-            <span className="ml-1.5 font-mono">({connectionDetail})</span>
-          </div>
-        )}
+      {error && (
+        <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-[10px] text-rose-700 font-semibold">
+          {error}
+        </div>
+      )}
 
-        {error && (
-          <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-[10px] text-rose-700 font-semibold">
-            {error}
-          </div>
-        )}
+      {/* One card per configured printer */}
+      {printers.map(p => {
+        const pill = STATE_PILL[p.state] || STATE_PILL.disconnected;
+        const busy = busyId === p.id;
+        return (
+          <div key={p.id} className="rounded-2xl bg-white border border-slate-200 shadow-sm overflow-hidden">
+            <div className="px-4 py-3 border-b border-slate-100 flex justify-between items-center gap-2">
+              <h3 className="text-[11px] font-black uppercase tracking-wider text-slate-600 m-0 flex items-center gap-1.5 truncate">
+                {p.name}
+                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 normal-case">
+                  {p.role}
+                </span>
+              </h3>
+              <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full border shrink-0 ${pill.cls}`}>
+                {pill.label}
+              </span>
+            </div>
 
-        {!supported ? (
-          <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-[10px] text-amber-800 font-semibold space-y-1">
-            <p>This browser cannot reach a Bluetooth serial printer.</p>
-            <p>Open the POS in Chrome on this device. If Chrome still cannot see the KP-307, this Android/browser combination does not expose Bluetooth serial printers to web apps - pair the printer to another POS device instead.</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-3 gap-2">
-            {!connected ? (
-              <button
-                type="button"
-                onClick={handleConnect}
-                disabled={connectLoading}
-                className="col-span-3 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold text-xs uppercase tracking-wider cursor-pointer transition flex items-center justify-center gap-1.5"
-              >
-                <Plug size={14} /> {connectLoading || connecting ? 'Connecting...' : 'Connect'}
-              </button>
-            ) : (
-              <>
+            <div className="p-4 space-y-3">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="text-[11px] font-bold text-slate-700">
+                  Device: {p.deviceName || <span className="text-slate-400">Not paired</span>}
+                  <span className="ml-2 text-[10px] font-mono text-slate-400">{p.connection}</span>
+                </div>
+                <label className="flex items-center gap-1 text-[9px] font-bold uppercase text-slate-500">
+                  Enabled
+                  <input
+                    type="checkbox"
+                    checked={p.enabled}
+                    onChange={e => updateConfig(p.id, { enabled: e.target.checked })}
+                    className="accent-emerald-600"
+                  />
+                </label>
+              </div>
+
+              {p.lastError && (
+                <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-[10px] text-rose-700 font-semibold">
+                  {p.lastError}
+                </div>
+              )}
+
+              <div className="grid grid-cols-3 gap-2">
                 <button
                   type="button"
-                  onClick={handleTest}
-                  disabled={testLoading || printing}
-                  className="py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs uppercase tracking-wider cursor-pointer transition flex items-center justify-center gap-1.5"
+                  onClick={() => handleConnect(p.id)}
+                  disabled={!supported || busy || p.state === 'connected'}
+                  className="py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white font-bold text-xs uppercase tracking-wider cursor-pointer transition flex items-center justify-center gap-1.5"
                 >
-                  <FlaskConical size={14} /> {(testLoading || printing) ? 'Printing...' : 'Test Print'}
+                  <Plug size={14} /> {busy && p.state !== 'connected' ? 'Connecting...' : p.state === 'connected' ? 'Connected' : 'Connect'}
                 </button>
                 <button
                   type="button"
-                  onClick={() => disconnect()}
-                  className="py-2.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs uppercase tracking-wider cursor-pointer transition flex items-center justify-center gap-1.5 col-span-2"
+                  onClick={() => handleTest(p.id)}
+                  disabled={busy || !supported || p.state !== 'connected'}
+                  className="py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white font-bold text-xs uppercase tracking-wider cursor-pointer transition flex items-center justify-center gap-1.5"
+                >
+                  <FlaskConical size={14} /> Test Print
+                </button>
+                <button
+                  type="button"
+                  onClick={() => disconnectPrinter(p.id)}
+                  disabled={p.state !== 'connected'}
+                  className="py-2.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 disabled:opacity-40 text-slate-700 font-bold text-xs uppercase tracking-wider cursor-pointer transition flex items-center justify-center gap-1.5"
                 >
                   <Unplug size={14} /> Disconnect
                 </button>
-              </>
-            )}
-          </div>
-        )}
+              </div>
 
-        {status === 'permission-required' && (
-          <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-[10px] text-amber-800 font-semibold space-y-1">
-            <p className="m-0">Could not connect to the KP-307.</p>
-            <p className="m-0">Make sure:</p>
-            <ol className="list-decimal ml-4 space-y-0.5 m-0">
-              <li>Bluetooth is ON.</li>
-              <li>KP-307 is powered ON.</li>
-              <li>The printer is paired with this device.</li>
-              <li>Chrome has permission to access the printer.</li>
-            </ol>
-          </div>
-        )}
-      </div>
-
-      {/* Printer configurations */}
-      <div className="rounded-2xl bg-white border border-slate-200 shadow-sm overflow-hidden">
-        <div className="px-4 py-3 border-b border-slate-100 flex justify-between items-center">
-          <h3 className="text-[11px] font-black uppercase tracking-wider text-slate-600 m-0">Printers</h3>
-          <button
-            type="button"
-            onClick={addPrinter}
-            className="flex items-center gap-1 text-[10px] font-bold uppercase text-indigo-600 hover:text-indigo-800 cursor-pointer"
-          >
-            <Plus size={12} /> Add Printer
-          </button>
-        </div>
-        <div className="divide-y divide-slate-100">
-          {printers.map(p => (
-            <div key={p.id} className={`p-4 space-y-3 ${p.id === activePrinterId ? 'bg-indigo-50/30' : ''}`}>
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="active-printer"
-                    checked={p.id === activePrinterId}
-                    onChange={() => setActivePrinter(p.id)}
-                    className="accent-indigo-600"
-                  />
+              {/* Configuration */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 pt-1">
+                <label className="space-y-0.5">
+                  <span className="text-[8px] font-black uppercase text-slate-400 block">Name</span>
                   <input
                     type="text"
                     value={p.name}
                     onChange={e => updateConfig(p.id, { name: e.target.value })}
-                    className="text-xs font-bold text-slate-800 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-indigo-500 focus:outline-none w-40"
+                    className="w-full text-[11px] font-bold bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none"
                   />
                 </label>
-                <div className="flex items-center gap-2">
-                  <label className="flex items-center gap-1 text-[9px] font-bold uppercase text-slate-500">
-                    Enabled
-                    <input
-                      type="checkbox"
-                      checked={p.enabled}
-                      onChange={e => updateConfig(p.id, { enabled: e.target.checked })}
-                      className="accent-emerald-600"
-                    />
-                  </label>
-                  {printers.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => removePrinterConfig(p.id)}
-                      className="p-1 rounded text-rose-500 hover:bg-rose-50 cursor-pointer"
-                      title="Remove printer"
-                    >
-                      <Trash2 size={13} />
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                 <label className="space-y-0.5">
                   <span className="text-[8px] font-black uppercase text-slate-400 block">Role</span>
                   <select
@@ -262,20 +223,9 @@ const PrinterSettingsPage: React.FC = () => {
                   </select>
                 </label>
                 <label className="space-y-0.5">
-                  <span className="text-[8px] font-black uppercase text-slate-400 block">Connection</span>
-                  <select
-                    value={p.connectionType}
-                    onChange={e => updateConfig(p.id, { connectionType: e.target.value as ConnectionType })}
-                    className="w-full text-[11px] font-bold bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 cursor-pointer focus:outline-none"
-                  >
-                    <option value="BLUETOOTH">Bluetooth (Serial/SPP)</option>
-                    <option value="BLE">Bluetooth LE (GATT)</option>
-                  </select>
-                </label>
-                <label className="space-y-0.5">
                   <span className="text-[8px] font-black uppercase text-slate-400 block">Paper</span>
                   <select
-                    value={p.paperWidth}
+                    value={p.config.paperWidth}
                     onChange={e => updateConfig(p.id, { paperWidth: Number(e.target.value) as 58 | 80 })}
                     className="w-full text-[11px] font-bold bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 cursor-pointer focus:outline-none"
                   >
@@ -283,29 +233,17 @@ const PrinterSettingsPage: React.FC = () => {
                     <option value={58}>58 mm</option>
                   </select>
                 </label>
-                {p.connectionType === 'BLUETOOTH' ? (
-                  <label className="space-y-0.5">
-                    <span className="text-[8px] font-black uppercase text-slate-400 block">Baud Rate</span>
-                    <select
-                      value={p.baudRate || 9600}
-                      onChange={e => updateConfig(p.id, { baudRate: Number(e.target.value) })}
-                      className="w-full text-[11px] font-bold bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 cursor-pointer focus:outline-none"
-                    >
-                      {[4800, 9600, 19200, 38400, 57600, 115200].map(b => <option key={b} value={b}>{b}</option>)}
-                    </select>
-                  </label>
-                ) : (
-                  <label className="space-y-0.5">
-                    <span className="text-[8px] font-black uppercase text-slate-400 block">BLE Service UUID</span>
-                    <input
-                      type="text"
-                      value={p.bleServiceUuid || ''}
-                      onChange={e => updateConfig(p.id, { bleServiceUuid: e.target.value.trim() || undefined })}
-                      placeholder="Optional"
-                      className="w-full text-[11px] font-mono bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none"
-                    />
-                  </label>
-                )}
+                <label className="space-y-0.5">
+                  <span className="text-[8px] font-black uppercase text-slate-400 block">Cut Mode</span>
+                  <select
+                    value={p.config.cutMode || 'FULL'}
+                    onChange={e => updateConfig(p.id, { cutMode: e.target.value as 'FULL' | 'PARTIAL' })}
+                    className="w-full text-[11px] font-bold bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 cursor-pointer focus:outline-none"
+                  >
+                    <option value="FULL">Full cut</option>
+                    <option value="PARTIAL">Partial cut</option>
+                  </select>
+                </label>
               </div>
 
               <details className="text-[10px] text-slate-500">
@@ -316,7 +254,7 @@ const PrinterSettingsPage: React.FC = () => {
                   <label className="space-y-0.5">
                     <span className="text-[8px] font-black uppercase text-slate-400 block">Marathi Encoding</span>
                     <select
-                      value={p.encodingMode || 'auto-raster'}
+                      value={p.config.encodingMode || 'auto-raster'}
                       onChange={e => updateConfig(p.id, { encodingMode: e.target.value as PrinterConfig['encodingMode'] })}
                       className="w-full text-[11px] font-bold bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 cursor-pointer focus:outline-none"
                     >
@@ -331,62 +269,78 @@ const PrinterSettingsPage: React.FC = () => {
                       type="number"
                       min={0}
                       max={255}
-                      value={p.codePage ?? ''}
+                      value={p.config.codePage ?? ''}
                       onChange={e => updateConfig(p.id, { codePage: e.target.value === '' ? undefined : Number(e.target.value) })}
                       placeholder="Model specific"
                       className="w-full text-[11px] font-mono bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none"
                     />
                   </label>
-                  <label className="flex items-end gap-1.5 text-[9px] font-bold uppercase text-slate-500 pb-1.5">
+                  <label className="space-y-0.5">
+                    <span className="text-[8px] font-black uppercase text-slate-400 block">BLE Service UUID</span>
                     <input
-                      type="checkbox"
-                      checked={!!p.beepEnabled}
-                      onChange={e => updateConfig(p.id, { beepEnabled: e.target.checked })}
-                      className="accent-indigo-600"
+                      type="text"
+                      value={p.config.bleServiceUuid || ''}
+                      onChange={e => updateConfig(p.id, { bleServiceUuid: e.target.value.trim() || undefined })}
+                      placeholder="Optional"
+                      className="w-full text-[11px] font-mono bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none"
                     />
-                    Beep after print (if supported)
                   </label>
                 </div>
               </details>
-            </div>
-          ))}
-        </div>
-      </div>
 
-      {/* Print queue */}
+              <button
+                type="button"
+                onClick={() => handleRemove(p.id)}
+                className="flex items-center gap-1 text-[10px] font-bold uppercase text-rose-500 hover:text-rose-700 cursor-pointer"
+              >
+                <Trash2 size={12} /> Remove this printer
+              </button>
+            </div>
+          </div>
+        );
+      })}
+
+      {/* Add printer */}
+      <button
+        type="button"
+        onClick={addPrinter}
+        className="w-full py-3 rounded-2xl border-2 border-dashed border-slate-300 hover:border-indigo-400 text-slate-500 hover:text-indigo-600 font-bold text-xs uppercase tracking-wider cursor-pointer transition flex items-center justify-center gap-1.5"
+      >
+        <Plus size={14} /> Add Another Printer
+      </button>
+
+      {/* Print queue - aggregated across all printers */}
       <div className="rounded-2xl bg-white border border-slate-200 shadow-sm overflow-hidden">
         <div className="px-4 py-3 border-b border-slate-100 flex justify-between items-center">
           <h3 className="text-[11px] font-black uppercase tracking-wider text-slate-600 m-0 flex items-center gap-1.5">
             <Activity size={13} /> Print Queue
           </h3>
           <div className="flex items-center gap-3">
-            <span className="text-[9px] font-bold text-slate-400 font-mono">
-              Q:{queue.counts.QUEUED} P:{queue.counts.PRINTING} OK:{queue.counts.PRINTED} F:{queue.counts.FAILED}
-            </span>
-            {printFailed && (
+            {failedJobs.length > 0 && (
               <button
                 type="button"
-                onClick={() => queue.jobs.filter(j => j.status === 'FAILED').forEach(j => retryJob(j.id))}
+                onClick={() => failedJobs.forEach(j => retryJob(j.printerId, j.id))}
                 className="flex items-center gap-1 text-[10px] font-bold uppercase text-amber-600 hover:text-amber-800 cursor-pointer"
               >
-                <RefreshCw size={11} /> Retry All
+                <RefreshCw size={11} /> Retry All Failed
               </button>
             )}
             <button
               type="button"
               onClick={clearFinishedJobs}
-              className="flex items-center gap-1 text-[10px] font-bold uppercase text-slate-500 hover:text-slate-700 cursor-pointer"
+              disabled={printing}
+              className="flex items-center gap-1 text-[10px] font-bold uppercase text-slate-500 hover:text-slate-700 disabled:opacity-40 cursor-pointer"
             >
               <XCircle size={11} /> Clear Done
             </button>
           </div>
         </div>
-        {queue.jobs.length === 0 ? (
+        {allJobs.length === 0 ? (
           <div className="p-6 text-center text-[11px] text-slate-400">No print jobs yet.</div>
         ) : (
           <div className="max-h-64 overflow-y-auto divide-y divide-slate-50">
-            {queue.jobs.map(job => (
-              <div key={job.id} className="px-4 py-2.5 flex items-center justify-between gap-2">
+            {allJobs.map(job => (
+              <div key={`${job.printerId}-${job.id}`} className="px-4 py-2.5 flex items-center justify-between gap-2">
                 <div className="min-w-0">
                   <span className="text-[11px] font-bold text-slate-700">{job.label}</span>
                   <span className="ml-2 text-[9px] font-bold uppercase text-slate-400">{job.kind} &middot; {job.role}</span>
@@ -402,11 +356,21 @@ const PrinterSettingsPage: React.FC = () => {
                   {job.status === 'FAILED' && (
                     <button
                       type="button"
-                      onClick={() => retryJob(job.id)}
+                      onClick={() => retryJob(job.printerId, job.id)}
                       className="p-1 rounded text-amber-600 hover:bg-amber-50 cursor-pointer"
                       title="Retry"
                     >
                       <RefreshCw size={12} />
+                    </button>
+                  )}
+                  {(job.status === 'QUEUED' || job.status === 'RETRYING') && (
+                    <button
+                      type="button"
+                      onClick={() => cancelJob(job.printerId, job.id)}
+                      className="p-1 rounded text-slate-400 hover:bg-slate-100 cursor-pointer"
+                      title="Cancel"
+                    >
+                      <XCircle size={12} />
                     </button>
                   )}
                 </div>
@@ -424,7 +388,7 @@ const PrinterSettingsPage: React.FC = () => {
           </h3>
           <button
             type="button"
-            onClick={() => getDiagnostics().then(setDiag).catch(() => setDiag(null))}
+            onClick={refreshDiag}
             className="flex items-center gap-1 text-[10px] font-bold uppercase text-indigo-600 hover:text-indigo-800 cursor-pointer"
           >
             <RefreshCw size={11} /> Refresh
@@ -432,18 +396,14 @@ const PrinterSettingsPage: React.FC = () => {
         </div>
         {diag && (
           <div className="px-4 py-2">
-            <DiagRow label="Browser" value={diag.browserName} />
-            <DiagRow label="Android detected" value={diag.androidDetected ? 'YES' : 'NO'} />
+            <DiagRow label="Browser" value={diag.browserName || 'Unknown'} />
+            <DiagRow label="Platform" value={diag.platform || 'Unknown'} />
             <DiagRow label="HTTPS" value={diag.https ? 'YES' : 'NO'} ok={diag.https} />
-            <DiagRow label="Web Serial" value={diag.webSerial ? 'YES' : 'NO'} ok={diag.webSerial} />
             <DiagRow label="Web Bluetooth" value={diag.webBluetooth ? 'YES' : 'NO'} ok={diag.webBluetooth} />
-            <DiagRow label="Previously granted ports" value={String(diag.grantedSerialPorts)} />
-            <DiagRow label="Bluetooth permission" value={diag.bluetoothPermission} />
-            <DiagRow label="Printer connected" value={diag.printerConnected ? 'YES' : 'NO'} ok={diag.printerConnected} />
-            <DiagRow label="Connection type" value={diag.connectionType || '—'} />
-            {diag.warnings.length > 0 && (
+            <DiagRow label="Any printer connected" value={connected ? 'YES' : 'NO'} ok={connected} />
+            {diag.warnings && diag.warnings.length > 0 && (
               <div className="py-2 space-y-1">
-                {diag.warnings.map((w, i) => (
+                {diag.warnings.map((w: string, i: number) => (
                   <p key={i} className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 m-0 font-semibold">
                     {w}
                   </p>

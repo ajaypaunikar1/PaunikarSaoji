@@ -430,14 +430,14 @@ const Dashboard: React.FC = () => {
 
                 <div className="border-b border-slate-100" />
 
-                {/* Section 2: Thermal Printer (Web Serial) */}
+                {/* Section 2: Thermal Printer (Bluetooth) */}
                 <div className="space-y-3">
-                  <h4 className="text-[10px] font-black uppercase text-slate-450 tracking-wider">Thermal Printer (Web Serial)</h4>
-                  <p className="text-[10px] text-slate-500 leading-tight">Print KOT &amp; bills directly from this device via the Web Serial API (KPC307-UEWB-6178, 9600 baud).</p>
+                  <h4 className="text-[10px] font-black uppercase text-slate-450 tracking-wider">Thermal Printers (Bluetooth)</h4>
+                  <p className="text-[10px] text-slate-500 leading-tight">Print KOTs &amp; bills directly from this device over Bluetooth LE. Manage per-role printers (Kitchen / Billing) under Printer Settings.</p>
 
                   {!supported ? (
                     <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-[10px] text-amber-800 font-semibold">
-                      Web Serial is not supported on this browser. Please use Chrome on Android or desktop.
+                      Web Bluetooth is not supported on this browser. Please use Chrome or Edge on a secure (https) page.
                     </div>
                   ) : (
                     <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
@@ -453,7 +453,7 @@ const Dashboard: React.FC = () => {
 
                       {connected && (
                         <div className="text-[10px] font-bold text-slate-600 font-mono">
-                          Printer: {printerName || 'KPC307-UEWB-6178'}
+                          Printer: {printerName || 'KP-307'}
                         </div>
                       )}
 

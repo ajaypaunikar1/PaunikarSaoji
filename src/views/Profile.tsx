@@ -146,7 +146,7 @@ const Profile: React.FC = () => {
 
   if (!currentUser) return null;
 
-  const isAdmin = currentUser.role === 'SuperAdmin' || currentUser.role === 'Admin';
+  const isAdmin = currentUser.role === 'SuperAdmin';
 
   return (
     <div className="space-y-6">

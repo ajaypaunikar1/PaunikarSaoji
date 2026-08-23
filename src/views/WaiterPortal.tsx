@@ -7,7 +7,9 @@ import {
   ChefHat, Key, Eye, EyeOff, Lock, Play, CheckCheck, Sparkles
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import type { Table, PortionType } from '../types/types';
+import type { Table, PortionType, OrderStatus } from '../types/types';
+import QtyStepper from '../components/QtyStepper';
+import { resolvePortionPrice } from '../utils/variants';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 
@@ -16,7 +18,7 @@ const WaiterPortal: React.FC = () => {
     currentUser, logout, language, changeLanguage, tables, menuItems, 
     addOrder, attendance, markAttendance, clockOut, leaves, submitLeave,
     payroll, orders, bills, generateBill, updateOrder, systemStatus, updateOrderStatus,
-    allCategories
+    setTableStatus, allCategories
   } = useApp();
   const router = useRouter();
   const t = translations[language];
@@ -26,7 +28,7 @@ const WaiterPortal: React.FC = () => {
 
   // Ordering workflow
   const [orderingTable, setOrderingTable] = useState<Table | null>(null);
-  const [basket, setBasket] = useState<{ id: string; name: string; portion: PortionType; price: number; quantity: number; specialNotes: string }[]>([]);
+  const [basket, setBasket] = useState<{ id: string; name: string; category?: string; portion: PortionType; price: number; quantity: number; specialNotes: string }[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
 
   // Password change state
@@ -140,11 +142,7 @@ const WaiterPortal: React.FC = () => {
       toast.error('Order capabilities locked. You must Clock In first under the Hours tab.');
       return;
     }
-    const price = portion === 'Half' 
-      ? menuItem.variants.find((v: any) => v.name === 'Half')?.price || 0
-      : portion === 'Full'
-        ? menuItem.variants.find((v: any) => v.name === 'Full')?.price || 0
-        : menuItem.price;
+    const price = resolvePortionPrice(menuItem, portion);
 
     setBasket(prev => {
       const exist = prev.find(i => i.id === menuItem.id && i.portion === portion);
@@ -166,7 +164,8 @@ const WaiterPortal: React.FC = () => {
     });
   };
 
-  const updateBasketQty = (index: number, amt: number) => {
+  /** Absolute quantity setter for direct numeric entry in the basket. */
+  const setBasketQty = (index: number, qty: number) => {
     if (currentUser?.status === 'Disabled') {
       toast.error('Your account is turned off. You cannot modify orders.');
       return;
@@ -175,13 +174,10 @@ const WaiterPortal: React.FC = () => {
       toast.error('Order capabilities locked. You must Clock In first under the Hours tab.');
       return;
     }
-    setBasket(prev => prev.map((item, idx) => {
-      if (idx === index) {
-        const newQty = item.quantity + amt;
-        return newQty > 0 ? { ...item, quantity: newQty } : item;
-      }
-      return item;
-    }).filter(i => i.quantity > 0));
+    const clamped = Math.min(999, Math.max(1, Math.floor(qty)));
+    setBasket(prev => prev.map((item, idx) =>
+      idx === index ? { ...item, quantity: clamped } : item
+    ));
   };
 
   const updateBasketNotes = (index: number, note: string) => {
@@ -466,7 +462,7 @@ const WaiterPortal: React.FC = () => {
                                 {item.variants.map((v, vIdx) => (
                                   <button
                                     key={vIdx}
-                                    onClick={() => handleAddToBasket(item, v.name as PortionType)}
+                                    onClick={() => handleAddToBasket(item, v.name)}
                                     className="w-full py-1 px-1 bg-slate-50 border border-slate-200 rounded text-[9px] font-bold text-indigo-600 cursor-pointer text-center hover:bg-indigo-50 hover:border-indigo-200 transition"
                                   >
                                     {v.name} (₹{v.price})
@@ -554,19 +550,10 @@ const WaiterPortal: React.FC = () => {
                                 <span className="ml-1 text-[8px] font-black uppercase text-indigo-600 bg-indigo-50 px-1 rounded border border-indigo-100">{item.portion}</span>
                               </div>
                               <div className="flex items-center gap-2">
-                                <button 
-                                  onClick={() => updateBasketQty(idx, -1)}
-                                  className="w-6 h-6 rounded bg-slate-100 hover:bg-slate-200 flex items-center justify-center font-bold cursor-pointer"
-                                >
-                                  -
-                                </button>
-                                <span className="font-bold w-4 text-center font-mono">{item.quantity}</span>
-                                <button 
-                                  onClick={() => updateBasketQty(idx, 1)}
-                                  className="w-6 h-6 rounded bg-slate-100 hover:bg-slate-200 flex items-center justify-center font-bold cursor-pointer"
-                                >
-                                  +
-                                </button>
+                                <QtyStepper
+                                  value={item.quantity}
+                                  onChange={next => setBasketQty(idx, next)}
+                                />
                               </div>
                             </div>
                             <input 
