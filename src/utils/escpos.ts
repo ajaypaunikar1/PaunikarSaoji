@@ -11,6 +11,8 @@ export const ESCPOS = {
   ALIGN_CENTER: '\x1b\x61\x01',
   ALIGN_RIGHT: '\x1b\x61\x02',
   TEXT_NORMAL: '\x1d\x21\x00',
+  /** Double height only (GS ! 0x01) - keeps item lines readable without wasting width. */
+  TEXT_TALL: '\x1d\x21\x01',
   TEXT_DOUBLE_SIZE: '\x1d\x21\x11',
   TEXT_BOLD_ON: '\x1b\x45\x01',
   TEXT_BOLD_OFF: '\x1b\x45\x00',
@@ -32,8 +34,11 @@ const nowIST = () =>
 
 type Align = 'left' | 'center' | 'right';
 
+/** Text magnification: normal, double-height (tall) or double width+height. */
+type TextSize = 'normal' | 'tall' | 'double';
+
 type Seg =
-  | { kind: 'text'; text: string; align?: Align; bold?: boolean; double?: boolean }
+  | { kind: 'text'; text: string; align?: Align; bold?: boolean; size?: TextSize }
   | { kind: 'raw'; raw: string };
 
 /**
@@ -63,11 +68,13 @@ async function renderSegments(segs: Seg[]): Promise<Uint8Array> {
           : ESCPOS.ALIGN_LEFT;
 
     if (isPlainAscii(seg.text)) {
+      const size: TextSize = seg.size ?? 'normal';
       let s = alignCmd;
       if (seg.bold) s += ESCPOS.TEXT_BOLD_ON;
-      if (seg.double) s += ESCPOS.TEXT_DOUBLE_SIZE;
+      if (size === 'tall') s += ESCPOS.TEXT_TALL;
+      if (size === 'double') s += ESCPOS.TEXT_DOUBLE_SIZE;
       s += seg.text + '\n';
-      if (seg.double) s += ESCPOS.TEXT_NORMAL;
+      if (size !== 'normal') s += ESCPOS.TEXT_NORMAL;
       if (seg.bold) s += ESCPOS.TEXT_BOLD_OFF;
       push(s);
     } else {
@@ -78,7 +85,8 @@ async function renderSegments(segs: Seg[]): Promise<Uint8Array> {
           widthDots: PRINTER_DOTS_80,
           align,
           bold: seg.bold,
-          fontSize: seg.double ? 44 : undefined
+          fontSize:
+            seg.size === 'double' ? 52 : seg.size === 'tall' ? 40 : undefined
         })
       );
     }
@@ -105,7 +113,7 @@ export async function generateKOT(order: Order, settings?: ReceiptSettings): Pro
 
   const segs: Seg[] = [
     { kind: 'raw', raw: ESCPOS.INIT },
-    { kind: 'text', text: 'KOT TICKET', align: 'center', bold: true, double: true },
+    { kind: 'text', text: 'KOT TICKET', align: 'center', bold: true, size: 'double' },
     { kind: 'text', text: order.isParcel ? 'Order Type: PARCEL' : `Table: T-${order.tableId}`, align: 'center' },
     { kind: 'text', text: `Order: #${order.id.substring(4, 10)}`, align: 'center' },
     { kind: 'text', text: `Time: ${nowIST()}`, align: 'center' },
@@ -114,13 +122,13 @@ export async function generateKOT(order: Order, settings?: ReceiptSettings): Pro
       : []),
     { kind: 'text', text: '--------------------------------', align: 'center' },
     ...order.items.flatMap<Seg>(item => [
-      { kind: 'text' as const, text: item.name },
-      { kind: 'text' as const, text: `  Qty: ${item.quantity} (${item.portion})` },
+      { kind: 'text' as const, text: item.name, bold: true, size: 'tall' },
+      { kind: 'text' as const, text: `  Qty: ${item.quantity} (${item.portion})`, size: 'tall' },
       ...(item.spiceLevel && item.spiceLevel !== 'normal'
-        ? [{ kind: 'text' as const, text: `  Spice: ${item.spiceLevel}` }]
+        ? [{ kind: 'text' as const, text: `  Spice: ${item.spiceLevel}`, size: 'tall' }]
         : []),
       ...(item.specialNotes
-        ? [{ kind: 'text' as const, text: `  * Notes: ${item.specialNotes}` }]
+        ? [{ kind: 'text' as const, text: `  * Notes: ${item.specialNotes}`, size: 'tall' }]
         : [])
     ]),
     { kind: 'text', text: '--------------------------------' },
@@ -150,7 +158,7 @@ export async function generateBillReceipt(
 
   const segs: Seg[] = [
     { kind: 'raw', raw: ESCPOS.INIT },
-    { kind: 'text', text: restName, align: 'center', bold: true, double: true },
+    { kind: 'text', text: restName, align: 'center', bold: true, size: 'double' },
     ...(address
       ? [{ kind: 'text' as const, text: address, align: 'center' as Align }]
       : []),
@@ -168,10 +176,10 @@ export async function generateBillReceipt(
     { kind: 'text', text: `Payment: ${bill.paymentMethod || 'Cash'}` },
     { kind: 'text', text: '--------------------------------' },
     ...order.items.flatMap<Seg>(item => [
-      { kind: 'text' as const, text: item.name },
-      { kind: 'text' as const, text: `  ${item.quantity} x Rs.${item.price} = Rs.${item.price * item.quantity}` },
+      { kind: 'text' as const, text: item.name, bold: true, size: 'tall' },
+      { kind: 'text' as const, text: `  ${item.quantity} x Rs.${item.price} = Rs.${item.price * item.quantity}`, size: 'tall' },
       ...(item.spiceLevel && item.spiceLevel !== 'normal'
-        ? [{ kind: 'text' as const, text: `  Spice: ${item.spiceLevel}` }]
+        ? [{ kind: 'text' as const, text: `  Spice: ${item.spiceLevel}`, size: 'tall' }]
         : [])
     ]),
     { kind: 'text', text: '--------------------------------' },
@@ -192,7 +200,7 @@ export async function generateBillReceipt(
     ...(bill.containerCharge && bill.containerCharge > 0
       ? [{ kind: 'text' as const, text: `Container Charge: Rs.${bill.containerCharge}`, align: 'right' as Align }]
       : []),
-    { kind: 'text', text: `GRAND TOTAL: Rs.${bill.grandTotal}`, align: 'right', bold: true },
+    { kind: 'text', text: `GRAND TOTAL: Rs.${bill.grandTotal}`, align: 'right', bold: true, size: 'double' },
     { kind: 'text', text: '--------------------------------', align: 'right' },
     { kind: 'text', text: 'Thank you! Visit Again.', align: 'center' },
     { kind: 'text', text: restName, align: 'center' },
@@ -212,7 +220,7 @@ export async function generateTestPrint(settings?: ReceiptSettings): Promise<Uin
 
   const segs: Seg[] = [
     { kind: 'raw', raw: ESCPOS.INIT },
-    { kind: 'text', text: 'PRINTER TEST', align: 'center', bold: true, double: true },
+    { kind: 'text', text: 'PRINTER TEST', align: 'center', bold: true, size: 'double' },
     { kind: 'text', text: '================================', align: 'center' },
     { kind: 'text', text: 'Printer:' },
     { kind: 'text', text: 'KPC307-UEWB-6178' },

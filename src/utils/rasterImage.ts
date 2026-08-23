@@ -101,7 +101,7 @@ export async function rasterizeTextLine(
   const align = options.align ?? 'left';
   const bold = options.bold ?? false;
   const feedDots = options.feedDots ?? 6;
-  let fontSize = options.fontSize ?? (widthDots >= 576 ? 24 : 20);
+  let fontSize = options.fontSize ?? (widthDots >= 576 ? 32 : 26);
 
   await ensureFont();
 

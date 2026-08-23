@@ -156,6 +156,7 @@ const WaiterPortal: React.FC = () => {
       return [...prev, {
         id: menuItem.id,
         name: menuItem.name,
+        category: menuItem.category,
         portion,
         price,
         quantity: 1,
@@ -489,6 +490,9 @@ const WaiterPortal: React.FC = () => {
                           {activeOrder.items.map((item, idx) => (
                             <div key={idx} className="flex justify-between items-center text-xs">
                               <div>
+                                {item.category && (
+                                  <span className="mr-1.5 text-[8px] font-bold uppercase text-emerald-700 bg-emerald-50 border border-emerald-200 px-1 py-0.2 rounded">{item.category}</span>
+                                )}
                                 <span className="font-semibold text-slate-800">{item.name}</span>
                                 <span className="text-[9px] text-slate-400 ml-1.5 uppercase font-bold">{item.portion}</span>
                               </div>
@@ -680,6 +684,9 @@ const WaiterPortal: React.FC = () => {
                           {order.items.filter(item => item.status !== 'Served').map((item, idx) => (
                             <div key={idx} className="flex justify-between items-center text-xs">
                               <div>
+                                {item.category && (
+                                  <span className="mr-1 text-[8px] font-bold uppercase text-emerald-700 bg-emerald-50 border border-emerald-200 px-1 py-0.2 rounded">{item.category}</span>
+                                )}
                                 <span className="font-bold text-slate-800">{item.quantity}x {item.name}</span>
                                 <span className="ml-1.5 text-[8px] font-bold uppercase bg-slate-100 border border-slate-150 px-1.5 py-0.2 rounded text-slate-500">
                                   {item.portion}

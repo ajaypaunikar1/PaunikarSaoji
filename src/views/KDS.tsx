@@ -274,6 +274,11 @@ const KDS: React.FC = () => {
                           </div>
                           
                           <div className="flex items-center gap-1.5 mt-0.5">
+                            {item.category && (
+                              <span className="text-[9px] font-bold bg-emerald-50 text-emerald-700 px-1.5 py-0.2 rounded border border-emerald-200 uppercase tracking-wide">
+                                {item.category}
+                              </span>
+                            )}
                             <span className="text-[9px] font-bold bg-slate-100 text-slate-650 px-1.5 py-0.2 rounded border border-slate-150 uppercase tracking-wide">
                               {item.portion}
                             </span>

@@ -75,6 +75,7 @@ const Parcel: React.FC = () => {
       return [...prev, {
         id: `cart-${Date.now()}-${Math.floor(Math.random() * 100)}`,
         name: item.name,
+        category: item.category,
         quantity: 1,
         portion,
         price,

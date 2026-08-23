@@ -55,6 +55,7 @@ export interface Table {
 export interface OrderItem {
   id: string; // matches menuItem.id
   name: string;
+  category?: string; // menu category, shown on billing/KDS/order views
   quantity: number;
   portion: PortionType;
   price: number;

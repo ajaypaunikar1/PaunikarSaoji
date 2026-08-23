@@ -380,7 +380,7 @@ const MenuManagement: React.FC = () => {
                         <input
                           type="number"
                           value={varPrice}
-                          onChange={e => setVarPrice(Math.max(1, parseInt(varPrice.toString()) || 0))}
+                          onChange={e => setVarPrice(parseInt(e.target.value) || 0)}
                           className="w-full p-2 bg-white border border-slate-200 text-xs rounded text-slate-800 focus:outline-none"
                         />
                       </div>
@@ -391,7 +391,7 @@ const MenuManagement: React.FC = () => {
                           <input
                             type="number"
                             value={varPrepTime}
-                            onChange={e => setVarPrepTime(Math.max(1, parseInt(varPrepTime.toString()) || 0))}
+                            onChange={e => setVarPrepTime(parseInt(e.target.value) || 0)}
                             className="w-full p-2 bg-white border border-slate-200 text-xs rounded text-slate-800 focus:outline-none"
                           />
                         </div>

@@ -343,6 +343,9 @@ const Billing: React.FC = () => {
                       <div key={idx} className="p-3 rounded-xl bg-slate-50 border border-slate-150 flex justify-between items-center text-xs relative group">
                         
                         <div className="pr-4">
+                          {item.category && (
+                            <span className="mr-1.5 text-[8px] font-black uppercase text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded align-middle">{item.category}</span>
+                          )}
                           <span className="font-bold text-slate-800">{item.name}</span>
                           <span className="ml-1.5 text-[9px] text-slate-550 font-bold uppercase bg-slate-200 px-1.5 py-0.2 rounded">{item.portion}</span>
                           <div className="text-[10px] text-slate-500 font-bold mt-0.5">{item.quantity} x ₹{item.price}</div>
