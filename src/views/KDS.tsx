@@ -116,7 +116,7 @@ const KDS: React.FC = () => {
     }
 
     // Grace period: suppress prints while initial data loads on mount.
-    if (Date.now() - mountedAtRef.current < 3000) return;
+    if (Date.now() - mountedAtRef.current < 5000) return;
 
     activeOrders.forEach(order => printAndMarkPrinted(order));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -163,12 +163,8 @@ const KDS: React.FC = () => {
     else if (order.status === 'Preparing') nextStatus = 'Ready';
     else if (order.status === 'Ready') nextStatus = 'Served';
 
-    const updatedItems = order.items.map(item => ({
-      ...item,
-      status: (item.status === 'Pending' || item.status === order.status) ? nextStatus : item.status
-    }));
-
-    updateOrder(order.id, { items: updatedItems });
+    // updateOrderStatus is the single writer for status (it also cascades
+    // item statuses locally); the old per-item write here conflicted with it.
     updateOrderStatus(order.id, nextStatus);
   };
 

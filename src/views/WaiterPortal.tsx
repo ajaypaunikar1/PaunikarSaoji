@@ -15,7 +15,8 @@ const WaiterPortal: React.FC = () => {
   const { 
     currentUser, logout, language, changeLanguage, tables, menuItems, 
     addOrder, attendance, markAttendance, clockOut, leaves, submitLeave,
-    payroll, orders, bills, generateBill, updateOrder, systemStatus, updateOrderStatus
+    payroll, orders, bills, generateBill, updateOrder, systemStatus, updateOrderStatus,
+    allCategories
   } = useApp();
   const router = useRouter();
   const t = translations[language];
@@ -26,7 +27,7 @@ const WaiterPortal: React.FC = () => {
   // Ordering workflow
   const [orderingTable, setOrderingTable] = useState<Table | null>(null);
   const [basket, setBasket] = useState<{ id: string; name: string; portion: PortionType; price: number; quantity: number; specialNotes: string }[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<'All' | 'Vegetarian' | 'Egg Curry' | 'Breads' | 'Rice' | 'Papad' | 'Starters' | 'Curries' | 'Handi Dishes'>('All');
+  const [selectedCategory, setSelectedCategory] = useState<string>('All');
 
   // Password change state
   const [currentPassword, setCurrentPassword] = useState('');
@@ -201,23 +202,32 @@ const WaiterPortal: React.FC = () => {
 
     const activeOrder = orders.find(o => o.id === orderingTable.orderId);
     if (orderingTable.status === 'Occupied' && activeOrder) {
-      // Merge basket items into activeOrder
+      // Merge basket items into activeOrder (immutably — never mutate state)
       const mergedItems = [...activeOrder.items];
       basket.forEach(newItem => {
-        const match = mergedItems.find(i => i.name === newItem.name && i.portion === newItem.portion);
-        if (match) {
-          match.quantity += newItem.quantity;
-          if (newItem.specialNotes) {
-            match.specialNotes = match.specialNotes ? `${match.specialNotes} | ${newItem.specialNotes}` : newItem.specialNotes;
-          }
+        const matchIdx = mergedItems.findIndex(i => i.name === newItem.name && i.portion === newItem.portion);
+        if (matchIdx >= 0) {
+          const m = mergedItems[matchIdx];
+          mergedItems[matchIdx] = {
+            ...m,
+            quantity: m.quantity + newItem.quantity,
+            category: m.category ?? newItem.category,
+            // printedQty intentionally untouched: KDS prints only the delta.
+            specialNotes: newItem.specialNotes
+              ? (m.specialNotes ? `${m.specialNotes} | ${newItem.specialNotes}` : newItem.specialNotes)
+              : m.specialNotes
+          };
         } else {
           mergedItems.push({
-            id: `item-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+            id: newItem.id,
             name: newItem.name,
+            category: newItem.category,
             quantity: newItem.quantity,
             portion: newItem.portion,
             price: newItem.price,
-            specialNotes: newItem.specialNotes
+            specialNotes: newItem.specialNotes,
+            status: 'Pending',
+            printedQty: 0
           });
         }
       });
@@ -427,7 +437,7 @@ const WaiterPortal: React.FC = () => {
                     
                     {/* Category tabs */}
                     <div className="flex gap-1.5 overflow-x-auto pb-1.5 no-scrollbar">
-                      {(['All', 'Vegetarian', 'Egg Curry', 'Breads', 'Rice', 'Papad', 'Starters', 'Curries', 'Handi Dishes'] as const).map(cat => (
+                      {['All', ...allCategories].map(cat => (
                         <button
                           key={cat}
                           onClick={() => setSelectedCategory(cat)}

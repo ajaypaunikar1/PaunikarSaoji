@@ -17,7 +17,7 @@ export interface MenuItemVariant {
 export interface MenuItem {
   id: string;
   name: string;
-  category: 'Vegetarian' | 'Egg Curry' | 'Breads' | 'Rice' | 'Papad' | 'Starters' | 'Curries' | 'Handi Dishes';
+  category: string; // defaults + admin-created categories (see utils/categories.ts)
   portionMode: 'Single' | 'Variant';
   price: number; // For single portion
   variants: MenuItemVariant[]; // For variant mode

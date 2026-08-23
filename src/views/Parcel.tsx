@@ -9,12 +9,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import type { MenuItem, PortionType, OrderItem, Order, PaymentMethod, SpiceLevel } from '../types/types';
 import { toast } from 'sonner';
 
-const CATEGORIES = ['All', 'Vegetarian', 'Egg Curry', 'Breads', 'Rice', 'Papad', 'Starters', 'Curries', 'Handi Dishes'] as const;
-
 const Parcel: React.FC = () => {
   const {
     menuItems, orders, addParcelOrder, updateOrder, generateParcelBill, payBill,
-    settings, currentUser, users
+    settings, currentUser, users, allCategories
   } = useApp();
   const { printBill: printBillThermal, connected } = usePrinter();
 
@@ -73,7 +71,9 @@ const Parcel: React.FC = () => {
         return prev.map(c => c.name === item.name && c.portion === portion ? { ...c, quantity: c.quantity + 1 } : c);
       }
       return [...prev, {
-        id: `cart-${Date.now()}-${Math.floor(Math.random() * 100)}`,
+        // Keep the menuItem id so Repeat/cancel lookups and KDS printedQty
+        // ticks stay linked to the original menu entry.
+        id: item.id,
         name: item.name,
         category: item.category,
         quantity: 1,
@@ -255,7 +255,7 @@ const Parcel: React.FC = () => {
             </div>
 
             <div className="flex flex-wrap gap-1.5 pb-1">
-              {CATEGORIES.map(cat => (
+              {['All', ...allCategories].map(cat => (
                 <button
                   key={cat}
                   onClick={() => setCategory(cat)}

@@ -60,11 +60,11 @@ router.post('/generate', protect, async (req, res) => {
     }
 
     // Calculations
-    const discountVal = Number(discount) || 0;
+    const discountVal = Math.max(0, Math.min(Number(discount) || 0, order.grandTotal)); // never go negative
     const containerVal = parcel ? (Number(containerCharge) || 0) : 0;
     const subtotal = order.grandTotal;
     const gst = Math.round(subtotal * (Number(gstPct) / 100) * 100) / 100;
-    const grandTotal = Math.round((subtotal + gst - discountVal + containerVal) * 100) / 100;
+    const grandTotal = Math.max(0, Math.round((subtotal + gst - discountVal + containerVal) * 100) / 100);
 
     // Check for existing pending bill
     const existing = await prisma.bill.findFirst({
@@ -305,13 +305,33 @@ router.put('/cancel-requests/:id', protect, async (req, res) => {
     if (status === 'Approved') {
       const order = await prisma.order.findUnique({ where: { id: cancelReq.orderId } });
       if (order && Array.isArray(order.items)) {
-        // Remove item from order
-        const updatedItems = order.items.filter(item => {
-          const detail = `${item.name} (${item.portion})`;
-          return detail.toLowerCase() !== cancelReq.itemText.toLowerCase() && item.name.toLowerCase() !== cancelReq.itemText.toLowerCase();
-        });
+        // itemText format: "<name> (<portion>) x<qty>" — the x<qty> suffix is
+        // optional; legacy requests without it cancel the entire line.
+        const qtyMatch = cancelReq.itemText.match(/\s*x(\d+)\s*$/i);
+        const cancelQty = qtyMatch ? parseInt(qtyMatch[1], 10) : null;
+        const baseText = cancelReq.itemText.replace(/\s*x\d+\s*$/i, '').trim().toLowerCase();
+
+        const updatedItems = [];
+        let remainingToCancel = cancelQty;
+        for (const item of order.items) {
+          const detail = `${item.name} (${item.portion})`.toLowerCase();
+          const matchesLine =
+            !cancelQty || remainingToCancel > 0
+              ? (detail === baseText || item.name.toLowerCase() === baseText)
+              : false;
+          if (!matchesLine) {
+            updatedItems.push(item);
+            continue;
+          }
+          const removeQty = cancelQty === null ? item.quantity : Math.min(remainingToCancel, item.quantity);
+          if (cancelQty !== null) remainingToCancel -= removeQty;
+          const leftQty = item.quantity - removeQty;
+          if (leftQty > 0) {
+            updatedItems.push({ ...item, quantity: leftQty });
+          }
+        }
         const grandTotal = updatedItems.reduce((acc, i) => acc + (i.price * i.quantity), 0);
-        
+
         await prisma.order.update({
           where: { id: order.id },
           data: {
@@ -325,18 +345,23 @@ router.put('/cancel-requests/:id', protect, async (req, res) => {
           where: { orderId: order.id, paymentStatus: 'Pending' }
         });
         if (pendingBill) {
-          const newGst = Math.round(grandTotal * 0.05 * 100) / 100;
-          const newGrandTotal = Math.round((grandTotal + newGst - pendingBill.discount + (pendingBill.containerCharge || 0)) * 100) / 100;
-          
+          const billGstPct = pendingBill.gstPct || 18; // honour the bill's own GST %
+          const safeDiscount = Math.min(pendingBill.discount || 0, grandTotal);
+          const newGst = Math.round(grandTotal * (billGstPct / 100) * 100) / 100;
+          const newGrandTotal = Math.max(0,
+            Math.round((grandTotal + newGst - safeDiscount + (pendingBill.containerCharge || 0)) * 100) / 100
+          );
+
           const updatedBill = await prisma.bill.update({
             where: { id: pendingBill.id },
             data: {
               subtotal: grandTotal,
               gst: newGst,
+              discount: safeDiscount,
               grandTotal: newGrandTotal
             }
           });
-          
+
           const io = req.app.get('io');
           io.emit('bill_generated', updatedBill); // broadcast updated bill
         }

@@ -1,38 +1,32 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { translations } from '../translations/translations';
-import { 
+import {
   MenuSquare, Plus, X, Edit, Trash2,
   ToggleLeft, ToggleRight
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { MenuItem, MenuItemVariant } from '../types/types';
+import { getCategoryLabel } from '../utils/categories';
 import { toast } from 'sonner';
 
 type PortionMode = 'Single' | 'Variant';
-type CategoryType = 'Vegetarian' | 'Egg Curry' | 'Breads' | 'Rice' | 'Papad' | 'Starters' | 'Curries' | 'Handi Dishes';
 
 const MenuManagement: React.FC = () => {
-  const { menuItems, addMenuItem, updateMenuItem, deleteMenuItem, language } = useApp();
+  const { menuItems, addMenuItem, updateMenuItem, deleteMenuItem, language, allCategories, addCategory } = useApp();
   const t = translations[language];
 
-  const getCategoryLabel = (cat: CategoryType | 'All') => {
-    switch(cat) {
-      case 'All': return language === 'mr' ? 'सर्व आयटम (All)' : 'All Items';
-      case 'Vegetarian': return language === 'mr' ? 'वेज (Veg)' : 'Vegetarian';
-      case 'Egg Curry': return language === 'mr' ? 'अंडा करी (Egg)' : 'Egg Curry';
-      case 'Breads': return language === 'mr' ? 'चपाती (Breads)' : 'Breads';
-      case 'Rice': return language === 'mr' ? 'राईस (Rice)' : 'Rice';
-      case 'Papad': return language === 'mr' ? 'पापड (Papad)' : 'Papad';
-      case 'Starters': return language === 'mr' ? 'स्टार्टर (Starters)' : 'Starters';
-      case 'Curries': return language === 'mr' ? 'करी (Curries)' : 'Curries';
-      case 'Handi Dishes': return language === 'mr' ? 'हांडी (Handi)' : 'Handi Dishes';
+  // Filters state
+  const [selectedCategory, setSelectedCategory] = useState<string>('All');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // New category creation
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const handleCreateCategory = () => {
+    if (addCategory(newCategoryName)) {
+      setNewCategoryName('');
     }
   };
-
-  // Filters state
-  const [selectedCategory, setSelectedCategory] = useState<CategoryType | 'All'>('All');
-  const [searchQuery, setSearchQuery] = useState('');
 
   // Modal / Form state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -40,7 +34,7 @@ const MenuManagement: React.FC = () => {
 
   // Form Fields
   const [name, setName] = useState('');
-  const [category, setCategory] = useState<CategoryType>('Vegetarian');
+  const [category, setCategory] = useState<string>('Vegetarian');
   const [portionMode, setPortionMode] = useState<PortionMode>('Single');
   const [singlePrice, setSinglePrice] = useState<number>(100);
   const [singlePrepTime, setSinglePrepTime] = useState<number>(10);
@@ -75,7 +69,7 @@ const MenuManagement: React.FC = () => {
   const handleOpenEditModal = (item: MenuItem) => {
     setEditingItem(item);
     setName(item.name);
-    setCategory(item.category as CategoryType);
+    setCategory(item.category);
     setPortionMode(item.portionMode);
     setSinglePrice(item.price || 0);
     setSinglePrepTime(item.prepTime || 10);
@@ -161,8 +155,8 @@ const MenuManagement: React.FC = () => {
       </div>
 
       {/* Category Navigation Bar */}
-      <div className="flex flex-wrap gap-2 pb-2 border-b border-slate-200">
-        {(['All', 'Vegetarian', 'Egg Curry', 'Breads', 'Rice', 'Papad', 'Starters', 'Curries', 'Handi Dishes'] as const).map(cat => (
+      <div className="flex flex-wrap items-center gap-2 pb-2 border-b border-slate-200">
+        {['All', ...allCategories].map(cat => (
           <button
             key={cat}
             onClick={() => setSelectedCategory(cat)}
@@ -172,9 +166,30 @@ const MenuManagement: React.FC = () => {
                 : 'bg-white border border-slate-200 hover:border-slate-300 text-slate-500 hover:text-slate-800'
             }`}
           >
-            {getCategoryLabel(cat)}
+            {getCategoryLabel(cat, language)}
           </button>
         ))}
+
+        {/* Create new category inline */}
+        <div className="flex items-center gap-1.5 ml-auto">
+          <input
+            type="text"
+            value={newCategoryName}
+            onChange={e => setNewCategoryName(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleCreateCategory(); } }}
+            placeholder="New category…"
+            maxLength={30}
+            className="w-36 px-3 py-2 bg-white border border-dashed border-emerald-400 rounded-xl text-xs font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:border-emerald-500"
+          />
+          <button
+            onClick={handleCreateCategory}
+            className="px-3 py-2 rounded-xl text-xs font-bold border border-emerald-500/20 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 cursor-pointer transition flex items-center gap-1"
+            title="Create category"
+          >
+            <Plus size={12} />
+            Add
+          </button>
+        </div>
       </div>
 
       {/* Search Bar */}
@@ -209,7 +224,7 @@ const MenuManagement: React.FC = () => {
             <div className="p-4 space-y-1">
               <div className="flex justify-between items-start">
                 <span className="text-[9px] font-bold uppercase text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-150">
-                  {getCategoryLabel(item.category as CategoryType)}
+                  {getCategoryLabel(item.category, language)}
                 </span>
                 <span className={`w-2.5 h-2.5 rounded-full ${item.isAvailable ? 'bg-emerald-500' : 'bg-rose-500'}`} />
               </div>
@@ -321,17 +336,12 @@ const MenuManagement: React.FC = () => {
                     <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Category</label>
                     <select
                       value={category}
-                      onChange={e => setCategory(e.target.value as CategoryType)}
+                      onChange={e => setCategory(e.target.value)}
                       className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-emerald-500"
                     >
-                      <option value="Vegetarian">Vegetarian (वेज)</option>
-                      <option value="Egg Curry">Egg Curry (अंडा करी)</option>
-                      <option value="Breads">Breads (चपाती)</option>
-                      <option value="Rice">Rice (राईस)</option>
-                      <option value="Papad">Papad (पापड)</option>
-                      <option value="Starters">Starters (स्टार्टर)</option>
-                      <option value="Curries">Curries (करी)</option>
-                      <option value="Handi Dishes">Handi Dishes (हांडी)</option>
+                      {allCategories.map(cat => (
+                        <option key={cat} value={cat}>{getCategoryLabel(cat, language)}</option>
+                      ))}
                     </select>
                   </div>
 

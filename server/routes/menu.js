@@ -95,7 +95,9 @@ router.delete('/:id', protect, authorize('SuperAdmin', 'Manager'), async (req, r
     });
 
     const io = req.app.get('io');
-    io.emit('menu_changed', item);
+    // Dedicated event: clients remove the item. Do NOT emit menu_changed here
+    // (its handler upserts, which would resurrect the deleted item).
+    io.emit('menu_deleted', { id: item.id });
 
     res.json({ success: true, data: item });
   } catch (error) {

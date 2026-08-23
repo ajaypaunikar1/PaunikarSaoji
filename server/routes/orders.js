@@ -274,4 +274,37 @@ router.put('/:id/status', protect, async (req, res) => {
   }
 });
 
+// @route   DELETE /api/orders/:id
+// @desc    Delete an unbilled order (used by table merge to retire source orders)
+router.delete('/:id', protect, async (req, res) => {
+  try {
+    const order = await prisma.order.findUnique({ where: { id: req.params.id } });
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Order not found' });
+    }
+
+    // Safety: never delete an order that already has a bill against it
+    const bill = await prisma.bill.findFirst({ where: { orderId: order.id } });
+    if (bill) {
+      return res.status(409).json({ success: false, message: 'Order has a bill and cannot be deleted' });
+    }
+
+    // Release any table still pointing at this order
+    await prisma.table.updateMany({
+      where: { orderId: order.id },
+      data: { orderId: null }
+    });
+
+    await prisma.order.delete({ where: { id: order.id } });
+
+    const io = req.app.get('io');
+    io.emit('orders_sync', await prisma.order.findMany({}));
+    io.emit('tables_sync', await prisma.table.findMany({ orderBy: { id: 'asc' } }));
+
+    res.json({ success: true, data: order });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 export default router;

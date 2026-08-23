@@ -132,17 +132,15 @@ const Billing: React.FC = () => {
   };
 
   // Standalone Printer Trigger (Print Bill without checking out)
+  // Prints the in-memory preview bill — no DB record is created, so prebill
+  // prints never pollute pending-dues / reports.
   const handlePrintOnly = async () => {
     if (!selectedOrder || !activeBill) {
       toast.error('Select an active order to print bill');
       return;
     }
     try {
-      const discountAmt = Math.round(selectedOrder.grandTotal * (discountPct / 100) * 100) / 100;
-      const containerCharge = selectedParcelId ? containerCount * 10 : 0;
-      const finalBill = selectedParcelId
-        ? await generateParcelBill(selectedOrder.id, discountAmt, customGstPct, containerCharge)
-        : await generateBill(selectedTableId!, discountAmt, customGstPct);
+      const finalBill = activeBill as Bill;
       const waiterName = users.find(u => u.id === selectedOrder.waiterId)?.name || 'Staff';
 
       // Physical thermal printing via Web Serial (performed on this device).
@@ -182,7 +180,7 @@ const Billing: React.FC = () => {
   };
 
   // Submit Cancellation Request to Manager or Cancel Directly
-  const triggerCancelRequest = (itemId: string, itemName: string, portion: string) => {
+  const triggerCancelRequest = (itemId: string, itemName: string, portion: string, quantity: number) => {
     if (!selectedOrder || !cancelReason.trim()) {
       toast.error('Please enter a cancellation reason');
       return;
@@ -191,11 +189,14 @@ const Billing: React.FC = () => {
     const canCancelDirectly = ['SuperAdmin', 'Admin', 'Manager', 'Cashier'].includes(currentUser?.role || '');
 
     if (canCancelDirectly) {
-      const updatedItems = selectedOrder.items.filter(item => item.id !== itemId);
+      const updatedItems = selectedOrder.items
+        .map(item => item.id === itemId ? { ...item, quantity: item.quantity - 1 } : item)
+        .filter(item => item.quantity > 0);
       updateOrder(selectedOrder.id, { items: updatedItems });
-      toast.success(`${itemName} removed successfully`);
+      toast.success(`1 x ${itemName} removed successfully`);
     } else {
-      requestCancellation(selectedOrder.id, `${itemName} (${portion})`, cancelReason);
+      // Encode quantity so approval can do a partial cancel: "Name (Full) x2"
+      requestCancellation(selectedOrder.id, `${itemName} (${portion}) x${quantity}`, cancelReason);
     }
 
     setCancelReason('');
@@ -386,7 +387,7 @@ const Billing: React.FC = () => {
                                 Cancel
                               </button>
                               <button 
-                                onClick={() => triggerCancelRequest(item.id, item.name, item.portion)}
+                                onClick={() => triggerCancelRequest(item.id, item.name, item.portion, item.quantity)}
                                 className="px-2 py-1 bg-rose-500 hover:bg-rose-650 text-white rounded font-bold text-[9px] cursor-pointer"
                               >
                                 Submit

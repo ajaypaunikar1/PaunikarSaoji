@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useMemo } from 'react';
 import type { ReactNode } from 'react';
 import type { 
   User, Table, Order, MenuItem, Attendance, LeaveRequest, 
@@ -7,6 +7,12 @@ import type {
 } from '../types/types';
 import { toast } from 'sonner';
 import { io } from 'socket.io-client';
+import {
+  buildCategoryList,
+  loadCustomCategories,
+  normalizeCategoryName,
+  saveCustomCategories
+} from '../utils/categories';
 
 let notificationAudio: HTMLAudioElement | null = null;
 if (typeof window !== 'undefined') {
@@ -59,6 +65,8 @@ interface AppContextType {
   language: 'en' | 'mr';
   mergedGroups: number[][];
   zones: string[];
+  allCategories: string[];
+  addCategory: (name: string) => boolean;
   login: (username: string, password?: string, role?: UserRole) => boolean;
   logout: () => void;
   addOrder: (tableId: number, items: Omit<Order['items'][0], 'id'>[], notes?: string) => Promise<Order>;
@@ -269,6 +277,39 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [language, setLanguage] = useState<'en' | 'mr'>('en');
   const [mergedGroups, setMergedGroups] = useState<number[][]>([]);
   const [zones, setZones] = useState<string[]>(['A', 'B', 'C']);
+
+  // User-created menu categories (device-persisted; categories that have
+  // items additionally sync to every device via the menu data itself).
+  const [customCategories, setCustomCategories] = useState<string[]>(() => loadCustomCategories());
+  const allCategories = useMemo(
+    () => buildCategoryList(menuItems, customCategories),
+    [menuItems, customCategories]
+  );
+
+  const addCategory = (rawName: string): boolean => {
+    const name = normalizeCategoryName(rawName);
+    if (!name) {
+      toast.error('Category name cannot be empty');
+      return false;
+    }
+    if (name.length > 30) {
+      toast.error('Category name is too long (max 30 characters)');
+      return false;
+    }
+    const exists = buildCategoryList(menuItems, customCategories)
+      .some(c => c.toLowerCase() === name.toLowerCase());
+    if (exists) {
+      toast.error(`Category "${name}" already exists`);
+      return false;
+    }
+    const next = [...customCategories, name];
+    setCustomCategories(next);
+    saveCustomCategories(next);
+    toast.success(`Category "${name}" created`);
+    addAuditLog(`Created menu category ${name}`);
+    return true;
+  };
+
   const [settings, setSettings] = useState<any>(null);
   const [systemStatus, setSystemStatus] = useState<{ server: 'online' | 'offline'; database: 'connected' | 'disconnected' }>({
     server: 'offline',
@@ -568,6 +609,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               return exists ? prev.map(m => m.id === data.id ? data : m) : [...prev, data];
             });
           });
+          socket.on('menu_deleted', (data: { id: string }) => {
+            if (isAborted) return;
+            setMenuItems(prev => prev.filter(m => m.id !== data.id));
+          });
           socket.on('leave_requested', (data: LeaveRequest) => {
             if (isAborted) return;
             setLeaves(prev => [data, ...prev]);
@@ -857,7 +902,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         throw new Error(res.message || 'Failed to create order');
       } catch (e: any) {
         toast.error(e.message || 'Failed to create order');
+        // Offline fallback: keep the order AND occupy the table so billing
+        // can still find it via table.orderId.
         setOrders(prev => [...prev, newOrder]);
+        setTables(prev => prev.map(t => t.id === tableId ? {
+          ...t,
+          status: 'Occupied',
+          orderId,
+          waiterId,
+          guests: t.guests || 2
+        } : t));
         return newOrder;
       }
     } else {
@@ -959,8 +1013,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     const subtotal = orderObj.grandTotal;
     const gst = Math.round(subtotal * (gstPct / 100) * 100) / 100;
-    const grandTotal = Math.round((subtotal + gst - discount + containerCharge) * 100) / 100;
-    const discountPct = subtotal > 0 ? Math.round((discount / subtotal) * 100 * 100) / 100 : 0;
+    const safeDiscount = Math.max(0, Math.min(discount, subtotal + gst)); // never go negative
+    const grandTotal = Math.round((subtotal + gst - safeDiscount + containerCharge) * 100) / 100;
+    const discountPct = subtotal > 0 ? Math.round((safeDiscount / subtotal) * 100 * 100) / 100 : 0;
 
     const newBill: Bill = {
       id: `bill-${Date.now()}`,
@@ -970,7 +1025,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       subtotal,
       gst,
       gstPct,
-      discount,
+      discount: safeDiscount,
       discountPct,
       containerCharge,
       grandTotal,
@@ -992,7 +1047,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         throw new Error(res.message || "Failed to generate parcel bill");
       }
     } else {
-      setBills(prev => [...prev, newBill]);
+      // Reuse an existing pending bill for this order (mirrors server dedupe)
+      const existingPending = bills.find(b => b.orderId === orderObj.id && b.paymentStatus === 'Pending');
+      const storedBill: Bill = existingPending
+        ? { ...newBill, id: existingPending.id }
+        : newBill;
+
+      setBills(prev => {
+        if (existingPending) {
+          return prev.map(b => b.id === existingPending.id ? storedBill : b);
+        }
+        return [...prev, newBill];
+      });
       const newNotif: Notification = {
         id: `notif-${Date.now()}`,
         title: 'Parcel Bill Generated',
@@ -1002,9 +1068,23 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         read: false
       };
       setNotifications(prev => [newNotif, ...prev]);
-      addAuditLog(`Generated parcel bill ${newBill.id}`);
-      return newBill;
+      addAuditLog(`Generated parcel bill ${storedBill.id}`);
+      return storedBill;
     }
+  };
+
+  const applyUpdateOrderLocal = (orderId: string, updates: Partial<Order>) => {
+    setOrders(prev => prev.map(o => {
+      if (o.id === orderId) {
+        const updated = { ...o, ...updates };
+        if (updates.items) {
+          updated.grandTotal = updates.items.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+        }
+        return updated;
+      }
+      return o;
+    }));
+    addAuditLog(`Updated Order ${orderId}`);
   };
 
   const updateOrder = (orderId: string, updates: Partial<Order>) => {
@@ -1013,19 +1093,48 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         method: 'PUT',
         headers: getHeaders(),
         body: JSON.stringify(updates)
+      }).then(res => {
+        if (!res.ok) throw new Error('Update rejected');
+      }).catch(() => {
+        // Server unreachable/rejected: apply locally so UI stays consistent
+        // (KDS ticks, merges etc. depend on this state).
+        applyUpdateOrderLocal(orderId, updates);
+        toast.error('Could not reach server — change applied locally only');
       });
     } else {
-      setOrders(prev => prev.map(o => {
-        if (o.id === orderId) {
-          const updated = { ...o, ...updates };
-          if (updates.items) {
-            updated.grandTotal = updates.items.reduce((acc, item) => acc + (item.price * item.quantity), 0);
-          }
-          return updated;
+      applyUpdateOrderLocal(orderId, updates);
+    }
+  };
+
+  const applyUpdateOrderStatusLocal = (orderId: string, status: Order['status']) => {
+    setOrders(prev => prev.map(o => {
+      if (o.id === orderId) {
+        if (status === 'Preparing') {
+          toast.info(`Table ${o.tableId} order is now being Prepared.`);
+        } else if (status === 'Ready') {
+          toast.success(`Table ${o.tableId} order is Ready!`, {
+            duration: 5000,
+            description: 'Please pick up and serve.'
+          });
         }
-        return o;
-      }));
-      addAuditLog(`Updated Order ${orderId}`);
+        const updatedItems = o.items.map(i => i.status === 'Served' ? i : { ...i, status });
+        return { ...o, status, items: updatedItems };
+      }
+      return o;
+    }));
+
+    const ord = orders.find(o => o.id === orderId);
+    if (ord) {
+      const newNotif: Notification = {
+        id: `notif-${Date.now()}`,
+        title: `Order ${status} - Table ${ord.tableId}`,
+        message: `Order #${ord.id.substring(4, 8)} status changed to ${status}`,
+        type: 'Kitchen',
+        timestamp: new Date().toLocaleTimeString(),
+        read: false
+      };
+      setNotifications(prev => [newNotif, ...prev]);
+      addAuditLog(`Order ${orderId} status changed to ${status}`);
     }
   };
 
@@ -1035,37 +1144,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         method: 'PUT',
         headers: getHeaders(),
         body: JSON.stringify({ status })
+      }).then(res => {
+        if (!res.ok) throw new Error('Status update rejected');
+      }).catch(() => {
+        applyUpdateOrderStatusLocal(orderId, status);
+        toast.error('Could not reach server — status applied locally only');
       });
     } else {
-      setOrders(prev => prev.map(o => {
-        if (o.id === orderId) {
-          if (status === 'Preparing') {
-            toast.info(`Table ${o.tableId} order is now being Prepared.`);
-          } else if (status === 'Ready') {
-            toast.success(`Table ${o.tableId} order is Ready!`, {
-              duration: 5000,
-              description: 'Please pick up and serve.'
-            });
-          }
-          const updatedItems = o.items.map(i => i.status === 'Served' ? i : { ...i, status });
-          return { ...o, status, items: updatedItems };
-        }
-        return o;
-      }));
-
-      const ord = orders.find(o => o.id === orderId);
-      if (ord) {
-        const newNotif: Notification = {
-          id: `notif-${Date.now()}`,
-          title: `Order ${status} - Table ${ord.tableId}`,
-          message: `Order #${ord.id.substring(4, 8)} status changed to ${status}`,
-          type: 'Kitchen',
-          timestamp: new Date().toLocaleTimeString(),
-          read: false
-        };
-        setNotifications(prev => [newNotif, ...prev]);
-        addAuditLog(`Order ${orderId} status changed to ${status}`);
-      }
+      applyUpdateOrderStatusLocal(orderId, status);
     }
   };
 
@@ -1168,7 +1254,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       waiterId: currentUser?.id || destTable.waiterId || 'u5',
       items: consolidatedItems,
       status: 'Pending',
-      notes: mergedNotes.join(' | '),
+      notes: [...new Set(mergedNotes.filter(Boolean))].join(' | '),
       timestamp: getISTTime(),
       grandTotal
     };
@@ -1177,12 +1263,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (destTable.orderId) oldOrderIds.push(destTable.orderId);
 
     if (isBackendMode) {
-      // Clear source tables, create main order on destination
+      // Create consolidated master order on destination, then retire the old
+      // source orders so they are not double-counted in reports / KDS.
       fetch(`${API_BASE}/orders`, {
         method: 'POST',
         headers: getHeaders(),
         body: JSON.stringify({ tableId: destinationId, items: consolidatedItems, notes: mergedNotes.join(' | ') })
-      }).then(() => {
+      }).then(async () => {
+        // Delete unbilled source orders (server refuses billed ones)
+        await Promise.all(oldOrderIds.map(oid =>
+          fetch(`${API_BASE}/orders/${oid}`, { method: 'DELETE', headers: getHeaders() }).catch(() => undefined)
+        ));
+
         // Put source tables to cleaning status
         sourceIds.forEach(sid => {
           fetch(`${API_BASE}/tables/${sid}/status`, {
@@ -1247,12 +1339,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
         if (moveQty > 0) {
           targetOrderItems.push({
-            id: `item-${Date.now()}-${item.id.substring(0, 4)}`,
+            // Preserve the original menuItem id / category / spice so Repeat,
+            // cancellation lookups and UI chips keep working on the new ticket.
+            id: item.id,
             name: item.name,
+            category: item.category,
             quantity: moveQty,
             portion: item.portion,
             price: item.price,
-            specialNotes: item.specialNotes
+            specialNotes: item.specialNotes,
+            spiceLevel: item.spiceLevel,
+            status: 'Pending',
+            // Moved quantity was never printed under this new table's KOT.
+            printedQty: 0
           });
         }
         if (stayQty > 0) {
@@ -1338,8 +1437,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     const subtotal = order.grandTotal;
     const gst = Math.round(subtotal * (gstPct / 100) * 100) / 100;
-    const grandTotal = Math.round((subtotal + gst - discount) * 100) / 100;
-    const discountPct = subtotal > 0 ? Math.round((discount / subtotal) * 100 * 100) / 100 : 0;
+    const safeDiscount = Math.max(0, Math.min(discount, subtotal + gst)); // never go negative
+    const grandTotal = Math.round((subtotal + gst - safeDiscount) * 100) / 100;
+    const discountPct = subtotal > 0 ? Math.round((safeDiscount / subtotal) * 100 * 100) / 100 : 0;
 
     const newBill: Bill = {
       id: `bill-${Date.now()}`,
@@ -1348,7 +1448,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       subtotal,
       gst,
       gstPct,
-      discount,
+      discount: safeDiscount,
       discountPct,
       grandTotal,
       paymentStatus: 'Pending',
@@ -1369,7 +1469,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         throw new Error(res.message || "Failed to generate bill");
       }
     } else {
-      setBills(prev => [...prev, newBill]);
+      // Reuse an existing pending bill for this order (mirrors server dedupe)
+      const existingPending = bills.find(b => b.orderId === order.id && b.paymentStatus === 'Pending');
+      const storedBill: Bill = existingPending
+        ? { ...newBill, id: existingPending.id }
+        : newBill;
+
+      setBills(prev => {
+        if (existingPending) {
+          return prev.map(b => b.id === existingPending.id ? storedBill : b);
+        }
+        return [...prev, newBill];
+      });
       setTableStatus(tableId, 'Billing');
 
       const newNotif: Notification = {
@@ -1381,8 +1492,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         read: false
       };
       setNotifications(prev => [newNotif, ...prev]);
-      addAuditLog(`Generated bill ${newBill.id} for Table ${tableId}`);
-      return newBill;
+      addAuditLog(`Generated bill ${storedBill.id} for Table ${tableId}`);
+      return storedBill;
     }
   };
 
@@ -1628,10 +1739,30 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setCancellationRequests(prev => prev.map(c => c.id === reqId ? { ...c, status: 'Approved' } : c));
       setOrders(prev => prev.map(o => {
         if (o.id === req.orderId) {
-          const cleanedItems = o.items.filter(item => {
-            const detail = `${item.name} (${item.portion})`;
-            return detail.toLowerCase() !== req.itemText.toLowerCase() && item.name.toLowerCase() !== req.itemText.toLowerCase();
-          });
+          // itemText format: "<name> (<portion>) x<qty>" — x<qty> suffix optional;
+          // legacy requests without it cancel the entire line.
+          const qtyMatch = req.itemText.match(/\s*x(\d+)\s*$/i);
+          const cancelQty = qtyMatch ? parseInt(qtyMatch[1], 10) : null;
+          const baseText = req.itemText.replace(/\s*x\d+\s*$/i, '').trim().toLowerCase();
+
+          let remainingToCancel = cancelQty;
+          const cleanedItems: OrderItem[] = [];
+          for (const item of o.items) {
+            const detail = `${item.name} (${item.portion})`.toLowerCase();
+            const matchesLine =
+              (!cancelQty || (remainingToCancel ?? 0) > 0) &&
+              (detail === baseText || item.name.toLowerCase() === baseText);
+            if (!matchesLine) {
+              cleanedItems.push(item);
+              continue;
+            }
+            const removeQty = cancelQty === null ? item.quantity : Math.min(remainingToCancel!, item.quantity);
+            if (cancelQty !== null) remainingToCancel = (remainingToCancel ?? 0) - removeQty;
+            const leftQty = item.quantity - removeQty;
+            if (leftQty > 0) {
+              cleanedItems.push({ ...item, quantity: leftQty });
+            }
+          }
           const grandTotal = cleanedItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
           return { ...o, items: cleanedItems, grandTotal };
         }
@@ -2010,7 +2141,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       rejectCancellation, addEmployee, updateEmployee, changeLanguage, addMenuItem,
       updateMenuItem, deleteMenuItem, clearNotification, clearAllNotifications, addAuditLog, setTableStatus,
       assignWaiter, deleteEmployee, saveAttendance, addTable, removeTable, updateTableLayout,
-      addZone, removeZone, unmergeTables, resetAllOrders, settings, updateSettings, systemStatus
+      addZone, removeZone, unmergeTables, resetAllOrders, settings, updateSettings, systemStatus,
+      allCategories, addCategory
     }}>
       {children}
     </AppContext.Provider>
