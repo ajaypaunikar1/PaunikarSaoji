@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { usePrinter } from '../context/PrinterContext';
 import RolePrinterButton from '../components/RolePrinterButton';
@@ -7,7 +7,7 @@ import {
   ChefHat, Play, CheckCheck, Check, Printer, Clock, Sparkles, X, Zap
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import type { Order, OrderStatus, OrderItem } from '../types/types';
+import type { Order, OrderStatus } from '../types/types';
 
 // Component: Kitchen Order Card Timer
 const OrderTimer: React.FC<{ timestamp: string }> = ({ timestamp }) => {
@@ -68,21 +68,12 @@ const KDS: React.FC = () => {
 
   const activeOrders = orders.filter(o => o.status !== 'Served' && !paidOrderIds.has(o.id));
 
-  // Auto-print KOT for brand new / appended items via Web Serial.
-  // Every item carries `printedQty` — the persistent "tick" marking what was
-  // already printed on a previous KOT. Only unprinted (non-ticked) quantity
-  // is printed, then it gets ticked so it never reprints.
-  const initializedRef = useRef<boolean>(false);
-  const mountedAtRef = useRef<number>(Date.now());
-  const printingKeysRef = useRef<Set<string>>(new Set());
-
-  const itemKey = (orderId: string, item: OrderItem) => `${orderId}::${item.name}::${item.portion}`;
-
-  const collectUnprinted = (order: Order, ignoreGuard = false) => {
-    const originals = order.items.filter(item =>
-      (item.printedQty ?? 0) < item.quantity &&
-      (ignoreGuard || !printingKeysRef.current.has(itemKey(order.id, item)))
-    );
+  // Printing is MANUAL ONLY via the per-card Print button.
+  // Every item carries `printedQty` — a persistent "tick" marking what was
+  // already printed on a previous KOT, so appended items show as
+  // "New Added" until the chef prints them.
+  const collectUnprinted = (order: Order) => {
+    const originals = order.items.filter(item => (item.printedQty ?? 0) < item.quantity);
     const printCopies = originals.map(item => ({
       ...item,
       quantity: item.quantity - (item.printedQty ?? 0)
@@ -90,46 +81,25 @@ const KDS: React.FC = () => {
     return { originals, printCopies };
   };
 
-  const printAndMarkPrinted = (order: Order, ignoreGuard = false): OrderItem[] => {
-    const { originals, printCopies } = collectUnprinted(order, ignoreGuard);
-    if (printCopies.length === 0) return [];
-
-    // Guard immediately so socket/polling re-renders don't double-print
-    originals.forEach(item => printingKeysRef.current.add(itemKey(order.id, item)));
-    printKOTThermal({ ...order, items: printCopies }, settings);
-
-    // Tick the printed items and persist so they are never printed again
-    const updatedItems = order.items.map(item =>
-      originals.includes(item) ? { ...item, printedQty: item.quantity } : item
-    );
-    updateOrder(order.id, { items: updatedItems });
-    return printCopies;
-  };
-
-  useEffect(() => {
-    if (!initializedRef.current) {
-      // Seed guard with everything present during initial bulk load so a page
-      // mount never triggers a reprint storm for existing orders. Fresh appends
-      // after mount still print because their items stay un-ticked.
-      orders.forEach(o => o.items.forEach(i => printingKeysRef.current.add(itemKey(o.id, i))));
-      initializedRef.current = true;
-      return;
-    }
-
-    // Grace period: suppress prints while initial data loads on mount.
-    if (Date.now() - mountedAtRef.current < 5000) return;
-
-    activeOrders.forEach(order => printAndMarkPrinted(order));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orders]);
-
   const handlePrintKOT = (order: Order) => {
-    // Manual print bypasses the in-memory guard but still respects the
-    // persisted tick — only non-ticked (never printed) items go out.
-    const printCopies = printAndMarkPrinted(order, true);
-    if (printCopies.length > 0) {
-      setPrintKOTData({ ...order, items: printCopies });
+    if (order.items.length === 0) return;
+
+    const { originals, printCopies } = collectUnprinted(order);
+    let copies = printCopies;
+
+    if (copies.length > 0) {
+      // Tick the printed items and persist so they are never auto-included again
+      const updatedItems = order.items.map(item =>
+        originals.includes(item) ? { ...item, printedQty: item.quantity } : item
+      );
+      updateOrder(order.id, { items: updatedItems });
+    } else {
+      // Everything already printed -> reprint the full ticket on demand
+      copies = order.items;
     }
+
+    printKOTThermal({ ...order, items: copies }, settings);
+    setPrintKOTData({ ...order, items: copies });
   };
 
   const getStatusActionLabel = (status: OrderStatus) => {
