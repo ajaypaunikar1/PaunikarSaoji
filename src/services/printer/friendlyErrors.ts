@@ -71,6 +71,11 @@ const HANDLERS: Record<string, Handler> = {
     detail: 'Data could not be sent to the printer.',
     steps: [...CONNECT_HELP, 'Check the printer for a paper jam or error light.']
   }),
+  BAD_BLE_SERVICE_UUID: () => ({
+    title: 'The BLE Service UUID is not valid.',
+    detail: 'Enter 4 hex digits (e.g. FF00) or the full 128-bit UUID.',
+    steps: ['Open Printer Settings > Advanced and correct the BLE Service UUID field.']
+  }),
   NO_BLE_SERVICE: () => ({
     title: 'This KP-307 is not a BLE printer.',
     detail: 'The printer does not expose a printable Bluetooth LE service to the browser.',

@@ -9,6 +9,22 @@ export type PrinterRole = 'KITCHEN' | 'BILLING' | 'PARCEL' | 'BAR';
 export type ConnectionType = 'BLUETOOTH' | 'BLE';
 export type EncodingMode = 'auto-raster' | 'utf8-codepage' | 'ascii-fold';
 
+/**
+ * GATT services commonly exposed by ESC/POS thermal printers. Web Bluetooth
+ * only permits access to services listed in requestDevice()'s optionalServices;
+ * an empty list makes Chrome reject every service with
+ * "Origin is not allowed to access any service".
+ */
+export const KNOWN_BLE_PRINTER_SERVICES: string[] = [
+  '6e400001-b5a3-f393-e0a9-e50e24dcca9e',
+  '49535343-fe7d-4ae5-8fa9-9fafd205e455',
+  '0000ff00-0000-1000-8000-00805f9b34fb',
+  '0000ffe0-0000-1000-8000-00805f9b34fb',
+  '0000fee7-0000-1000-8000-00805f9b34fb',
+  '000018f0-0000-1000-8000-00805f9b34fb',
+  'e7810a71-73ae-499d-8c15-faa9aef0c3f2'
+];
+
 export interface PrinterConfig {
   id: string;
   name: string;

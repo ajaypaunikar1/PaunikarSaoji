@@ -1,6 +1,19 @@
 import { WebSerialPrinterError } from './errors';
 import { errorCode } from './errors';
-import type { PrinterConfig } from './printerConfig';
+import { KNOWN_BLE_PRINTER_SERVICES, type PrinterConfig } from './printerConfig';
+
+const FULL_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const SHORT_UUID_RE = /^[0-9a-f]{4}$/;
+
+function normalizeBleServiceUuid(raw: string): string {
+  const v = raw.trim().toLowerCase();
+  if (FULL_UUID_RE.test(v)) return v;
+  if (SHORT_UUID_RE.test(v)) return `0000${v}-0000-1000-8000-00805f9b34fb`;
+  throw new WebSerialPrinterError(
+    'BAD_BLE_SERVICE_UUID',
+    `"${raw}" is not a valid BLE service UUID (use 4 hex digits or the full 128-bit form)`
+  );
+}
 
 /**
  * BluetoothPrinter - ONE BLE/GATT connection to ONE thermal printer.
@@ -73,8 +86,12 @@ export class BluetoothPrinter {
       );
     }
 
-    const optionalServices: Array<string | number> = [];
-    if (config.bleServiceUuid) optionalServices.push(config.bleServiceUuid);
+    const requested = config.bleServiceUuid
+      ? normalizeBleServiceUuid(config.bleServiceUuid)
+      : null;
+    const optionalServices: Array<string | number> = Array.from(
+      new Set([...KNOWN_BLE_PRINTER_SERVICES, ...(requested ? [requested] : [])])
+    );
 
     let device: BluetoothDevice;
     try {
@@ -162,14 +179,25 @@ export class BluetoothPrinter {
     config: PrinterConfig
   ): Promise<BluetoothRemoteGATTCharacteristic | null> {
     let services;
+    let wanted: string | null = null;
+    if (config.bleServiceUuid) {
+      try {
+        wanted = normalizeBleServiceUuid(config.bleServiceUuid);
+      } catch { /* malformed stored value - fall back to full discovery */ }
+    }
     try {
-      services = config.bleServiceUuid
-        ? [await gatt.getPrimaryService(config.bleServiceUuid)]
+      services = wanted
+        ? [await gatt.getPrimaryService(wanted)]
         : await gatt.getPrimaryServices();
     } catch (err) {
       const code = errorCode(err);
       if (code === 'NotFoundError') {
-        throw new WebSerialPrinterError('NO_BLE_SERVICE', 'No accessible BLE service on printer');
+        throw new WebSerialPrinterError(
+          'NO_BLE_SERVICE',
+          wanted
+            ? 'Printer does not expose the configured BLE service UUID'
+            : 'No accessible BLE service on printer'
+        );
       }
       throw new WebSerialPrinterError(
         'OPEN_FAILED',
