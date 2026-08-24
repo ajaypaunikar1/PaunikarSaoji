@@ -59,18 +59,24 @@ function logTimingSummary(timing: ConnectionTiming, label: string): void {
 const CHUNK_LADDER = [512, 240, 120, 52, 20];
 
 /**
- * Inter-chunk pacing for large payloads (raster bitmaps).
+ * Inter-chunk pacing so the wire rate stays below the print-engine rate.
  *
  * Cheap BLE printer firmware ACKs GATT writes instantly but buffers received
  * bytes in a very small RX ring. When we feed chunks faster than the thermal
  * head consumes them, the firmware silently drops bytes - and a byte lost
  * inside a GS v 0 raster body leaves the printer waiting for bitmap data that
  * never arrives, so the rest of the slip never prints ("stops midway").
- * Pausing briefly between chunks keeps the wire rate below the print rate.
+ *
+ * The delay scales with chunk size: 20-byte chunks are already spaced by
+ * their natural GATT round-trip, while 512-byte bursts need an explicit gap.
  */
-const CHUNK_PACE_MS = 12;
+const PACE_MS_PER_BYTE = 0.03;
 /** Payloads below this size print fast enough that pacing is unnecessary. */
 const PACE_THRESHOLD_BYTES = 1024;
+
+function paceDelayMs(chunkSize: number): number {
+  return Math.round(chunkSize * PACE_MS_PER_BYTE);
+}
 
 /** Hard ceiling for GATT connect + service discovery. Target: ≤ 10 s total. */
 const CONNECT_TIMEOUT_MS = 10000;
@@ -101,7 +107,7 @@ export class BluetoothPrinter {
   private characteristic: BluetoothRemoteGATTCharacteristic | null = null;
   private printing = false;
   private queue: Promise<void> = Promise.resolve();
-  /** Largest acknowledged payload proven to work on the current connection. */
+  /** Write mode this connection has proven to accept (skips re-probing). */
   private workingMode: WriteMode | null = null;
   /** Per-connection timing for the last successful connect. */
   private lastTiming: ConnectionTiming | null = null;
@@ -423,23 +429,28 @@ export class BluetoothPrinter {
   }
 
   /**
-   * Candidate write modes, ordered most-reliable-and-fastest first.
+   * Candidate write modes, ordered most-reliable-first (KP-307 proven).
    *
-   * writeWithResponse is preferred: ATT long writes guarantee up to 512-byte
-   * payloads regardless of negotiated MTU, and every block is ACKed by the
-   * printer (real flow control - critical for multi-KB raster bitmaps).
-   * writeWithoutResponse has no flow control and its payload must fit a single
-   * MTU packet, so it only appears with conservative sizes as a last resort.
+   * Unacknowledged writes come FIRST: this is the transport the separated
+   * print system shipped with and it never dropped the GATT link. Values
+   * larger than the negotiated MTU-3 are rejected LOCALLY by Chrome without
+   * touching the radio link, so walking this ladder on an MTU-23 unit costs
+   * nothing and simply lands on 20 bytes - the vendor-app configuration these
+   * firmwares are engineered for.
+   *
+   * Acknowledged long writes (Prepare/Execute Write) are LAST RESORT only:
+   * cheap BLE 4.x firmware stalls or resets the link when subjected to them,
+   * which showed up as random mid-print disconnections.
    */
   private writeModes(ch: BluetoothRemoteGATTCharacteristic): WriteMode[] {
     const modes: WriteMode[] = [];
-    if (ch.properties.write) {
-      for (const size of CHUNK_LADDER) modes.push({ withResponse: true, size });
-    }
     if (ch.properties.writeWithoutResponse) {
       for (const size of CHUNK_LADDER) {
         if (size <= 240) modes.push({ withResponse: false, size });
       }
+    }
+    if (ch.properties.write) {
+      for (const size of CHUNK_LADDER) modes.push({ withResponse: true, size });
     }
     return modes;
   }
@@ -473,7 +484,8 @@ export class BluetoothPrinter {
             await ch.writeValueWithoutResponse(chunk);
           }
           if (data.length > PACE_THRESHOLD_BYTES && end < data.length) {
-            await new Promise(resolve => setTimeout(resolve, CHUNK_PACE_MS));
+            const pace = paceDelayMs(mode.size);
+            if (pace > 0) await new Promise(resolve => setTimeout(resolve, pace));
           }
         }
         this.workingMode = mode;
