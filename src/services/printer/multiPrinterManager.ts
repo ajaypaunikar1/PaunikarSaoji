@@ -2,6 +2,7 @@ import { detectCapabilities, capabilityWarnings } from './capabilities';
 import type { BrowserCapabilities } from './capabilities';
 import { WebSerialPrinterError } from './errors';
 import { BluetoothPrinter } from './bluetoothPrinter';
+import type { ConnectionTiming } from './bluetoothPrinter';
 import { PrintQueue } from './printQueue';
 import type { PrintJob, PrintJobKind } from './printQueue';
 import {
@@ -13,7 +14,11 @@ import type { PrinterConfig, PrinterRole } from './printerConfig';
 
 export type PrinterConnState =
   | 'disconnected'
+  | 'discovering'
+  | 'device_found'
   | 'pairing'
+  | 'connecting'
+  | 'discovering_services'
   | 'connected'
   | 'reconnecting'
   | 'error';
@@ -32,6 +37,8 @@ export interface PrinterStatusInfo {
   jobs: PrintJob[];
   /** Full persisted configuration for this printer. */
   config: PrinterConfig;
+  /** Timing of last successful connection (for diagnostics). */
+  lastTiming: ConnectionTiming | null;
 }
 
 type StatusListener = (statuses: PrinterStatusInfo[]) => void;
@@ -50,6 +57,8 @@ interface PrinterEntry {
   reconnecting: boolean;
   reconnectTimer: ReturnType<typeof setTimeout> | null;
   reconnectAttempts: number;
+  /** Track if we're in the middle of a connection attempt to prevent duplicates. */
+  connecting: boolean;
 }
 
 /**
@@ -100,7 +109,8 @@ class MultiPrinterManager {
         intentionalDisconnect: false,
         reconnecting: false,
         reconnectTimer: null,
-        reconnectAttempts: 0
+        reconnectAttempts: 0,
+        connecting: false
       };
       this.entries.set(config.id, entry);
     }
@@ -209,7 +219,8 @@ class MultiPrinterManager {
       connection: e.ble.describe(),
       lastError: e.lastError,
       jobs: e.queue.snapshot(),
-      config: { ...e.config }
+      config: { ...e.config },
+      lastTiming: e.ble.getLastTiming()
     }));
   }
 
@@ -267,18 +278,26 @@ class MultiPrinterManager {
       );
     }
     if (entry.ble.isConnected()) return;
-    if (entry.state === 'pairing') {
+    if (entry.connecting || entry.state === 'pairing') {
       throw new WebSerialPrinterError(
         'BUSY',
         `${entry.config.name} is already connecting - wait a moment`
       );
     }
 
-    entry.state = 'pairing';
+    entry.connecting = true;
+    entry.state = 'discovering';
     entry.lastError = null;
     this.emit();
+
     try {
+      entry.state = 'pairing';
+      this.emit();
+
       const device = await entry.ble.pair(entry.config);
+      entry.state = 'device_found';
+      this.emit();
+
       const duplicate = [...this.entries.entries()].find(
         ([id, e]) => id !== printerId && !!e.config.deviceId && e.config.deviceId === device.id
       );
@@ -289,6 +308,10 @@ class MultiPrinterManager {
           `That unit is already bound to ${other.config.name}. Choose your OTHER KP-307 in the browser list (both may share the same name).`
         );
       }
+
+      entry.state = 'connecting';
+      this.emit();
+
       await entry.ble.connectDevice(device, entry.config);
       entry.config = { ...entry.config, deviceId: device.id };
       this.upsertConfig(entry.config);
@@ -299,6 +322,7 @@ class MultiPrinterManager {
       entry.lastError = err instanceof Error ? err.message : String(err);
       throw err;
     } finally {
+      entry.connecting = false;
       this.emit();
     }
   }
@@ -382,6 +406,9 @@ class MultiPrinterManager {
       if (!deviceId || !entry.config.enabled || entry.ble.isConnected()) continue;
       const device = granted.find(d => d.id === deviceId);
       if (!device) continue;
+      entry.connecting = true;
+      entry.state = 'connecting';
+      this.emit();
       try {
         await entry.ble.connectDevice(device, entry.config);
         entry.state = 'connected';
@@ -389,9 +416,11 @@ class MultiPrinterManager {
       } catch (err) {
         entry.state = 'error';
         entry.lastError = err instanceof Error ? err.message : String(err);
+      } finally {
+        entry.connecting = false;
+        this.emit();
       }
     }
-    this.emit();
   }
 
   private handleUnexpectedDrop(printerId: string): void {
@@ -530,6 +559,13 @@ class MultiPrinterManager {
 
   clearFinishedJobs(): void {
     for (const e of this.entries.values()) e.queue.clearFinished();
+  }
+
+  /** Get connection timing for a specific printer (for diagnostics). */
+  getTiming(printerId: string): ConnectionTiming | null {
+    this.init();
+    const entry = this.entries.get(printerId);
+    return entry?.ble.getLastTiming() ?? null;
   }
 
   private emit(): void {

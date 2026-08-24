@@ -1,19 +1,10 @@
-'use client';
-import React, {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-  useCallback,
-  useMemo
-} from 'react';
-import type { ReactNode } from 'react';
 import { toast } from 'sonner';
 import { printerHub } from '../services/printer/multiPrinterManager';
 import { BluetoothPrinter } from '../services/printer/bluetoothPrinter';
 import type { PrinterStatusInfo } from '../services/printer/multiPrinterManager';
+import type { ConnectionTiming } from '../services/printer/bluetoothPrinter';
 import type { ReceiptOptions } from '../utils/escpos';
-import { staffErrorMessage, toStaffError } from '../services/printer/friendlyErrors';
+import { toStaffError } from '../services/printer/friendlyErrors';
 import type { StaffError } from '../services/printer/friendlyErrors';
 import { generateKOT, generateBillReceipt, generateTestPrint } from '../utils/escpos';
 import type { ReceiptSettings } from '../utils/escpos';
@@ -53,6 +44,7 @@ interface PrinterContextType {
   cancelJob: (printerId: string, jobId: string) => void;
   clearFinishedJobs: () => void;
   getDiagnostics: () => Record<string, unknown>;
+  getTiming: (printerId: string) => ConnectionTiming | null;
   // ----- configuration CRUD (settings page) -----
   savePrinterConfig: (config: PrinterConfig) => void;
   removePrinterConfig: (printerId: string) => void;
@@ -284,6 +276,10 @@ export const PrinterProvider: React.FC<{ children: ReactNode }> = ({ children })
     return printerHub.diagnostics();
   }, []);
 
+  const getTiming = useCallback((printerId: string): ConnectionTiming | null => {
+    return printerHub.getTiming(printerId);
+  }, []);
+
   const savePrinterConfig = useCallback((config: PrinterConfig): void => {
     printerHub.upsertConfig(config);
   }, []);
@@ -329,6 +325,7 @@ export const PrinterProvider: React.FC<{ children: ReactNode }> = ({ children })
         cancelJob,
         clearFinishedJobs,
         getDiagnostics,
+        getTiming,
         savePrinterConfig,
         removePrinterConfig,
         swapPrinters,

@@ -4,17 +4,22 @@ import { usePrinter } from '../context/PrinterContext';
 import { useApp } from '../context/AppContext';
 import {
   Printer, Plug, Unplug, FlaskConical, Activity,
-  Plus, Trash2, RefreshCw, XCircle, Stethoscope, ArrowLeftRight
+  Plus, Trash2, RefreshCw, XCircle, Stethoscope, ArrowLeftRight, Timer
 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { PrinterConfig, PrinterRole } from '../services/printer/printerConfig';
+import type { PrinterConnState } from '../services/printer/multiPrinterManager';
 
 const ROLES: PrinterRole[] = ['KITCHEN', 'BILLING', 'PARCEL', 'BAR'];
 
-const STATE_PILL: Record<string, { label: string; cls: string }> = {
+const STATE_PILL: Record<PrinterConnState, { label: string; cls: string }> = {
   connected: { label: 'Connected', cls: 'bg-emerald-50 border-emerald-200 text-emerald-700' },
   disconnected: { label: 'Disconnected', cls: 'bg-slate-50 border-slate-200 text-slate-600' },
+  discovering: { label: 'Discovering...', cls: 'bg-amber-50 border-amber-200 text-amber-700 animate-pulse' },
+  device_found: { label: 'Device Found', cls: 'bg-amber-50 border-amber-200 text-amber-700 animate-pulse' },
   pairing: { label: 'Pairing...', cls: 'bg-amber-50 border-amber-200 text-amber-700 animate-pulse' },
+  connecting: { label: 'Connecting...', cls: 'bg-amber-50 border-amber-200 text-amber-700 animate-pulse' },
+  discovering_services: { label: 'Services...', cls: 'bg-amber-50 border-amber-200 text-amber-700 animate-pulse' },
   reconnecting: { label: 'Reconnecting', cls: 'bg-amber-50 border-amber-200 text-amber-700 animate-pulse' },
   error: { label: 'Connection Error', cls: 'bg-rose-50 border-rose-200 text-rose-700' }
 };
@@ -237,6 +242,26 @@ const PrinterSettingsPage: React.FC = () => {
               {p.lastError && (
                 <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-[10px] text-rose-700 font-semibold">
                   {p.lastError}
+                </div>
+              )}
+
+              {p.lastTiming && p.lastTiming.printerReady && (
+                <div className="p-2.5 rounded-xl bg-indigo-50 border border-indigo-200 text-[9px] text-indigo-900 font-mono">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <Timer size={11} /> Last Connection Time
+                  </div>
+                  <div className="grid grid-cols-2 gap-1 text-[8px]">
+                    <span>GATT: {p.lastTiming.gattConnected && p.lastTiming.connectStart
+                      ? `${((p.lastTiming.gattConnected - p.lastTiming.connectStart) / 1000).toFixed(2)} s`
+                      : '—'}</span>
+                    <span>Services: {p.lastTiming.serviceFound && p.lastTiming.serviceDiscoveryStart
+                      ? `${((p.lastTiming.serviceFound - p.lastTiming.serviceDiscoveryStart) / 1000).toFixed(2)} s`
+                      : '—'}</span>
+                    <span>Char: {p.lastTiming.characteristicFound && p.lastTiming.serviceFound
+                      ? `${((p.lastTiming.characteristicFound - p.lastTiming.serviceFound) / 1000).toFixed(2)} s`
+                      : '—'}</span>
+                    <span className="font-bold">Total: {((p.lastTiming.printerReady - p.lastTiming.discoveryStart) / 1000).toFixed(2)} s</span>
+                  </div>
                 </div>
               )}
 

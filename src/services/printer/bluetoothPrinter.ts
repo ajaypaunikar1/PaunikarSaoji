@@ -15,35 +15,51 @@ function normalizeBleServiceUuid(raw: string): string {
   );
 }
 
-/**
- * BluetoothPrinter - ONE BLE/GATT connection to ONE thermal printer.
- *
- * The POS instantiates one of these per configured printer (KITCHEN, BILLING,
- * ...), so two KP-307 units stay connected simultaneously and never share a
- * transport.
- *
- * Connection lifecycle:
- *   pair()            - user gesture -> chooser -> remember device.id
- *   connectDevice()   - open GATT + discover writable characteristic
- *   connectRemembered - silent relaunch reconnect via getDevices()
- *   tryReconnect()    - re-open GATT after an unexpected drop (no dialogs)
- *
- * All writes are serialized through an internal promise queue so jobs on this
- * printer never interleave ESC/POS bytes.
- */
-interface WriteMode {
-  withResponse: boolean;
-  size: number;
+/** Connection stage timing record. */
+export interface ConnectionTiming {
+  discoveryStart: number;
+  deviceFound: number | null;
+  connectStart: number | null;
+  gattConnected: number | null;
+  serviceDiscoveryStart: number | null;
+  serviceFound: number | null;
+  characteristicFound: number | null;
+  printerReady: number | null;
+}
+
+function now(): number {
+  return performance.now();
+}
+
+function logStage(timing: ConnectionTiming, stage: keyof ConnectionTiming): void {
+  (timing as Record<string, number>)[stage] = now();
+}
+
+function formatMs(ms: number): string {
+  return `${ms.toFixed(1)} ms`;
+}
+
+function logTimingSummary(timing: ConnectionTiming, label: string): void {
+  const d = (k: keyof ConnectionTiming) => timing[k] ?? 0;
+  const base = d('discoveryStart');
+  console.log(
+    `[PRINTER] ${label}\n` +
+    `  discoveryStart:       ${formatMs(base)}\n` +
+    `  deviceFound:          ${d('deviceFound') ? formatMs(d('deviceFound') - base) : '—'}\n` +
+    `  connectStart:         ${d('connectStart') ? formatMs(d('connectStart') - base) : '—'}\n` +
+    `  gattConnected:        ${d('gattConnected') ? formatMs(d('gattConnected') - base) : '—'}\n` +
+    `  serviceDiscoveryStart:${d('serviceDiscoveryStart') ? formatMs(d('serviceDiscoveryStart') - base) : '—'}\n` +
+    `  serviceFound:         ${d('serviceFound') ? formatMs(d('serviceFound') - base) : '—'}\n` +
+    `  characteristicFound:  ${d('characteristicFound') ? formatMs(d('characteristicFound') - base) : '—'}\n` +
+    `  printerReady:         ${d('printerReady') ? formatMs(d('printerReady') - base) : '—'}\n` +
+    `  TOTAL:                ${d('printerReady') ? formatMs(d('printerReady') - base) : '—'}`
+  );
 }
 
 const CHUNK_LADDER = [512, 240, 120, 52, 20];
 
-/**
- * Hard ceiling for GATT connect + service discovery. Without this, Chrome
- * silently retries a sleeping/unreachable peripheral for MINUTES before
- * surfacing an error - staff see an endless spinner instead of guidance.
- */
-const CONNECT_TIMEOUT_MS = 15000;
+/** Hard ceiling for GATT connect + service discovery. Target: ≤ 10 s total. */
+const CONNECT_TIMEOUT_MS = 10000;
 
 function errCode(message: string): WebSerialPrinterError {
   return new WebSerialPrinterError('OPEN_FAILED', message);
@@ -56,7 +72,7 @@ async function withTimeout<T>(task: () => Promise<T>, ms: number): Promise<T> {
       task(),
       new Promise<never>((_, reject) => {
         timer = setTimeout(
-          () => reject(errCode(`Printer did not respond within ${Math.round(ms / 1000)} s - power-cycle it (hold FEED ~5 s) and try again`)),
+          () => reject(errCode(`Connection timed out after ${Math.round(ms / 1000)} s - power-cycle the KP-307 (hold FEED ~5 s) and try again`)),
           ms
         );
       })
@@ -73,6 +89,8 @@ export class BluetoothPrinter {
   private queue: Promise<void> = Promise.resolve();
   /** Largest acknowledged payload proven to work on the current connection. */
   private workingMode: WriteMode | null = null;
+  /** Per-connection timing for the last successful connect. */
+  private lastTiming: ConnectionTiming | null = null;
 
   /** Fired when the peripheral drops the GATT link on its own. */
   onDisconnect: (() => void) | null = null;
@@ -92,6 +110,11 @@ export class BluetoothPrinter {
 
   isPrinting(): boolean {
     return this.printing;
+  }
+
+  /** Timing of the last successful connection (for diagnostics). */
+  getLastTiming(): ConnectionTiming | null {
+    return this.lastTiming;
   }
 
   /** Stable browser-assigned id of the paired device (for config persistence). */
@@ -116,6 +139,17 @@ export class BluetoothPrinter {
    * its id in the printer config.
    */
   async pair(config: PrinterConfig): Promise<BluetoothDevice> {
+    const timing: ConnectionTiming = {
+      discoveryStart: now(),
+      deviceFound: null,
+      connectStart: null,
+      gattConnected: null,
+      serviceDiscoveryStart: null,
+      serviceFound: null,
+      characteristicFound: null,
+      printerReady: null
+    };
+
     if (!BluetoothPrinter.isSupported()) {
       throw new WebSerialPrinterError(
         'NOT_SUPPORTED',
@@ -149,6 +183,11 @@ export class BluetoothPrinter {
         (err as Error)?.message || 'Bluetooth chooser failed'
       );
     }
+
+    logStage(timing, 'deviceFound');
+    console.log(`[PRINTER] Device selected: ${device.name || device.id} (${formatMs(timing.deviceFound! - timing.discoveryStart)})`);
+
+    // Pairing doesn't establish GATT yet - that happens in connectDevice
     return device;
   }
 
@@ -172,12 +211,30 @@ export class BluetoothPrinter {
 
   /** Open GATT + discover writable characteristic on the given device. */
   async connectDevice(device: BluetoothDevice, config: PrinterConfig): Promise<void> {
-    if (this.device === device && this.isConnected()) return;
+    // Reuse existing connection if already on this device
+    if (this.device === device && this.isConnected()) {
+      console.log('[PRINTER] Reusing existing connection');
+      return;
+    }
+
+    const timing: ConnectionTiming = {
+      discoveryStart: now(),
+      deviceFound: null,
+      connectStart: null,
+      gattConnected: null,
+      serviceDiscoveryStart: null,
+      serviceFound: null,
+      characteristicFound: null,
+      printerReady: null
+    };
 
     const gatt = device.gatt;
     if (!gatt) {
       throw new WebSerialPrinterError('NO_BLE_SERVICE', 'Printer exposes no GATT server');
     }
+
+    logStage(timing, 'connectStart');
+    console.log('[PRINTER] GATT connect started');
 
     try {
       await withTimeout(() => gatt.connect(), CONNECT_TIMEOUT_MS);
@@ -191,10 +248,16 @@ export class BluetoothPrinter {
       );
     }
 
+    logStage(timing, 'gattConnected');
+    console.log(`[PRINTER] GATT connected (${formatMs(timing.gattConnected! - timing.connectStart!)})`);
+
+    logStage(timing, 'serviceDiscoveryStart');
+    console.log('[PRINTER] Service discovery started');
+
     let characteristic: BluetoothRemoteGATTCharacteristic | null;
     try {
       characteristic = await withTimeout(
-        () => this.findWritable(gatt, config),
+        () => this.findWritable(gatt, config, timing),
         CONNECT_TIMEOUT_MS
       );
     } catch (err) {
@@ -215,6 +278,10 @@ export class BluetoothPrinter {
     this.workingMode = null;
 
     device.addEventListener('gattserverdisconnected', this.handleGattDisconnected);
+
+    logStage(timing, 'printerReady');
+    this.lastTiming = timing;
+    logTimingSummary(timing, 'Connection complete');
   }
 
   private handleGattDisconnected = (): void => {
@@ -228,7 +295,8 @@ export class BluetoothPrinter {
 
   private async findWritable(
     gatt: NonNullable<BluetoothDevice['gatt']>,
-    config: PrinterConfig
+    config: PrinterConfig,
+    timing: ConnectionTiming
   ): Promise<BluetoothRemoteGATTCharacteristic | null> {
     let wanted: string | null = null;
     if (config.bleServiceUuid) {
@@ -252,9 +320,15 @@ export class BluetoothPrinter {
     for (const uuid of candidates) {
       try {
         const service = await gatt.getPrimaryService(uuid);
+        logStage(timing, 'serviceFound');
+        console.log(`[PRINTER] Service found: ${uuid} (${formatMs(timing.serviceFound! - timing.serviceDiscoveryStart!)})`);
         const chars = await service.getCharacteristics();
         const found = pickWritable(chars);
-        if (found) return found;
+        if (found) {
+          logStage(timing, 'characteristicFound');
+          console.log(`[PRINTER] Write characteristic found (${formatMs(timing.characteristicFound! - timing.serviceFound!)})`);
+          return found;
+        }
       } catch { /* not this one - try next */ }
     }
     if (wanted) {
@@ -288,7 +362,11 @@ export class BluetoothPrinter {
         chars = await service.getCharacteristics();
       } catch { /* blocked service - skip */ }
       const found = pickWritable(chars);
-      if (found) return found;
+      if (found) {
+        logStage(timing, 'characteristicFound');
+        console.log('[PRINTER] Write characteristic found (fallback path)');
+        return found;
+      }
     }
     return null;
   }
@@ -419,4 +497,9 @@ export class BluetoothPrinter {
       }
     });
   }
+}
+
+interface WriteMode {
+  withResponse: boolean;
+  size: number;
 }
