@@ -4,7 +4,7 @@ import { usePrinter } from '../context/PrinterContext';
 import { useApp } from '../context/AppContext';
 import {
   Printer, Plug, Unplug, FlaskConical, Activity,
-  Plus, Trash2, RefreshCw, XCircle, Stethoscope
+  Plus, Trash2, RefreshCw, XCircle, Stethoscope, ArrowLeftRight
 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { PrinterConfig, PrinterRole } from '../services/printer/printerConfig';
@@ -52,10 +52,11 @@ const PrinterSettingsPage: React.FC = () => {
     supported, connected, printing, error, printers,
     connectPrinter, disconnectPrinter, testPrintOn,
     retryJob, cancelJob, clearFinishedJobs, getDiagnostics,
-    savePrinterConfig, removePrinterConfig
+    savePrinterConfig, removePrinterConfig, swapPrinters
   } = usePrinter();  const { settings } = useApp();
 
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [swapping, setSwapping] = useState(false);
   const [diag, setDiag] = useState<Diag | null>(() => getDiagnostics() as Diag);
 
   const refreshDiag = () => setDiag(getDiagnostics() as Diag);
@@ -93,6 +94,14 @@ const PrinterSettingsPage: React.FC = () => {
     setBusyId(id);
     await testPrintOn(id, settings);
     setBusyId(null);
+  };
+
+  const handleSwap = async () => {
+    const [a, b] = printers;
+    if (!a || !b) return;
+    setSwapping(true);
+    await swapPrinters(a.id, b.id);
+    setSwapping(false);
   };
 
   const updateConfig = (id: string, patch: Partial<PrinterConfig>) => {
@@ -163,8 +172,25 @@ const PrinterSettingsPage: React.FC = () => {
           <p className="text-[9px] font-black uppercase tracking-wider text-slate-500">How to connect your 2nd printer</p>
           <p>1. Power on BOTH KP-307 units with paper loaded, keep them within 2 m of this device.</p>
           <p>2. Tap Connect on the second card below - Chrome shows a device list.</p>
-          <p>3. Pick the entry you have NOT used yet (names may look identical - each unit is a separate row).</p>
+          <p>3. Pick the entry you have NOT used yet (names may look identical - each unit is a separate row). Tip: power ONE unit off if unsure - the entry that disappears is that unit.</p>
           <p>4. Only ONE entry in the list? Hold the printer's FEED button ~5 s to restart it, and make sure no phone is paired to it - then tap Connect again.</p>
+          <p>5. After both are connected, tap Test Print on each card - the paper names its ROLE, so you instantly see which unit is which.</p>
+        </div>
+      )}
+
+      {printers.length >= 2 && printers.some(p => p.config.deviceId) && (
+        <div className="flex items-center justify-between p-3 rounded-xl bg-indigo-50/60 border border-indigo-200 gap-3">
+          <p className="text-[10px] text-indigo-900 font-semibold m-0">
+            Printed a test and the papers came from the WRONG units (e.g. "KITCHEN" on the counter printer)? Swap the bindings here - no re-pairing needed.
+          </p>
+          <button
+            type="button"
+            onClick={handleSwap}
+            disabled={swapping}
+            className="shrink-0 py-2 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white font-bold text-[10px] uppercase tracking-wider cursor-pointer transition flex items-center gap-1.5"
+          >
+            <ArrowLeftRight size={13} /> {swapping ? 'Swapping...' : 'Swap Devices'}
+          </button>
         </div>
       )}
 

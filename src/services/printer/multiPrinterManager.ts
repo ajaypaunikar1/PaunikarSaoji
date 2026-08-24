@@ -319,6 +319,46 @@ class MultiPrinterManager {
   }
 
   /**
+   * Exchange the bound devices between two printer slots. Used when the two
+   * identically-named KP-307 units were paired to the WRONG roles - fixes the
+   * mix-up without opening any chooser again.
+   */
+  async swapDevices(idA: string, idB: string): Promise<void> {
+    this.init();
+    const a = this.entries.get(idA);
+    const b = this.entries.get(idB);
+    if (!a || !b || a === b) {
+      throw new WebSerialPrinterError('NOT_FOUND', 'Unknown printer slot');
+    }
+
+    // Deliberate disconnects so auto-reconnect does not fight the swap
+    for (const e of [a, b]) {
+      e.intentionalDisconnect = true;
+      if (e.reconnectTimer) {
+        clearTimeout(e.reconnectTimer);
+        e.reconnectTimer = null;
+      }
+      e.reconnecting = false;
+      try {
+        await e.ble.disconnect();
+      } catch { /* already down */ }
+      e.state = 'disconnected';
+      e.lastError = null;
+    }
+
+    const tmp = a.config.deviceId;
+    a.config = { ...a.config, deviceId: b.config.deviceId };
+    b.config = { ...b.config, deviceId: tmp };
+    savePrinterConfigs(this.getConfigs());
+
+    a.intentionalDisconnect = false;
+    b.intentionalDisconnect = false;
+    this.emit();
+
+    await this.autoReconnectOnLaunch();
+  }
+
+  /**
    * Launch-time silent reconnect for every configured printer using devices
    * already granted to this browser (no choosers).
    */

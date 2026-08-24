@@ -56,6 +56,7 @@ interface PrinterContextType {
   // ----- configuration CRUD (settings page) -----
   savePrinterConfig: (config: PrinterConfig) => void;
   removePrinterConfig: (printerId: string) => void;
+  swapPrinters: (printerIdA: string, printerIdB: string) => Promise<void>;
   setActivePrinter: (printerId: string) => void;
 }
 
@@ -244,10 +245,14 @@ export const PrinterProvider: React.FC<{ children: ReactNode }> = ({ children })
     async (printerId: string, settings?: ReceiptSettings): Promise<boolean> => {
       try {
         const config = printerHub.getConfigs().find(c => c.id === printerId);
-        const data = await generateTestPrint(settings, {
-          cutMode: config?.cutMode ?? 'FULL',
-          paperWidth: config?.paperWidth ?? 80
-        });
+        const data = await generateTestPrint(
+          settings,
+          {
+            cutMode: config?.cutMode ?? 'FULL',
+            paperWidth: config?.paperWidth ?? 80
+          },
+          { name: config?.name ?? 'Printer', role: String(config?.role ?? 'UNKNOWN') }
+        );
         const printed = await printerHub.printOn(printerId, {
           kind: 'TEST',
           label: 'Test Print',
@@ -287,6 +292,18 @@ export const PrinterProvider: React.FC<{ children: ReactNode }> = ({ children })
     printerHub.removeConfig(printerId);
   }, []);
 
+  const swapPrinters = useCallback(
+    async (printerIdA: string, printerIdB: string): Promise<void> => {
+      try {
+        await printerHub.swapDevices(printerIdA, printerIdB);
+        toast.success('Devices swapped between the two slots');
+      } catch (err) {
+        setError(reportError(err));
+      }
+    },
+    [reportError]
+  );
+
   const setActivePrinter = useCallback((printerId: string): void => {
     printerHub.setActivePrinter(printerId);
   }, []);
@@ -314,6 +331,7 @@ export const PrinterProvider: React.FC<{ children: ReactNode }> = ({ children })
         getDiagnostics,
         savePrinterConfig,
         removePrinterConfig,
+        swapPrinters,
         setActivePrinter
       }}
     >

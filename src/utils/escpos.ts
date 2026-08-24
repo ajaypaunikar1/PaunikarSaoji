@@ -253,7 +253,8 @@ export async function generateBillReceipt(
  */
 export async function generateTestPrint(
   settings?: ReceiptSettings,
-  opts?: ReceiptOptions
+  opts?: ReceiptOptions,
+  identity?: { name: string; role: string }
 ): Promise<Uint8Array> {
   const restName = settings?.restaurantName || 'Paunikar Saoji Restaurant';
   const cut = cutCommand(opts?.cutMode ?? 'FULL');
@@ -261,6 +262,13 @@ export async function generateTestPrint(
   const segs: Seg[] = [
     { kind: 'raw', raw: ESCPOS.INIT },
     { kind: 'text', text: 'PRINTER TEST', align: 'center', bold: true, size: 'double' },
+    ...(identity
+      ? [
+          { kind: 'text', text: '================================', align: 'center' },
+          { kind: 'text', text: identity.name.toUpperCase(), align: 'center', bold: true },
+          { kind: 'text', text: `ROLE: ${identity.role}`, align: 'center', bold: true }
+        ]
+      : []),
     { kind: 'text', text: '================================', align: 'center' },
     { kind: 'text', text: 'Connection:' },
     { kind: 'text', text: 'Bluetooth LE (Web Bluetooth)' },
