@@ -53,8 +53,7 @@ const PrinterSettingsPage: React.FC = () => {
     connectPrinter, disconnectPrinter, testPrintOn,
     retryJob, cancelJob, clearFinishedJobs, getDiagnostics,
     savePrinterConfig, removePrinterConfig
-  } = usePrinter();
-  const { settings } = useApp();
+  } = usePrinter();  const { settings } = useApp();
 
   const [busyId, setBusyId] = useState<string | null>(null);
   const [diag, setDiag] = useState<Diag | null>(() => getDiagnostics() as Diag);
@@ -64,8 +63,27 @@ const PrinterSettingsPage: React.FC = () => {
   const allJobs = printers.flatMap(p => p.jobs.map(j => ({ ...j, printerId: p.id })));
   const failedJobs = allJobs.filter(j => j.status === 'FAILED');
 
+  const deviceOwners = new Map<string, string[]>();
+  printers.forEach(p => {
+    if (!p.config.deviceId) return;
+    const owners = deviceOwners.get(p.config.deviceId) ?? [];
+    owners.push(p.id);
+    deviceOwners.set(p.config.deviceId, owners);
+  });
+  const duplicatedIds = new Set(
+    [...deviceOwners.entries()].filter(([, ids]) => ids.length > 1).map(([deviceId]) => deviceId)
+  );
+
   const handleConnect = async (id: string) => {
     setBusyId(id);
+    await connectPrinter(id);
+    refreshDiag();
+    setBusyId(null);
+  };
+
+  const handleRePair = async (id: string) => {
+    setBusyId(id);
+    await disconnectPrinter(id, true);
     await connectPrinter(id);
     refreshDiag();
     setBusyId(null);
@@ -133,6 +151,23 @@ const PrinterSettingsPage: React.FC = () => {
         </div>
       )}
 
+      {duplicatedIds.size > 0 && (
+        <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-[10px] text-amber-800 font-semibold space-y-1">
+          <p>Two printer slots are bound to the SAME physical KP-307.</p>
+          <p>On one of the cards below tap Disconnect, then Re-pair, and pick the OTHER unit in the browser list (both units can share an identical name).</p>
+        </div>
+      )}
+
+      {printers.filter(p => p.state === 'connected').length < 2 && (
+        <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-[10px] text-slate-600 font-semibold space-y-1">
+          <p className="text-[9px] font-black uppercase tracking-wider text-slate-500">How to connect your 2nd printer</p>
+          <p>1. Power on BOTH KP-307 units with paper loaded, keep them within 2 m of this device.</p>
+          <p>2. Tap Connect on the second card below - Chrome shows a device list.</p>
+          <p>3. Pick the entry you have NOT used yet (names may look identical - each unit is a separate row).</p>
+          <p>4. Only ONE entry in the list? Hold the printer's FEED button ~5 s to restart it, and make sure no phone is paired to it - then tap Connect again.</p>
+        </div>
+      )}
+
       {/* One card per configured printer */}
       {printers.map(p => {
         const pill = STATE_PILL[p.state] || STATE_PILL.disconnected;
@@ -156,6 +191,11 @@ const PrinterSettingsPage: React.FC = () => {
                 <div className="text-[11px] font-bold text-slate-700">
                   Device: {p.deviceName || <span className="text-slate-400">Not paired</span>}
                   <span className="ml-2 text-[10px] font-mono text-slate-400">{p.connection}</span>
+                  {p.config.deviceId && (
+                    <span className={`ml-2 text-[9px] font-mono ${duplicatedIds.has(p.config.deviceId) ? 'text-rose-600' : 'text-slate-400'}`}>
+                      #{p.config.deviceId.slice(0, 8)}
+                    </span>
+                  )}
                 </div>
                 <label className="flex items-center gap-1 text-[9px] font-bold uppercase text-slate-500">
                   Enabled
@@ -174,7 +214,7 @@ const PrinterSettingsPage: React.FC = () => {
                 </div>
               )}
 
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                 <button
                   type="button"
                   onClick={() => handleConnect(p.id)}
@@ -198,6 +238,14 @@ const PrinterSettingsPage: React.FC = () => {
                   className="py-2.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 disabled:opacity-40 text-slate-700 font-bold text-xs uppercase tracking-wider cursor-pointer transition flex items-center justify-center gap-1.5"
                 >
                   <Unplug size={14} /> Disconnect
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleRePair(p.id)}
+                  disabled={!supported || busy}
+                  className="py-2.5 rounded-xl border border-indigo-300 bg-indigo-50 hover:bg-indigo-100 disabled:opacity-40 text-indigo-700 font-bold text-xs uppercase tracking-wider cursor-pointer transition flex items-center justify-center gap-1.5"
+                >
+                  <RefreshCw size={14} /> Re-pair
                 </button>
               </div>
 

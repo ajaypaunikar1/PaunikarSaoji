@@ -273,6 +273,16 @@ class MultiPrinterManager {
     this.emit();
     try {
       const device = await entry.ble.pair(entry.config);
+      const duplicate = [...this.entries.entries()].find(
+        ([id, e]) => id !== printerId && !!e.config.deviceId && e.config.deviceId === device.id
+      );
+      if (duplicate) {
+        const [, other] = duplicate;
+        throw new WebSerialPrinterError(
+          'DUPLICATE_DEVICE',
+          `That unit is already bound to ${other.config.name}. Choose your OTHER KP-307 in the browser list (both may share the same name).`
+        );
+      }
       await entry.ble.connectDevice(device, entry.config);
       entry.config = { ...entry.config, deviceId: device.id };
       this.upsertConfig(entry.config);
@@ -287,7 +297,7 @@ class MultiPrinterManager {
     }
   }
 
-  async disconnectPrinter(printerId: string): Promise<void> {
+  async disconnectPrinter(printerId: string, forget = false): Promise<void> {
     this.init();
     const entry = this.entries.get(printerId);
     if (!entry) return;
@@ -297,9 +307,13 @@ class MultiPrinterManager {
       entry.reconnectTimer = null;
     }
     entry.reconnecting = false;
-    await entry.ble.disconnect();
+    await entry.ble.disconnect(forget);
     entry.state = 'disconnected';
     entry.lastError = null;
+    if (forget) {
+      entry.config = { ...entry.config, deviceId: undefined };
+      savePrinterConfigs(this.getConfigs());
+    }
     entry.intentionalDisconnect = false;
     this.emit();
   }

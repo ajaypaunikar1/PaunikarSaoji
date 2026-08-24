@@ -71,6 +71,14 @@ const HANDLERS: Record<string, Handler> = {
     detail: 'Data could not be sent to the printer.',
     steps: [...CONNECT_HELP, 'Check the printer for a paper jam or error light.']
   }),
+  DUPLICATE_DEVICE: () => ({
+    title: 'That is the same physical printer.',
+    detail: 'Another printer slot already uses this device.',
+    steps: [
+      'Tap Connect again and pick a DIFFERENT row in the browser list (both KP-307 units can share one name).',
+      'Not sure which row? Disconnect the first printer, then the remaining row in the list is your second unit.'
+    ]
+  }),
   BAD_BLE_SERVICE_UUID: () => ({
     title: 'The BLE Service UUID is not valid.',
     detail: 'Enter 4 hex digits (e.g. FF00) or the full 128-bit UUID.',

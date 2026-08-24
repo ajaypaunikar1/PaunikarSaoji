@@ -47,7 +47,7 @@ interface PrinterContextType {
   // ----- multi-printer surface -----
   printers: PrinterStatusInfo[];
   connectPrinter: (printerId: string) => Promise<boolean>;
-  disconnectPrinter: (printerId: string) => Promise<void>;
+  disconnectPrinter: (printerId: string, forget?: boolean) => Promise<void>;
   testPrintOn: (printerId: string, settings?: ReceiptSettings) => Promise<boolean>;
   retryJob: (printerId: string, jobId: string) => void;
   cancelJob: (printerId: string, jobId: string) => void;
@@ -230,9 +230,9 @@ export const PrinterProvider: React.FC<{ children: ReactNode }> = ({ children })
   );
 
   const disconnectPrinter = useCallback(
-    async (printerId: string): Promise<void> => {
+    async (printerId: string, forget = false): Promise<void> => {
       try {
-        await printerHub.disconnectPrinter(printerId);
+        await printerHub.disconnectPrinter(printerId, forget);
       } catch (err) {
         setError(reportError(err));
       }
