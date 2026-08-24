@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { usePrinter } from '../context/PrinterContext';
+import RolePrinterButton from '../components/RolePrinterButton';
 import { translations } from '../translations/translations';
 import { 
   ChefHat, Play, CheckCheck, Check, Printer, Clock, Sparkles, X, Zap
@@ -54,7 +55,7 @@ const OrderTimer: React.FC<{ timestamp: string }> = ({ timestamp }) => {
 
 const KDS: React.FC = () => {
   const { orders, bills, users, updateOrderStatus, updateOrder, language, settings } = useApp();
-  const { printKOT: printKOTThermal, connected } = usePrinter();
+  const { printKOT: printKOTThermal } = usePrinter();
   const t = translations[language];
 
   const [printKOTData, setPrintKOTData] = useState<Order | null>(null);
@@ -191,15 +192,8 @@ const KDS: React.FC = () => {
           <p className="text-xs text-slate-500 font-medium mt-1">Live active preparation queue and order ticket router.</p>
         </div>
         <div className="flex items-center gap-2">
-          {/* Thermal Printer Status */}
-          <div className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs shadow-sm border ${
-            connected
-              ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
-              : 'bg-rose-50 border-rose-200 text-rose-600'
-          }`}>
-            <span className={`w-2 h-2 rounded-full ${connected ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
-            <span className="font-bold">{connected ? 'Printer' : 'Printer Off'}</span>
-          </div>
+          {/* Kitchen printer connect/disconnect - lives HERE so kitchen staff pair the kitchen unit */}
+          <RolePrinterButton role="KITCHEN" label="Kitchen Printer" />
           <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs shadow-sm">
             <ChefHat size={16} className="text-emerald-500" />
             <span className="font-bold text-slate-850">{activeOrders.length} {t.liveOrders}</span>

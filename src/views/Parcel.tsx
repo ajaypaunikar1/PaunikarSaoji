@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { usePrinter } from '../context/PrinterContext';
+import RolePrinterButton from '../components/RolePrinterButton';
 import {
   ShoppingBag, Plus, Trash2, Search, Send, Printer,
   Wallet, CreditCard, Smartphone, PackageCheck, UserRound, Pencil, X
@@ -230,13 +231,7 @@ const Parcel: React.FC = () => {
           <p className="text-xs text-slate-500 font-medium mt-1">Set up takeaway orders and collect payments without a table.</p>
         </div>
         <div className="flex items-center gap-2">
-          <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[10px] font-bold uppercase tracking-widest transition ${
-            connected
-              ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
-              : 'bg-rose-50 border-rose-200 text-rose-600'
-          }`}>
-            <Printer size={13} className={connected ? 'text-emerald-600' : 'text-rose-500'} /> {connected ? 'Thermal: Connected' : 'Thermal: Offline'}
-          </div>
+          <RolePrinterButton role="BILLING" label="Billing Printer" />
           <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl">
             <PackageCheck size={14} className="text-emerald-600" />
             <span className="text-[10px] uppercase font-bold tracking-widest text-emerald-700">Parcel Counter</span>

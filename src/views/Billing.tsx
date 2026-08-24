@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { usePrinter } from '../context/PrinterContext';
+import RolePrinterButton from '../components/RolePrinterButton';
 import { translations } from '../translations/translations';
 import { 
   Receipt, CreditCard, Wallet, Smartphone,
@@ -523,9 +524,7 @@ const Billing: React.FC = () => {
                   >
                     <FileText size={12} /> Browser Print (PDF)
                   </button>
-                  <span className={`text-[9px] font-bold uppercase tracking-wider ${connected ? 'text-emerald-600' : 'text-rose-500'}`}>
-                    {connected ? 'Thermal: Connected' : 'Thermal: Offline'}
-                  </span>
+                  <RolePrinterButton role="BILLING" label="Billing Printer" />
                 </div>
               </motion.div>
             ) : (
