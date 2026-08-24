@@ -58,6 +58,20 @@ function logTimingSummary(timing: ConnectionTiming, label: string): void {
 
 const CHUNK_LADDER = [512, 240, 120, 52, 20];
 
+/**
+ * Inter-chunk pacing for large payloads (raster bitmaps).
+ *
+ * Cheap BLE printer firmware ACKs GATT writes instantly but buffers received
+ * bytes in a very small RX ring. When we feed chunks faster than the thermal
+ * head consumes them, the firmware silently drops bytes - and a byte lost
+ * inside a GS v 0 raster body leaves the printer waiting for bitmap data that
+ * never arrives, so the rest of the slip never prints ("stops midway").
+ * Pausing briefly between chunks keeps the wire rate below the print rate.
+ */
+const CHUNK_PACE_MS = 12;
+/** Payloads below this size print fast enough that pacing is unnecessary. */
+const PACE_THRESHOLD_BYTES = 1024;
+
 /** Hard ceiling for GATT connect + service discovery. Target: ≤ 10 s total. */
 const CONNECT_TIMEOUT_MS = 10000;
 
@@ -457,6 +471,9 @@ export class BluetoothPrinter {
             await ch.writeValueWithResponse(chunk);
           } else {
             await ch.writeValueWithoutResponse(chunk);
+          }
+          if (data.length > PACE_THRESHOLD_BYTES && end < data.length) {
+            await new Promise(resolve => setTimeout(resolve, CHUNK_PACE_MS));
           }
         }
         this.workingMode = mode;
