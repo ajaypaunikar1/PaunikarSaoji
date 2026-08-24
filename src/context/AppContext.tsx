@@ -14,6 +14,7 @@ import {
   normalizeCategoryName,
   saveCustomCategories
 } from '../utils/categories';
+import { formatCurrency } from '../utils/currency';
 
 let notificationAudio: HTMLAudioElement | null = null;
 if (typeof window !== 'undefined') {
@@ -73,14 +74,14 @@ interface AppContextType {
   logout: () => void;
   addOrder: (tableId: number, items: Omit<Order['items'][0], 'id'>[], notes?: string) => Promise<Order>;
   addParcelOrder: (items: Omit<Order['items'][0], 'id'>[], notes?: string, customerName?: string) => Promise<Order>;
-  generateParcelBill: (order: string | Order, discount?: number, gstPct?: number, containerCharge?: number) => Promise<Bill>;
+  generateParcelBill: (order: string | Order, discount?: number, containerCharge?: number) => Promise<Bill>;
   updateOrder: (orderId: string, updates: Partial<Order>) => void;
   updateOrderStatus: (orderId: string, status: Order['status']) => void;
   mergeTables: (sourceIds: number[], destinationId: number) => void;
   splitTables: (sourceId: number, targetId: number, itemsToMove: { id: string; name: string; portion: PortionType; price: number; quantity: number }[]) => void;
   unmergeTables: (tableId: number) => void;
   transferTable: (sourceId: number, destinationId: number) => void;
-  generateBill: (tableId: number, discount: number, gstPct?: number) => Promise<Bill>;
+  generateBill: (tableId: number, discount: number) => Promise<Bill>;
   payBill: (billId: string, method: PaymentMethod) => Promise<void>;
   submitLeave: (startDate: string, endDate: string, reason: string) => void;
   approveLeave: (leaveId: string) => void;
@@ -1029,14 +1030,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return newOrder;
   };
 
-  const generateParcelBill = async (order: string | Order, discount: number = 0, gstPct: number = 18, containerCharge: number = 0): Promise<Bill> => {
+  const generateParcelBill = async (order: string | Order, discount: number = 0, containerCharge: number = 0): Promise<Bill> => {
     const orderObj = typeof order === 'string' ? orders.find(o => o.id === order) : order;
     if (!orderObj) throw new Error("Order not found");
 
     const subtotal = orderObj.grandTotal;
-    const gst = Math.round(subtotal * (gstPct / 100) * 100) / 100;
-    const safeDiscount = Math.max(0, Math.min(discount, subtotal + gst)); // never go negative
-    const grandTotal = Math.round((subtotal + gst - safeDiscount + containerCharge) * 100) / 100;
+    const safeDiscount = Math.max(0, Math.min(discount, subtotal)); // never go negative
+    const grandTotal = Math.round((subtotal - safeDiscount + containerCharge) * 100) / 100;
     const discountPct = subtotal > 0 ? Math.round((safeDiscount / subtotal) * 100 * 100) / 100 : 0;
 
     const newBill: Bill = {
@@ -1045,8 +1045,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       tableId: 0,
       isParcel: true,
       subtotal,
-      gst,
-      gstPct,
       discount: safeDiscount,
       discountPct,
       containerCharge,
@@ -1060,7 +1058,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const res = await fetch(`${API_BASE}/billing/generate`, {
         method: 'POST',
         headers: getHeaders(),
-        body: JSON.stringify({ orderId: orderObj.id, isParcel: true, discount, gstPct, containerCharge })
+        body: JSON.stringify({ orderId: orderObj.id, isParcel: true, discount, containerCharge })
       }).then(r => r.json());
       if (res.success) {
         loadDatabaseData();
@@ -1084,7 +1082,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const newNotif: Notification = {
         id: `notif-${Date.now()}`,
         title: 'Parcel Bill Generated',
-        message: `Total: ₹${grandTotal} (Subtotal: ₹${subtotal}, GST: ₹${gst}${containerCharge ? `, Container: ₹${containerCharge}` : ''})`,
+        message: `Total: ${formatCurrency(grandTotal)} (Subtotal: ${formatCurrency(subtotal)}${containerCharge ? `, Container: ${formatCurrency(containerCharge)}` : ''})`,
         type: 'Billing',
         timestamp: getISTTime(),
         read: false
@@ -1450,7 +1448,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     addAuditLog(`Split Table ${sourceId} to Table ${targetId}`);
   };
 
-  const generateBill = async (tableId: number, discount: number, gstPct: number = 18): Promise<Bill> => {
+  const generateBill = async (tableId: number, discount: number): Promise<Bill> => {
     const table = tables.find(t => t.id === tableId);
     if (!table || !table.orderId) throw new Error("Table has no active order");
     
@@ -1458,9 +1456,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (!order) throw new Error("Order not found");
 
     const subtotal = order.grandTotal;
-    const gst = Math.round(subtotal * (gstPct / 100) * 100) / 100;
-    const safeDiscount = Math.max(0, Math.min(discount, subtotal + gst)); // never go negative
-    const grandTotal = Math.round((subtotal + gst - safeDiscount) * 100) / 100;
+    const safeDiscount = Math.max(0, Math.min(discount, subtotal)); // never go negative
+    const grandTotal = Math.round((subtotal - safeDiscount) * 100) / 100;
     const discountPct = subtotal > 0 ? Math.round((safeDiscount / subtotal) * 100 * 100) / 100 : 0;
 
     const newBill: Bill = {
@@ -1468,8 +1465,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       orderId: order.id,
       tableId,
       subtotal,
-      gst,
-      gstPct,
       discount: safeDiscount,
       discountPct,
       grandTotal,
@@ -1482,7 +1477,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const res = await fetch(`${API_BASE}/billing/generate`, {
         method: 'POST',
         headers: getHeaders(),
-        body: JSON.stringify({ tableId, discount, gstPct })
+        body: JSON.stringify({ tableId, discount })
       }).then(r => r.json());
       if (res.success) {
         loadDatabaseData();
@@ -1508,7 +1503,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const newNotif: Notification = {
         id: `notif-${Date.now()}`,
         title: `Bill Generated - Table ${tableId}`,
-        message: `Total: ₹${grandTotal} (Subtotal: ₹${subtotal}, GST: ₹${gst})`,
+        message: `Total: ${formatCurrency(grandTotal)} (Subtotal: ${formatCurrency(subtotal)})`,
         type: 'Billing',
         timestamp: getISTTime(),
         read: false

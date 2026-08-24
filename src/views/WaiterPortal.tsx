@@ -10,6 +10,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import type { Table, PortionType, OrderStatus } from '../types/types';
 import QtyStepper from '../components/QtyStepper';
 import { resolvePortionPrice } from '../utils/variants';
+import { formatCurrency } from '../utils/currency';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 
@@ -393,7 +394,7 @@ const WaiterPortal: React.FC = () => {
                               {currentUser?.status === 'Disabled' ? 'Unavailable' : tbl.status}
                             </span>
                             {ord && currentUser?.status !== 'Disabled' && (
-                              <span className="text-xs font-bold text-emerald-600 font-mono">₹{ord.grandTotal}</span>
+                              <span className="text-xs font-bold text-emerald-600 font-mono">{formatCurrency(ord.grandTotal)}</span>
                             )}
                           </div>
                           
@@ -465,7 +466,7 @@ const WaiterPortal: React.FC = () => {
                                     onClick={() => handleAddToBasket(item, v.name)}
                                     className="w-full py-1 px-1 bg-slate-50 border border-slate-200 rounded text-[9px] font-bold text-indigo-600 cursor-pointer text-center hover:bg-indigo-50 hover:border-indigo-200 transition"
                                   >
-                                    {v.name} (₹{v.price})
+                                    {v.name} ({formatCurrency(v.price)})
                                   </button>
                                 ))}
                               </div>
@@ -474,7 +475,7 @@ const WaiterPortal: React.FC = () => {
                                 onClick={() => handleAddToBasket(item, 'Single')}
                                 className="w-full py-1 bg-slate-50 border border-slate-200 rounded text-[10px] font-bold text-indigo-600 cursor-pointer text-center hover:bg-indigo-50 hover:border-indigo-200 transition"
                               >
-                                Add (₹{item.price})
+                                Add ({formatCurrency(item.price)})
                               </button>
                             )}
                           </div>
@@ -924,7 +925,7 @@ const WaiterPortal: React.FC = () => {
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
                     <span className="text-slate-500 text-[10px] block mb-0.5">Base Pay</span>
-                    <span className="font-bold text-slate-800 font-mono">₹{currentUser?.salary}</span>
+                    <span className="font-bold text-slate-800 font-mono">{formatCurrency(currentUser?.salary)}</span>
                   </div>
                   
                   <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
@@ -938,7 +939,7 @@ const WaiterPortal: React.FC = () => {
                   {waiterPayroll.map(p => (
                     <div key={p.id} className="flex justify-between items-center text-xs py-1.5">
                       <span className="font-bold text-slate-600">{p.month}</span>
-                      <span className="font-bold text-slate-800 font-mono">₹{p.netSalary}</span>
+                      <span className="font-bold text-slate-800 font-mono">{formatCurrency(p.netSalary)}</span>
                       <span className="px-1.5 py-0.5 rounded bg-emerald-100 border border-emerald-200 text-emerald-700 text-[8px] font-bold uppercase">{p.status}</span>
                     </div>
                   ))}

@@ -103,10 +103,8 @@ export const translations = {
     markServed: "Serve",
 
     // Billing
-    gstBill: "GST Bill (5% GST)",
     invoiceNo: "Invoice #",
     subtotal: "Subtotal",
-    gstAmount: "GST (5%)",
     discount: "Discount",
     grandTotal: "Grand Total",
     paymentMethod: "Payment Method",
@@ -284,10 +282,8 @@ export const translations = {
     markServed: "ग्राहकास द्या",
 
     // Billing
-    gstBill: "जीएसटी बिल (५% जीएसटी)",
     invoiceNo: "इनव्हॉइस क्र.",
     subtotal: "एकूण रक्कम",
-    gstAmount: "जीएसटी (५%)",
     discount: "सवलत",
     grandTotal: "अंतिम एकूण",
     paymentMethod: "पैसे देण्याची पद्धत",

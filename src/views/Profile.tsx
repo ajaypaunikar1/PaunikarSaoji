@@ -8,14 +8,11 @@ const Profile: React.FC = () => {
   
   // Settings States
   const [cancellationApproval, setCancellationApproval] = useState(settings?.cancellationApproval || false);
-  const [gstEnabled, setGstEnabled] = useState(settings?.gstEnabled || false);
-  const [gstPct, setGstPct] = useState<number>(settings?.gstPct ?? 18);
 
   // Restaurant Info States (from DB settings, fully editable)
   const [restaurantName, setRestaurantName] = useState(settings?.restaurantName || '');
   const [address, setAddress] = useState(settings?.address || '');
   const [phone, setPhone] = useState(settings?.phone || '');
-  const [gstNumber, setGstNumber] = useState(settings?.gstNumber || '');
   const [upiId, setUpiId] = useState(settings?.upiId || '');
 
   // Sync restaurant info when settings load from DB
@@ -24,11 +21,8 @@ const Profile: React.FC = () => {
       setRestaurantName(settings.restaurantName || '');
       setAddress(settings.address || '');
       setPhone(settings.phone || '');
-      setGstNumber(settings.gstNumber || '');
       setUpiId(settings.upiId || '');
       setCancellationApproval(settings.cancellationApproval || false);
-      setGstEnabled(settings.gstEnabled || false);
-      setGstPct(settings.gstPct ?? 18);
     }
   }, [settings]);
 
@@ -89,11 +83,8 @@ const Profile: React.FC = () => {
         restaurantName,
         address,
         phone,
-        gstNumber,
         upiId,
         cancellationApproval,
-        gstEnabled,
-        gstPct,
         rbac: rbacConfig
       });
       toast.success('Settings saved successfully');
@@ -294,17 +285,6 @@ const Profile: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">GST Number (optional)</label>
-                    <input
-                      type="text"
-                      value={gstNumber}
-                      onChange={e => setGstNumber(e.target.value)}
-                      placeholder="e.g. 27AAAAA1111A1Z1 (leave blank to hide)"
-                      className="w-full bg-slate-50 border border-slate-200 text-slate-800 p-2.5 rounded-xl focus:outline-none focus:border-emerald-400 transition font-mono"
-                    />
-                  </div>
-
-                  <div>
                     <label className="text-[10px] font-bold text-slate-500 uppercase block mb-1">UPI ID</label>
                     <input
                       type="text"
@@ -337,35 +317,6 @@ const Profile: React.FC = () => {
                       className="w-4 h-4 accent-indigo-600"
                     />
                   </label>
-
-                  <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl">
-                    <div className="flex items-center justify-between">
-                      <div className="pr-3">
-                        <span className="text-xs font-bold text-slate-800 block">GST on Billing</span>
-                        <span className="text-[10px] text-slate-500">Apply GST to invoices. Set the rate to 0% to disable. The rate is split evenly into CGST + SGST on the printed bill.</span>
-                      </div>
-                      <input
-                        type="checkbox"
-                        checked={gstEnabled}
-                        onChange={e => setGstEnabled(e.target.checked)}
-                        className="w-4 h-4 accent-indigo-600 shrink-0"
-                      />
-                    </div>
-                    <div className="flex items-center gap-2 mt-3">
-                      <span className="text-[10px] font-bold text-slate-500">Rate</span>
-                      <input
-                        type="number"
-                        min={0}
-                        max={40}
-                        step={0.5}
-                        value={gstPct}
-                        disabled={!gstEnabled}
-                        onChange={e => setGstPct(Math.max(0, Math.min(40, parseFloat(e.target.value) || 0)))}
-                        className="w-24 px-2 py-1.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
-                      />
-                      <span className="text-xs font-bold text-slate-500">%</span>
-                    </div>
-                  </div>
                 </div>
               </div>
 

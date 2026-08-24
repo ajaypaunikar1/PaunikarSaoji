@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Bill, PaymentMethod } from '../types/types';
+import { formatCurrency, formatAmount } from '../utils/currency';
 import { toast } from 'sonner';
 
 const Billing: React.FC = () => {
@@ -23,7 +24,6 @@ const Billing: React.FC = () => {
   const [selectedTableId, setSelectedTableId] = useState<number | null>(null);
   const [selectedParcelId, setSelectedParcelId] = useState<string | null>(null);
   const [discountPct, setDiscountPct] = useState<number>(0);   // Discount in %
-  const [customGstPct, setCustomGstPct] = useState<number>(18); // Default 18%
   const [containerCount, setContainerCount] = useState<number>(1); // ₹10/plate for parcels
   const [cancelReason, setCancelReason] = useState<string>('');
   const [activeCancelItemId, setActiveCancelItemId] = useState<string | null>(null);
@@ -69,24 +69,21 @@ const Billing: React.FC = () => {
 
     // Calculate dynamically based on inputs
     const subtotal = selectedOrder.grandTotal;
-    const gst = Math.round(subtotal * (customGstPct / 100) * 100) / 100;
     // Discount is now a percentage
     const discountAmt = Math.round(subtotal * (discountPct / 100) * 100) / 100;
-    const discount = Math.min(discountAmt, subtotal + gst);
+    const discount = Math.min(discountAmt, subtotal);
     const containerCharge = isParcel ? containerCount * 10 : 0;
-    const grandTotal = Math.max(0, Math.round((subtotal + gst - discount + containerCharge) * 100) / 100);
+    const grandTotal = Math.max(0, Math.round((subtotal - discount + containerCharge) * 100) / 100);
 
     return {
       ...baseBill,
       subtotal,
-      gst,
-      gstPct: customGstPct,
       discount,
       discountPct,
       containerCharge,
       grandTotal,
     };
-  }, [selectedTableId, selectedParcelId, selectedOrder, discountPct, customGstPct, containerCount, bills]);
+  }, [selectedTableId, selectedParcelId, selectedOrder, discountPct, containerCount, bills]);
 
   // Submit payment
   const handleProcessPayment = async () => {
@@ -99,8 +96,8 @@ const Billing: React.FC = () => {
       const discountAmt = Math.round(selectedOrder.grandTotal * (discountPct / 100) * 100) / 100;
       const containerCharge = selectedParcelId ? containerCount * 10 : 0;
       const finalBill = selectedParcelId
-        ? await generateParcelBill(selectedOrder.id, discountAmt, customGstPct, containerCharge)
-        : await generateBill(selectedTableId!, discountAmt, customGstPct);
+        ? await generateParcelBill(selectedOrder.id, discountAmt, containerCharge)
+        : await generateBill(selectedTableId!, discountAmt);
       const waiterName = users.find(u => u.id === selectedOrder.waiterId)?.name || 'Staff';
 
       // Record the payment BEFORE triggering the printer so the receipt reflects
@@ -124,7 +121,6 @@ const Billing: React.FC = () => {
       setSelectedTableId(null);
       setSelectedParcelId(null);
       setDiscountPct(0);
-      setCustomGstPct(settings?.gstEnabled ? (settings?.gstPct ?? 18) : 0);
       setPaymentMethod(null);
       setPrintBillData(null);
     } catch (err: any) {
@@ -239,7 +235,6 @@ const Billing: React.FC = () => {
                       setSelectedTableId(tbl.id);
                       setSelectedParcelId(null);
                       setDiscountPct(0);
-                      setCustomGstPct(settings?.gstEnabled ? (settings?.gstPct ?? 18) : 0);
                     }}
                     className={`p-4 rounded-2xl border transition duration-300 flex justify-between items-center cursor-pointer ${
                       isSelected 
@@ -255,7 +250,7 @@ const Billing: React.FC = () => {
                     </div>
 
                     <div className="text-right">
-                      {order && <div className="text-xs font-bold text-slate-800 font-mono">₹{order.grandTotal}</div>}
+                      {order && <div className="text-xs font-bold text-slate-800 font-mono">{formatCurrency(order.grandTotal)}</div>}
                       <span className={`text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded border mt-1.5 inline-block ${
                         isWaitingPayment 
                           ? 'bg-cyan-100 border-cyan-200 text-cyan-700' 
@@ -287,7 +282,6 @@ const Billing: React.FC = () => {
                       setSelectedParcelId(o.id);
                       setSelectedTableId(null);
                       setDiscountPct(0);
-                      setCustomGstPct(settings?.gstEnabled ? (settings?.gstPct ?? 18) : 0);
                     }}
                     className={`p-4 rounded-2xl border transition duration-300 flex justify-between items-center cursor-pointer ${
                       isSelected
@@ -306,7 +300,7 @@ const Billing: React.FC = () => {
                     </div>
 
                     <div className="text-right shrink-0">
-                      <div className="text-xs font-bold text-slate-800 font-mono">₹{o.grandTotal}</div>
+                      <div className="text-xs font-bold text-slate-800 font-mono">{formatCurrency(o.grandTotal)}</div>
                       <span className="text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded border mt-1.5 inline-block bg-indigo-100 border-indigo-200 text-indigo-700">
                         {o.status}
                       </span>
@@ -350,11 +344,11 @@ const Billing: React.FC = () => {
                           )}
                           <span className="font-bold text-slate-800">{item.name}</span>
                           <span className="ml-1.5 text-[9px] text-slate-550 font-bold uppercase bg-slate-200 px-1.5 py-0.2 rounded">{item.portion}</span>
-                          <div className="text-[10px] text-slate-500 font-bold mt-0.5">{item.quantity} x ₹{item.price}</div>
+                          <div className="text-[10px] text-slate-500 font-bold mt-0.5">{item.quantity} x {formatCurrency(item.price)}</div>
                         </div>
 
                         <div className="flex items-center gap-2">
-                          <span className="font-bold text-slate-800 font-mono">₹{item.quantity * item.price}</span>
+                          <span className="font-bold text-slate-800 font-mono">{formatCurrency(item.quantity * item.price)}</span>
                           
                           {/* Cancellation request trigger */}
                           <button
@@ -405,23 +399,7 @@ const Billing: React.FC = () => {
                   <div className="pt-3 border-t border-slate-100 space-y-1.5 text-xs text-slate-500">
                     <div className="flex justify-between">
                       <span>Subtotal</span>
-                      <span className="font-mono text-slate-800">₹{activeBill.subtotal}</span>
-                    </div>
-
-                    {/* Editable GST Input */}
-                    <div className="flex justify-between items-center py-1">
-                      <span className="font-bold text-slate-700">GST (%)</span>
-                      <div className="flex items-center gap-2">
-                        <input 
-                          type="number"
-                          min="0"
-                          max="28"
-                          value={customGstPct}
-                          onChange={e => setCustomGstPct(Math.max(0, parseFloat(e.target.value) || 0))}
-                          className="w-16 bg-slate-50 border border-slate-200 rounded font-mono text-right text-slate-800 p-1 text-xs focus:outline-none focus:border-emerald-500"
-                        />
-                        <span className="font-mono text-slate-800 w-16 text-right">₹{activeBill.gst.toFixed(2)}</span>
-                      </div>
+                      <span className="font-mono text-slate-800">{formatCurrency(activeBill.subtotal)}</span>
                     </div>
 
                     {/* Editable Discount Input — now in % */}
@@ -438,7 +416,7 @@ const Billing: React.FC = () => {
                           onChange={e => setDiscountPct(Math.max(0, Math.min(100, parseFloat(e.target.value) || 0)))}
                           className="w-16 bg-slate-50 border border-slate-200 rounded font-mono text-right text-slate-800 p-1 text-xs focus:outline-none focus:border-emerald-500"
                         />
-                        <span className="font-mono text-slate-800 w-16 text-right">-₹{activeBill.discount.toFixed(2)}</span>
+                        <span className="font-mono text-slate-800 w-16 text-right">-{formatCurrency(activeBill.discount)}</span>
                       </div>
                     </div>
 
@@ -456,14 +434,14 @@ const Billing: React.FC = () => {
                             onChange={e => setContainerCount(Math.max(0, Math.min(99, parseInt(e.target.value) || 0)))}
                             className="w-12 px-1.5 py-0.5 text-right text-xs font-mono font-bold rounded bg-slate-50 border border-slate-200 focus:outline-none focus:border-emerald-500"
                           />
-                          <span className="font-mono text-slate-800 w-14 text-right text-xs">₹{activeBill.containerCharge.toFixed(2)}</span>
+                          <span className="font-mono text-slate-800 w-14 text-right text-xs">{formatCurrency(activeBill.containerCharge)}</span>
                         </div>
                       </div>
                     )}
                     
                     <div className="pt-3 border-t border-slate-100 flex justify-between items-center text-sm font-black">
                       <span className="text-slate-850 uppercase tracking-wider">{t.grandTotal}</span>
-                      <span className="text-emerald-600 font-mono">₹{activeBill.grandTotal}</span>
+                      <span className="text-emerald-600 font-mono">{formatCurrency(activeBill.grandTotal)}</span>
                     </div>
                   </div>
                 </div>
@@ -555,7 +533,7 @@ const Billing: React.FC = () => {
                 {settings?.phone && (
                   <p style={{ margin: '2px 0 0 0', fontSize: '9px', fontWeight: 'bold' }}>📞 {settings.phone}</p>
                 )}
-                <h3 style={{ margin: '6px 0 0 0', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '1px' }}>TAX INVOICE (कर बीजक)</h3>
+                <h3 style={{ margin: '6px 0 0 0', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '1px' }}>BILL / INVOICE</h3>
               </div>
 
               <table style={{ width: '100%', fontSize: '10px', marginBottom: '8px' }}>
@@ -626,8 +604,8 @@ const Billing: React.FC = () => {
                         )}
                       </td>
                       <td style={{ textAlign: 'center', padding: '4px 0', fontFamily: 'monospace' }}>{item.quantity}</td>
-                      <td style={{ textAlign: 'right', padding: '4px 0', fontFamily: 'monospace' }}>{item.price}</td>
-                      <td style={{ textAlign: 'right', padding: '4px 0', fontFamily: 'monospace' }}>{item.quantity * item.price}</td>
+                      <td style={{ textAlign: 'right', padding: '4px 0', fontFamily: 'monospace' }}>{formatAmount(item.price)}</td>
+                      <td style={{ textAlign: 'right', padding: '4px 0', fontFamily: 'monospace' }}>{formatAmount(item.quantity * item.price)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -635,45 +613,28 @@ const Billing: React.FC = () => {
 
               <div style={{ borderBottom: '1px dashed black', marginBottom: '6px' }} />
 
-              {/* Totals — CGST 9% + SGST 9% for 18% GST */}
+              {/* Totals */}
               <table style={{ width: '100%', fontSize: '10px', fontFamily: 'monospace', marginBottom: '10px' }}>
                 <tbody>
                   <tr>
                     <td>Subtotal:</td>
-                    <td style={{ textAlign: 'right' }}>₹{printBillData.bill.subtotal.toFixed(2)}</td>
+                    <td style={{ textAlign: 'right' }}>{formatCurrency(printBillData.bill.subtotal)}</td>
                   </tr>
-                  {printBillData.bill.gst > 0 && (() => {
-                    const gstPct = printBillData.bill.gstPct || 18;
-                    const halfPct = gstPct / 2;
-                    const halfAmt = Math.round(printBillData.bill.gst / 2 * 100) / 100;
-                    return (
-                      <>
-                        <tr>
-                          <td>CGST ({halfPct}%):</td>
-                          <td style={{ textAlign: 'right' }}>₹{halfAmt.toFixed(2)}</td>
-                        </tr>
-                        <tr>
-                          <td>SGST ({halfPct}%):</td>
-                          <td style={{ textAlign: 'right' }}>₹{halfAmt.toFixed(2)}</td>
-                        </tr>
-                      </>
-                    );
-                  })()}
                   {printBillData.bill.discount > 0 && (
                     <tr style={{ color: 'green' }}>
                       <td>Discount{printBillData.bill.discountPct ? ` (${printBillData.bill.discountPct}%)` : ''}:</td>
-                      <td style={{ textAlign: 'right' }}>-₹{printBillData.bill.discount.toFixed(2)}</td>
+                      <td style={{ textAlign: 'right' }}>-{formatCurrency(printBillData.bill.discount)}</td>
                     </tr>
                   )}
                   {(printBillData.bill.containerCharge || 0) > 0 && (
                     <tr>
                       <td>Container Charge:</td>
-                      <td style={{ textAlign: 'right' }}>₹{(printBillData.bill.containerCharge || 0).toFixed(2)}</td>
+                      <td style={{ textAlign: 'right' }}>{formatCurrency(printBillData.bill.containerCharge || 0)}</td>
                     </tr>
                   )}
                   <tr style={{ fontSize: '12px', fontWeight: 'bold', borderTop: '1px solid black' }}>
                     <td style={{ paddingTop: '4px' }}>GRAND TOTAL:</td>
-                    <td style={{ textAlign: 'right', paddingTop: '4px' }}>₹{printBillData.bill.grandTotal.toFixed(2)}</td>
+                    <td style={{ textAlign: 'right', paddingTop: '4px' }}>{formatCurrency(printBillData.bill.grandTotal)}</td>
                   </tr>
                 </tbody>
               </table>

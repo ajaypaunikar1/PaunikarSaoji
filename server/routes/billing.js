@@ -1,5 +1,5 @@
 import express from 'express';
-import { Table, Order, Bill, Notification, CancellationRequest, Settings } from '../models/index.js';
+import { Table, Order, Bill, Notification, CancellationRequest } from '../models/index.js';
 import { protect } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -27,12 +27,9 @@ router.get('/pending-bills', async (req, res) => {
 });
 
 // @route   POST /api/billing/generate
-// @desc    Generate tax invoice bill
+// @desc    Generate bill
 router.post('/generate', protect, async (req, res) => {
-  // GST % must always be supplied by the client (from Settings); the legacy
-  // default of 5 is kept only as a last-resort fallback for old clients.
-  const { tableId, discount, gstPct = 5, orderId, isParcel, containerCharge } = req.body;
-  const gstPercentage = Math.max(0, Number(gstPct) || 0);
+  const { tableId, discount, orderId, isParcel, containerCharge } = req.body;
 
   try {
     const parcel = !!isParcel;
@@ -64,8 +61,7 @@ router.post('/generate', protect, async (req, res) => {
     const discountVal = Math.max(0, Math.min(Number(discount) || 0, order.grandTotal)); // never go negative
     const containerVal = parcel ? (Number(containerCharge) || 0) : 0;
     const subtotal = order.grandTotal;
-    const gst = Math.round(subtotal * (gstPercentage / 100) * 100) / 100;
-    const grandTotal = Math.max(0, Math.round((subtotal + gst - discountVal + containerVal) * 100) / 100);
+    const grandTotal = Math.max(0, Math.round((subtotal - discountVal + containerVal) * 100) / 100);
 
     // Check for existing pending bill
     const existing = await Bill.findOne({
@@ -76,8 +72,6 @@ router.post('/generate', protect, async (req, res) => {
     let newBill;
     if (existing) {
       existing.subtotal = subtotal;
-      existing.gst = gst;
-      existing.gstPct = gstPercentage;
       existing.discount = discountVal;
       existing.containerCharge = containerVal;
       existing.grandTotal = grandTotal;
@@ -89,8 +83,6 @@ router.post('/generate', protect, async (req, res) => {
         orderId: order.id,
         tableId: billTableId,
         subtotal,
-        gst,
-        gstPct: gstPercentage,
         discount: discountVal,
         containerCharge: containerVal,
         grandTotal,
@@ -111,7 +103,7 @@ router.post('/generate', protect, async (req, res) => {
     // Create Notification
     const notif = await Notification.create({
       title: parcel ? 'Parcel Bill Generated' : `Bill Generated - Table ${billTableId}`,
-      message: `Total: ₹${grandTotal} (Subtotal: ₹${subtotal}, GST: ₹${gst})`,
+      message: `Total: ₹${grandTotal} (Subtotal: ₹${subtotal})`,
       type: 'Billing',
       timestamp: new Date().toLocaleTimeString(),
       read: false
@@ -317,21 +309,12 @@ router.put('/cancel-requests/:id', protect, async (req, res) => {
           paymentStatus: 'Pending'
         });
         if (pendingBill) {
-          // Honour the bill's own GST %; fall back to the restaurant setting
-          // for legacy bills created before gstPct was persisted.
-          let billGstPct = pendingBill.gstPct;
-          if (typeof billGstPct !== 'number') {
-            const settings = await Settings.findOne();
-            billGstPct = settings?.gstEnabled === false ? 0 : (settings?.gstPct ?? 18);
-          }
           const safeDiscount = Math.min(pendingBill.discount || 0, grandTotal);
-          const newGst = Math.round(grandTotal * (billGstPct / 100) * 100) / 100;
           const newGrandTotal = Math.max(0,
-            Math.round((grandTotal + newGst - safeDiscount + (pendingBill.containerCharge || 0)) * 100) / 100
+            Math.round((grandTotal - safeDiscount + (pendingBill.containerCharge || 0)) * 100) / 100
           );
 
           pendingBill.subtotal = grandTotal;
-          pendingBill.gst = newGst;
           pendingBill.discount = safeDiscount;
           pendingBill.grandTotal = newGrandTotal;
           const updatedBill = await pendingBill.save();

@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { User, UserRole, Zone } from '../types/types';
+import { formatCurrency } from '../utils/currency';
 import { toast } from 'sonner';
 
 const EmployeeManagement: React.FC = () => {
@@ -572,7 +573,7 @@ const EmployeeManagement: React.FC = () => {
                             <span className="font-bold text-slate-800">{p.month}</span>
                             <span className="ml-2 text-[10px] bg-emerald-100 text-emerald-700 font-black uppercase px-2 py-0.5 rounded border border-emerald-200">{p.status}</span>
                           </div>
-                          <span className="font-mono font-bold text-slate-800">₹{p.netSalary}</span>
+                          <span className="font-mono font-bold text-slate-800">{formatCurrency(p.netSalary)}</span>
                         </div>
                       ))
                     )}
@@ -791,19 +792,19 @@ const EmployeeManagement: React.FC = () => {
                 <tbody>
                   <tr>
                     <td>Base Salary:</td>
-                    <td style={{ textAlign: 'right' }}>₹{printPayslipData.salary}</td>
+                    <td style={{ textAlign: 'right' }}>{formatCurrency(printPayslipData.salary)}</td>
                   </tr>
                   <tr>
                     <td>Overtime Pay:</td>
-                    <td style={{ textAlign: 'right' }}>+₹{printPayslipData.overtime}</td>
+                    <td style={{ textAlign: 'right' }}>+{formatCurrency(printPayslipData.overtime)}</td>
                   </tr>
                   <tr>
                     <td>Deductions:</td>
-                    <td style={{ textAlign: 'right' }}>-₹{printPayslipData.deductions}</td>
+                    <td style={{ textAlign: 'right' }}>-{formatCurrency(printPayslipData.deductions)}</td>
                   </tr>
                   <tr style={{ fontSize: '14px', fontWeight: 'bold', borderTop: '1px solid black' }}>
                     <td style={{ paddingTop: '5px' }}>NET PAY:</td>
-                    <td style={{ textAlign: 'right', paddingTop: '5px' }}>₹{printPayslipData.netPay}</td>
+                    <td style={{ textAlign: 'right', paddingTop: '5px' }}>{formatCurrency(printPayslipData.netPay)}</td>
                   </tr>
                 </tbody>
               </table>

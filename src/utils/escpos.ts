@@ -45,16 +45,15 @@ export interface ReceiptOptions {
  * against a physical KP-307.
  */
 const RASTER_PX: Record<'normal' | 'tall' | 'double', Record<58 | 80, number>> = {
-  normal: { 80: 26, 58: 21 },
-  tall: { 80: 40, 58: 34 },
-  double: { 80: 52, 58: 44 }
+  normal: { 80: 28, 58: 23 },
+  tall: { 80: 44, 58: 37 },
+  double: { 80: 56, 58: 47 }
 };
 
 export interface ReceiptSettings {
   restaurantName?: string;
   address?: string;
   phone?: string;
-  gstNumber?: string;
   upiId?: string;
 }
 
@@ -191,9 +190,6 @@ export async function generateBillReceipt(
   const restName = settings?.restaurantName || 'Paunikar Saoji Restaurant';
   const address = settings?.address || '';
   const phone = settings?.phone || '';
-  const gstPct = bill.gstPct || 18;
-  const halfPct = gstPct / 2;
-  const halfAmt = Math.round((bill.gst / 2) * 100) / 100;
   const cut = cutCommand(opts?.cutMode ?? 'FULL');
 
   const segs: Seg[] = [
@@ -205,7 +201,7 @@ export async function generateBillReceipt(
     ...(phone
       ? [{ kind: 'text' as const, text: `Ph: ${phone}`, align: 'center' as Align }]
       : []),
-    { kind: 'text', text: 'TAX INVOICE (kar bijak)', align: 'center', bold: true },
+    { kind: 'text', text: 'BILL / INVOICE', align: 'center', bold: true },
     { kind: 'text', text: '--------------------------------', align: 'center' },
     { kind: 'text', text: `Invoice: #${bill.id ? bill.id.substring(5, 12) : 'PENDING'}` },
     { kind: 'text', text: bill.isParcel ? 'Order Type: PARCEL' : `Table: T-${bill.tableId}` },
@@ -221,22 +217,15 @@ export async function generateBillReceipt(
         text:
           item.name +
           (item.portion && item.portion !== 'Single' ? ` (${item.portion})` : ''),
-        bold: true as const,
-        size: 'tall' as const
+        bold: true as const
       },
-      { kind: 'text' as const, text: `  ${item.quantity} x Rs.${item.price} = Rs.${item.price * item.quantity}`, size: 'tall' as const },
+      { kind: 'text' as const, text: `  ${item.quantity} x Rs.${item.price} = Rs.${item.price * item.quantity}` },
       ...(item.spiceLevel && item.spiceLevel !== 'normal'
-        ? [{ kind: 'text' as const, text: `  Spice: ${item.spiceLevel}`, size: 'tall' as const }]
+        ? [{ kind: 'text' as const, text: `  Spice: ${item.spiceLevel}` }]
         : [])
     ]),
     { kind: 'text', text: '--------------------------------' },
     { kind: 'text', text: `Subtotal: Rs.${bill.subtotal}`, align: 'right' },
-    ...(bill.gst > 0
-      ? [
-          { kind: 'text' as const, text: `CGST (${halfPct}%): Rs.${halfAmt}`, align: 'right' as Align },
-          { kind: 'text' as const, text: `SGST (${halfPct}%): Rs.${halfAmt}`, align: 'right' as Align }
-        ]
-      : []),
     ...(bill.discount > 0
       ? [{
           kind: 'text' as const,
@@ -247,7 +236,7 @@ export async function generateBillReceipt(
     ...(bill.containerCharge && bill.containerCharge > 0
       ? [{ kind: 'text' as const, text: `Container Charge: Rs.${bill.containerCharge}`, align: 'right' as Align }]
       : []),
-    { kind: 'text', text: `GRAND TOTAL: Rs.${bill.grandTotal}`, align: 'right', bold: true, size: 'double' },
+    { kind: 'text', text: `GRAND TOTAL: Rs.${bill.grandTotal}`, align: 'right', bold: true },
     { kind: 'text', text: '--------------------------------', align: 'right' },
     { kind: 'text', text: 'Thank you! Visit Again.', align: 'center' },
     { kind: 'text', text: restName, align: 'center' },

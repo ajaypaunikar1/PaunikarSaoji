@@ -13,6 +13,7 @@ import {
 } from 'recharts';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getISTDateKey, getISTHour } from '../utils/date';
+import { formatCurrency } from '../utils/currency';
 
 const istTodayDisplay = () =>
   new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -35,7 +36,6 @@ const Dashboard: React.FC = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [formRestName, setFormRestName] = useState('');
   const [formAddress, setFormAddress] = useState('');
-  const [formGst, setFormGst] = useState('');
   const [formUpi, setFormUpi] = useState('');
   const [connectLoading, setConnectLoading] = useState(false);
   const [testLoading, setTestLoading] = useState(false);
@@ -176,7 +176,6 @@ const Dashboard: React.FC = () => {
                 if (settings) {
                   setFormRestName(settings.restaurantName || '');
                   setFormAddress(settings.address || '');
-                  setFormGst(settings.gstNumber || '');
                   setFormUpi(settings.upiId || '');
                 }
                 setIsSettingsOpen(true);
@@ -208,7 +207,7 @@ const Dashboard: React.FC = () => {
           </div>
           <div>
             <span className="text-[10px] uppercase font-bold text-gray-400 block mb-1">{t.revenue}</span>
-            <span className="text-lg font-black text-gray-900 tracking-tight">₹{metrics.totalRevenue}</span>
+            <span className="text-lg font-black text-gray-900 tracking-tight">{formatCurrency(metrics.totalRevenue)}</span>
           </div>
         </motion.div>
 
@@ -296,10 +295,10 @@ const Dashboard: React.FC = () => {
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="hour" stroke="#94a3b8" fontSize={9} tickLine={false} axisLine={false} />
-                <YAxis stroke="#94a3b8" fontSize={9} tickLine={false} axisLine={false} tickFormatter={(v) => `₹${v / 1000}k`} />
+                <YAxis stroke="#94a3b8" fontSize={9} tickLine={false} axisLine={false} tickFormatter={(v) => `₹${Number((v / 1000).toFixed(1))}k`} />
                 <Tooltip 
                   contentStyle={{ background: '#ffffff', borderRadius: '12px', border: '1px solid #e5e7eb', fontSize: '11px', fontFamily: 'monospace' }}
-                  formatter={(value: any) => [`₹${value}`, 'Sales']}
+                  formatter={(value: any) => [formatCurrency(value), 'Sales']}
                 />
                 <Area type="monotone" dataKey="sales" stroke="#6366f1" strokeWidth={2.5} fillOpacity={1} fill="url(#colorSales)" />
               </AreaChart>
@@ -373,7 +372,6 @@ const Dashboard: React.FC = () => {
                 await updateSettings({
                   restaurantName: formRestName,
                   address: formAddress,
-                  gstNumber: formGst,
                   upiId: formUpi
                 });
                 setIsSettingsOpen(false);
@@ -405,26 +403,15 @@ const Dashboard: React.FC = () => {
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <label className="text-[9px] uppercase font-bold text-slate-500">GST Number</label>
-                      <input 
-                        type="text" 
-                        value={formGst} 
-                        onChange={e => setFormGst(e.target.value)} 
-                        className="w-full text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-850 font-mono focus:outline-none focus:ring-1 focus:ring-emerald-500" 
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[9px] uppercase font-bold text-slate-500">UPI Pay ID</label>
-                      <input 
-                        type="text" 
-                        value={formUpi} 
-                        onChange={e => setFormUpi(e.target.value)} 
-                        className="w-full text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-850 font-mono focus:outline-none focus:ring-1 focus:ring-emerald-500" 
-                        required
-                      />
-                    </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] uppercase font-bold text-slate-500">UPI Pay ID</label>
+                    <input 
+                      type="text" 
+                      value={formUpi} 
+                      onChange={e => setFormUpi(e.target.value)} 
+                      className="w-full text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-850 font-mono focus:outline-none focus:ring-1 focus:ring-emerald-500" 
+                      required
+                    />
                   </div>
                 </div>
 

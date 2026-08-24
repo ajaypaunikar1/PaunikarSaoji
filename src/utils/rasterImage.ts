@@ -121,7 +121,7 @@ export async function rasterizeTextLine(
 
   draw(fontSize);
   let metrics = ctx.measureText(text);
-  while (metrics.width > widthDots - 8 && fontSize > 10) {
+  while (metrics.width > widthDots - 8 && fontSize > 14) {
     fontSize -= 1;
     draw(fontSize);
     metrics = ctx.measureText(text);

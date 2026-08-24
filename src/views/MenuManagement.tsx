@@ -8,6 +8,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import type { MenuItem, MenuItemVariant } from '../types/types';
 import { getCategoryLabel, DEFAULT_CATEGORIES } from '../utils/categories';
+import { formatCurrency } from '../utils/currency';
 import { toast } from 'sonner';
 
 type PortionMode = 'Single' | 'Variant';
@@ -255,12 +256,12 @@ const MenuManagement: React.FC = () => {
               {/* Pricing detail */}
               <div className="text-xs font-semibold text-slate-500 pt-1 font-mono">
                 {item.portionMode === 'Single' ? (
-                  <span>₹{item.price} &bull; {item.prepTime} {t.mins}</span>
+                  <span>{formatCurrency(item.price)} &bull; {item.prepTime} {t.mins}</span>
                 ) : (
                   <div className="flex gap-1.5 flex-wrap">
                     {item.variants.map((v, idx) => (
                       <span key={idx} className="bg-slate-50 border border-slate-200 px-1.5 py-0.5 rounded text-[10px] text-emerald-600 font-bold">
-                        {v.name}: ₹{v.price}
+                        {v.name}: {formatCurrency(v.price)}
                       </span>
                     ))}
                   </div>
@@ -457,7 +458,7 @@ const MenuManagement: React.FC = () => {
                       <div className="mt-3 pt-3 border-t border-slate-200 space-y-1.5 max-h-36 overflow-y-auto">
                         {variantsList.map((v, idx) => (
                           <div key={idx} className="flex justify-between items-center text-xs py-1.5 border-b border-slate-100 last:border-b-0">
-                            <span className="font-bold text-slate-650">{v.name} &bull; Price: ₹{v.price} &bull; Prep: {v.prepTime}m</span>
+                            <span className="font-bold text-slate-650">{v.name} &bull; Price: {formatCurrency(v.price)} &bull; Prep: {v.prepTime}m</span>
                             <button
                               type="button"
                               onClick={() => handleRemoveVariant(idx)}

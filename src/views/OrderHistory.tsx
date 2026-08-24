@@ -3,6 +3,7 @@ import { useApp } from '../context/AppContext';
 import { ClipboardList, Search, Eye, Filter } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Order } from '../types/types';
+import { formatCurrency } from '../utils/currency';
 
 const OrderHistory: React.FC = () => {
   const { orders, users } = useApp();
@@ -141,7 +142,7 @@ const OrderHistory: React.FC = () => {
                           {order.status}
                         </span>
                       </td>
-                      <td className="p-4 text-right pr-6 font-black text-slate-900 font-mono">₹{order.grandTotal}</td>
+                      <td className="p-4 text-right pr-6 font-black text-slate-900 font-mono">{formatCurrency(order.grandTotal)}</td>
                       <td className="p-4 text-center">
                         <button
                           onClick={() => setSelectedOrder(order)}
@@ -233,8 +234,8 @@ const OrderHistory: React.FC = () => {
                         )}
                       </div>
                       <div className="text-right">
-                        <span className="font-mono text-slate-505 text-[10px]">{item.quantity} x ₹{item.price}</span>
-                        <p className="font-black text-slate-800 font-mono m-0 mt-0.5">₹{item.quantity * item.price}</p>
+                        <span className="font-mono text-slate-505 text-[10px]">{item.quantity} x {formatCurrency(item.price)}</span>
+                        <p className="font-black text-slate-800 font-mono m-0 mt-0.5">{formatCurrency(item.quantity * item.price)}</p>
                       </div>
                     </div>
                   ))}
@@ -243,7 +244,7 @@ const OrderHistory: React.FC = () => {
 
               <div className="pt-3 border-t border-slate-100 flex justify-between items-center">
                 <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Grand Total</span>
-                <span className="text-base font-black text-emerald-600 font-mono">₹{selectedOrder.grandTotal}</span>
+                <span className="text-base font-black text-emerald-600 font-mono">{formatCurrency(selectedOrder.grandTotal)}</span>
               </div>
             </motion.div>
           </>

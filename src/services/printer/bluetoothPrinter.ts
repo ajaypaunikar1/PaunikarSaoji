@@ -31,11 +31,20 @@ function normalizeBleServiceUuid(raw: string): string {
  * All writes are serialized through an internal promise queue so jobs on this
  * printer never interleave ESC/POS bytes.
  */
+interface WriteMode {
+  withResponse: boolean;
+  size: number;
+}
+
+const CHUNK_LADDER = [512, 240, 120, 52, 20];
+
 export class BluetoothPrinter {
   private device: BluetoothDevice | null = null;
   private characteristic: BluetoothRemoteGATTCharacteristic | null = null;
   private printing = false;
   private queue: Promise<void> = Promise.resolve();
+  /** Largest acknowledged payload proven to work on the current connection. */
+  private workingMode: WriteMode | null = null;
 
   /** Fired when the peripheral drops the GATT link on its own. */
   onDisconnect: (() => void) | null = null;
@@ -162,12 +171,14 @@ export class BluetoothPrinter {
 
     this.device = device;
     this.characteristic = characteristic;
+    this.workingMode = null;
 
     device.addEventListener('gattserverdisconnected', this.handleGattDisconnected);
   }
 
   private handleGattDisconnected = (): void => {
     this.characteristic = null;
+    this.workingMode = null;
     if (this.device) {
       this.device.removeEventListener('gattserverdisconnected', this.handleGattDisconnected);
     }
@@ -236,6 +247,7 @@ export class BluetoothPrinter {
   async disconnect(forget = false): Promise<void> {
     const device = this.device;
     this.characteristic = null;
+    this.workingMode = null;
     this.device = null;
     if (device) {
       device.removeEventListener('gattserverdisconnected', this.handleGattDisconnected);
@@ -253,7 +265,68 @@ export class BluetoothPrinter {
     return run;
   }
 
-  /** Send raw ESC/POS bytes over GATT, MTU-safe chunked, strictly serialized. */
+  /**
+   * Candidate write modes, ordered most-reliable-and-fastest first.
+   *
+   * writeWithResponse is preferred: ATT long writes guarantee up to 512-byte
+   * payloads regardless of negotiated MTU, and every block is ACKed by the
+   * printer (real flow control - critical for multi-KB raster bitmaps).
+   * writeWithoutResponse has no flow control and its payload must fit a single
+   * MTU packet, so it only appears with conservative sizes as a last resort.
+   */
+  private writeModes(ch: BluetoothRemoteGATTCharacteristic): WriteMode[] {
+    const modes: WriteMode[] = [];
+    if (ch.properties.write) {
+      for (const size of CHUNK_LADDER) modes.push({ withResponse: true, size });
+    }
+    if (ch.properties.writeWithoutResponse) {
+      for (const size of CHUNK_LADDER) {
+        if (size <= 240) modes.push({ withResponse: false, size });
+      }
+    }
+    return modes;
+  }
+
+  /**
+   * Send the full payload, starting at the largest payload this connection has
+   * already accepted. If a size is rejected mid-transfer (firmware/MTU limits),
+   * downgrade and restart from the beginning of the payload rather than
+   * splicing mismatched chunk sizes into one stream. The winning size is
+   * remembered so subsequent jobs skip probing entirely.
+   */
+  private async writeAll(
+    ch: BluetoothRemoteGATTCharacteristic,
+    device: BluetoothDevice,
+    data: Uint8Array
+  ): Promise<void> {
+    let modes = this.writeModes(ch);
+    if (this.workingMode) {
+      modes = [this.workingMode, ...modes.filter(m => m !== this.workingMode)];
+    }
+
+    let lastError: unknown = null;
+    for (const mode of modes) {
+      try {
+        for (let offset = 0; offset < data.length; offset += mode.size) {
+          const end = Math.min(offset + mode.size, data.length);
+          const chunk = data.subarray(offset, end) as unknown as BufferSource;
+          if (mode.withResponse) {
+            await ch.writeValueWithResponse(chunk);
+          } else {
+            await ch.writeValueWithoutResponse(chunk);
+          }
+        }
+        this.workingMode = mode;
+        return;
+      } catch (err) {
+        lastError = err;
+        if (!device.gatt?.connected) break;
+      }
+    }
+    throw lastError ?? new Error('No writable BLE mode available');
+  }
+
+  /** Send raw ESC/POS bytes over GATT, adaptively chunked, strictly serialized. */
   print(data: Uint8Array): Promise<void> {
     if (!this.isConnected()) {
       throw new WebSerialPrinterError('NOT_CONNECTED', 'BLE printer is not connected');
@@ -266,16 +339,7 @@ export class BluetoothPrinter {
       }
       this.printing = true;
       try {
-        const useWithoutResponse = !!ch.properties.writeWithoutResponse;
-        const chunkSize = useWithoutResponse ? 20 : 512;
-        for (let offset = 0; offset < data.length; offset += chunkSize) {
-          const chunk = data.subarray(offset, Math.min(offset + chunkSize, data.length)) as unknown as BufferSource;
-          if (useWithoutResponse) {
-            await ch.writeValueWithoutResponse(chunk);
-          } else {
-            await ch.writeValueWithResponse(chunk);
-          }
-        }
+        await this.writeAll(ch, device, data);
       } catch (err) {
         if (!device.gatt?.connected) {
           this.handleGattDisconnected();

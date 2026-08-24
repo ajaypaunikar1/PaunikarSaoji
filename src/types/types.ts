@@ -130,8 +130,6 @@ export interface Bill {
   orderId: string;
   tableId: number;
   subtotal: number;
-  gst: number;
-  gstPct?: number; // GST percentage used
   discount: number;
   discountPct?: number; // discount percentage used
   containerCharge?: number; // parcel container charge (flat ₹10 per order)

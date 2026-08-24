@@ -71,17 +71,13 @@ app.get('/api/settings', async (req, res) => {
         restaurantName: 'Paunikar Saoji Restaurant',
         address: 'Plot no.10 Near Purti Bazar, Manewada Rd, Besa Pipla, Maharashtra 440037',
         phone: '',
-        gstNumber: '',
         upiId: 'restaurant@upi',
         zones: ['A', 'B', 'C'],
         mergedGroups: [],
-        gstEnabled: true,
-        gstPct: 18,
         kitchenPrinterIp: '127.0.0.1',
         billingPrinterIp: '127.0.0.1'
       });
     }
-    if (settings.gstPct == null) settings.gstPct = 18;
     res.json({ success: true, data: settings });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -260,12 +256,9 @@ const seedDatabase = async () => {
         _id: 'settings-main',
         restaurantName: 'Paunikar Saoji Family Restaurant',
         address: 'Nagpur, Maharashtra',
-        gstNumber: '27AAAAA1111A1Z1',
         upiId: 'restaurant@upi',
         zones: ['A', 'B', 'C'],
-        mergedGroups: [],
-        gstEnabled: true,
-        gstPct: 18
+        mergedGroups: []
       });
       console.log('Settings seeded successfully!');
     }

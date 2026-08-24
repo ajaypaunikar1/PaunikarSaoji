@@ -11,6 +11,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import type { Table, PortionType, TableStatus } from '../types/types';
 import QtyStepper from '../components/QtyStepper';
 import { resolvePortionPrice } from '../utils/variants';
+import { formatCurrency } from '../utils/currency';
 import { toast } from 'sonner';
 
 const STATUS_STYLES: Record<TableStatus, { card: string; badge: string; badgeText: string }> = {
@@ -345,7 +346,7 @@ const TableManagement: React.FC = () => {
                     </div>
                   )}
                   {tableOrder && (
-                    <div className="text-xs font-black text-gray-800">₹{tableOrder.grandTotal}</div>
+                    <div className="text-xs font-black text-gray-800">{formatCurrency(tableOrder.grandTotal)}</div>
                   )}
                   {isMerged && isMaster && !isEditMode && (
                     <button onClick={e => { e.stopPropagation(); unmergeTables(table.id); }}
@@ -417,7 +418,7 @@ const TableManagement: React.FC = () => {
                               <div>
                                 <span className="font-bold text-gray-800">{item.name}</span>
                                 <span className="ml-1.5 text-[9px] bg-indigo-50 text-indigo-600 font-bold px-1.5 py-0.5 rounded capitalize">{item.portion}</span>
-                                <div className="text-[10px] text-gray-400 font-mono mt-0.5">₹{item.price} each</div>
+                                <div className="text-[10px] text-gray-400 font-mono mt-0.5">{formatCurrency(item.price)} each</div>
                               </div>
                               <div className="flex items-center gap-2">
                                 <button onClick={() => handleUpdateActiveOrderItemQty(idx, -1)} className="w-5 h-5 rounded bg-white border border-gray-200 flex items-center justify-center text-xs font-bold text-gray-700 cursor-pointer">-</button>
@@ -430,7 +431,7 @@ const TableManagement: React.FC = () => {
                         </div>
                         <div className="pt-3 border-t border-gray-100 flex justify-between items-center text-xs font-bold">
                           <span>Total</span>
-                          <span className="text-indigo-600 text-sm font-mono">₹{activeOrder.grandTotal}</span>
+                          <span className="text-indigo-600 text-sm font-mono">{formatCurrency(activeOrder.grandTotal)}</span>
                         </div>
                       </div>
                     ) : (
@@ -601,7 +602,7 @@ const TableManagement: React.FC = () => {
                                     onClick={() => handleAddToOrder(item, v.name)}
                                     className="w-full py-1 px-1 bg-slate-50 border border-slate-200 rounded text-[9px] font-bold text-indigo-600 cursor-pointer text-center hover:bg-indigo-50 hover:border-indigo-200 transition"
                                   >
-                                    {v.name} (₹{v.price})
+                                    {v.name} ({formatCurrency(v.price)})
                                   </button>
                                 ))}
                               </div>
@@ -610,7 +611,7 @@ const TableManagement: React.FC = () => {
                                 onClick={() => handleAddToOrder(item, 'Single')}
                                 className="w-full py-1 bg-slate-50 border border-slate-200 rounded text-[10px] font-bold text-indigo-600 cursor-pointer text-center hover:bg-indigo-50 hover:border-indigo-200 transition"
                               >
-                                Add (₹{item.price})
+                                Add ({formatCurrency(item.price)})
                               </button>
                             )}
                           </div>

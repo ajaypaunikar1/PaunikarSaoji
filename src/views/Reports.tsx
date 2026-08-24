@@ -8,6 +8,7 @@ import {
 import { toast } from 'sonner';
 import type { PaymentMethod } from '../types/types';
 import { getISTDateKey } from '../utils/date';
+import { formatCurrency } from '../utils/currency';
 
 const orderDateKey = (ord: any): string => {
   if (ord?.createdAt) return getISTDateKey(ord.createdAt);
@@ -102,7 +103,6 @@ const Reports: React.FC = () => {
   // Order Metrics
   const orderMetrics = useMemo(() => {
     let totalRevenue = 0;
-    let totalGST = 0;
     let totalDiscount = 0;
     let totalOrders = filteredOrders.length;
 
@@ -111,20 +111,18 @@ const Reports: React.FC = () => {
       if (bill) {
         if (bill.paymentStatus === 'Paid') {
           totalRevenue += bill.grandTotal;
-          totalGST += bill.gst;
           totalDiscount += bill.discount;
         }
       } else {
         if (ord.status === 'Served') {
           totalRevenue += ord.grandTotal;
-          totalGST += ord.grandTotal * ((settings?.gstPct ?? 18) / 100);
         }
       }
     });
 
     const avgOrderValue = totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0;
-    return { totalRevenue, totalGST, totalDiscount, totalOrders, avgOrderValue };
-  }, [filteredOrders, bills, settings]);
+    return { totalRevenue, totalDiscount, totalOrders, avgOrderValue };
+  }, [filteredOrders, bills]);
 
   // Product Metrics
   const productMetrics = useMemo(() => {
@@ -167,7 +165,7 @@ const Reports: React.FC = () => {
 
   // CSV Export handlers
   const handleExportOrdersCSV = () => {
-    let csv = 'Order ID,Table ID,Waiter,Date/Time,Items,Subtotal,GST,Discount,Grand Total,Status,Payment Method,Payment Status\n';
+    let csv = 'Order ID,Table ID,Waiter,Date/Time,Items,Subtotal,Discount,Grand Total,Status,Payment Method,Payment Status\n';
     
     filteredOrders.forEach(ord => {
       const bill = bills.find(b => b.orderId === ord.id);
@@ -176,13 +174,12 @@ const Reports: React.FC = () => {
       const itemsList = ord.items.map(i => `${i.name} (${i.portion} x${i.quantity})`).join(' | ').replace(/,/g, '');
       
       const subtotal = bill ? bill.subtotal : ord.grandTotal;
-      const gst = bill ? bill.gst : Math.round(ord.grandTotal * ((settings?.gstPct ?? 18) / 100) * 100) / 100;
       const discount = bill ? bill.discount : 0;
-      const grandTotal = bill ? bill.grandTotal : ord.grandTotal + gst;
+      const grandTotal = bill ? bill.grandTotal : ord.grandTotal;
       const paymentMethod = bill && bill.paymentMethod ? bill.paymentMethod : '-';
       const paymentStatus = bill ? bill.paymentStatus : 'Unbilled';
 
-      csv += `"${ord.id}","${ord.tableId}","${waiterName}","${dateStr}","${itemsList}",${subtotal},${gst},${discount},${grandTotal},"${ord.status}","${paymentMethod}","${paymentStatus}"\n`;
+      csv += `"${ord.id}","${ord.tableId}","${waiterName}","${dateStr}","${itemsList}",${subtotal},${discount},${grandTotal},"${ord.status}","${paymentMethod}","${paymentStatus}"\n`;
     });
 
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -348,7 +345,7 @@ const Reports: React.FC = () => {
             <div className="p-4 bg-emerald-50/50 border border-emerald-200/60 rounded-3xl shadow-xs flex items-center justify-between">
               <div>
                 <span className="text-[10px] uppercase font-bold text-emerald-700 block mb-1">{language === 'en' ? 'Revenue (Paid)' : 'एकूण महसूल'}</span>
-                <span className="text-xl font-black text-slate-800">₹{orderMetrics.totalRevenue}</span>
+                <span className="text-xl font-black text-slate-800">{formatCurrency(orderMetrics.totalRevenue)}</span>
               </div>
               <div className="w-10 h-10 rounded-xl bg-emerald-100/50 flex items-center justify-center text-emerald-700"><IndianRupee size={18} /></div>
             </div>
@@ -356,23 +353,15 @@ const Reports: React.FC = () => {
             <div className="p-4 bg-slate-50 border border-slate-200 rounded-3xl shadow-xs flex items-center justify-between">
               <div>
                 <span className="text-[10px] uppercase font-bold text-slate-500 block mb-1">{language === 'en' ? 'Avg Order Value' : 'सरासरी ऑर्डर मूल्य'}</span>
-                <span className="text-xl font-black text-slate-800">₹{orderMetrics.avgOrderValue}</span>
+                <span className="text-xl font-black text-slate-800">{formatCurrency(orderMetrics.avgOrderValue)}</span>
               </div>
               <div className="w-10 h-10 rounded-xl bg-slate-200/50 flex items-center justify-center text-slate-600"><ArrowUpRight size={18} /></div>
             </div>
 
             <div className="p-4 bg-white border border-slate-200 rounded-3xl shadow-xs flex items-center justify-between">
               <div>
-                <span className="text-[10px] uppercase font-bold text-slate-45 block mb-1">{language === 'en' ? 'Total GST' : 'एकूण जीएसटी'}</span>
-                <span className="text-xl font-black text-slate-800">₹{Math.round(orderMetrics.totalGST)}</span>
-              </div>
-              <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-500"><IndianRupee size={18} /></div>
-            </div>
-
-            <div className="p-4 bg-white border border-slate-200 rounded-3xl shadow-xs flex items-center justify-between">
-              <div>
                 <span className="text-[10px] uppercase font-bold text-slate-45 block mb-1">{language === 'en' ? 'Discounts Given' : 'दिलेली सवलत'}</span>
-                <span className="text-xl font-black text-slate-800">₹{orderMetrics.totalDiscount}</span>
+                <span className="text-xl font-black text-slate-800">{formatCurrency(orderMetrics.totalDiscount)}</span>
               </div>
               <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-500"><IndianRupee size={18} /></div>
             </div>
@@ -401,7 +390,6 @@ const Reports: React.FC = () => {
                     <th className="p-4">{language === 'en' ? 'Date/Time' : 'तारीख/वेळ'}</th>
                     <th className="p-4">{language === 'en' ? 'Items' : 'पदार्थ'}</th>
                     <th className="p-4 text-right">{t.subtotal}</th>
-                    <th className="p-4 text-right">{t.gstAmount}</th>
                     <th className="p-4 text-right">{t.discount}</th>
                     <th className="p-4 text-right pr-6">{t.grandTotal}</th>
                     <th className="p-4 text-center">{t.orderStatus}</th>
@@ -411,15 +399,14 @@ const Reports: React.FC = () => {
                 <tbody>
                   {filteredOrders.length === 0 ? (
                     <tr>
-                      <td colSpan={11} className="p-8 text-center text-slate-400 font-medium text-xs">{language === 'en' ? 'No orders recorded in this date range.' : 'या कालावधीत कोणतीही ऑर्डर नोंदवली गेली नाही.'}</td>
+                      <td colSpan={10} className="p-8 text-center text-slate-400 font-medium text-xs">{language === 'en' ? 'No orders recorded in this date range.' : 'या कालावधीत कोणतीही ऑर्डर नोंदवली गेली नाही.'}</td>
                     </tr>
                   ) : (
                     filteredOrders.map(ord => {
                       const bill = bills.find(b => b.orderId === ord.id);
                       const subtotal = bill ? bill.subtotal : ord.grandTotal;
-                      const gst = bill ? bill.gst : Math.round(ord.grandTotal * ((settings?.gstPct ?? 18) / 100) * 100) / 100;
                       const discount = bill ? bill.discount : 0;
-                      const grandTotal = bill ? bill.grandTotal : ord.grandTotal + gst;
+                      const grandTotal = bill ? bill.grandTotal : ord.grandTotal;
                       const dateStr = (ord as any).createdAt ? new Date((ord as any).createdAt).toLocaleString() : ord.timestamp;
 
                       return (
@@ -431,10 +418,9 @@ const Reports: React.FC = () => {
                           <td className="p-4 max-w-xs truncate" title={ord.items.map(i => `${i.name} (${i.portion} x${i.quantity})`).join(', ')}>
                             {ord.items.map(i => `${i.name} (${i.portion} x${i.quantity})`).join(', ')}
                           </td>
-                          <td className="p-4 text-right font-mono">₹{subtotal}</td>
-                          <td className="p-4 text-right text-slate-500 font-mono">₹{gst}</td>
-                          <td className="p-4 text-right text-rose-600 font-mono">₹{discount}</td>
-                          <td className="p-4 text-right font-black text-slate-900 font-mono pr-6">₹{grandTotal}</td>
+                          <td className="p-4 text-right font-mono">{formatCurrency(subtotal)}</td>
+                          <td className="p-4 text-right text-rose-600 font-mono">-{formatCurrency(discount)}</td>
+                          <td className="p-4 text-right font-black text-slate-900 font-mono pr-6">{formatCurrency(grandTotal)}</td>
                           <td className="p-4 text-center">
                             <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase border ${
                               ord.status === 'Served' ? 'bg-emerald-100 border-emerald-250 text-emerald-700' :
@@ -638,7 +624,7 @@ const Reports: React.FC = () => {
                       <tr key={idx} className="border-b border-slate-50 hover:bg-slate-50/50 transition text-xs font-medium">
                         <td className="p-4 pl-6 font-bold text-slate-800">{prod.name}</td>
                         <td className="p-4 text-center font-bold text-slate-700">{prod.quantity}</td>
-                        <td className="p-4 text-right pr-6 font-mono text-emerald-700 font-bold">₹{prod.revenue}</td>
+                        <td className="p-4 text-right pr-6 font-mono text-emerald-700 font-bold">{formatCurrency(prod.revenue)}</td>
                       </tr>
                     ))
                   )}

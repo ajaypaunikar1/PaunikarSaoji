@@ -79,8 +79,6 @@ export async function buildBillReceipt(bill, order) {
   const address = settings?.address || '';
   const phone = settings?.phone || '';
   const nowIST = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true });
-  const gstPct = bill.gstPct || 18;
-  const halfPct = gstPct / 2;
 
   let receipt = '';
   receipt += CHARS.INIT;
@@ -115,11 +113,6 @@ export async function buildBillReceipt(bill, order) {
 
   receipt += CHARS.ALIGN_RIGHT;
   receipt += `Subtotal: Rs.${bill.subtotal}\n`;
-  if (bill.gst > 0) {
-    const halfAmt = Math.round((bill.gst / 2) * 100) / 100;
-    receipt += `CGST (${halfPct}%): Rs.${halfAmt}\n`;
-    receipt += `SGST (${halfPct}%): Rs.${halfAmt}\n`;
-  }
   if (bill.discount > 0) {
     const discLabel = bill.discountPct ? `Discount (${bill.discountPct}%)` : 'Discount';
     receipt += `${discLabel}: -Rs.${bill.discount}\n`;
