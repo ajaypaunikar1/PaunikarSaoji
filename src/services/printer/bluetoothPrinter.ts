@@ -38,6 +38,34 @@ interface WriteMode {
 
 const CHUNK_LADDER = [512, 240, 120, 52, 20];
 
+/**
+ * Hard ceiling for GATT connect + service discovery. Without this, Chrome
+ * silently retries a sleeping/unreachable peripheral for MINUTES before
+ * surfacing an error - staff see an endless spinner instead of guidance.
+ */
+const CONNECT_TIMEOUT_MS = 15000;
+
+function errCode(message: string): WebSerialPrinterError {
+  return new WebSerialPrinterError('OPEN_FAILED', message);
+}
+
+async function withTimeout<T>(task: () => Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  try {
+    return await Promise.race([
+      task(),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => reject(errCode(`Printer did not respond within ${Math.round(ms / 1000)} s - power-cycle it (hold FEED ~5 s) and try again`)),
+          ms
+        );
+      })
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 export class BluetoothPrinter {
   private device: BluetoothDevice | null = null;
   private characteristic: BluetoothRemoteGATTCharacteristic | null = null;
@@ -152,15 +180,28 @@ export class BluetoothPrinter {
     }
 
     try {
-      await gatt.connect();
+      await withTimeout(() => gatt.connect(), CONNECT_TIMEOUT_MS);
     } catch (err) {
+      // Abandon the stalled link immediately so Chrome stops retrying silently
+      try { gatt.disconnect(); } catch { /* ignore */ }
+      if (err instanceof WebSerialPrinterError) throw err;
       throw new WebSerialPrinterError(
         'OPEN_FAILED',
         (err as Error)?.message || 'GATT connect failed'
       );
     }
 
-    const characteristic = await this.findWritable(gatt, config);
+    let characteristic: BluetoothRemoteGATTCharacteristic | null;
+    try {
+      characteristic = await withTimeout(
+        () => this.findWritable(gatt, config),
+        CONNECT_TIMEOUT_MS
+      );
+    } catch (err) {
+      // Clean up the half-open link so the printer returns to advertising mode
+      try { gatt.disconnect(); } catch { /* ignore */ }
+      throw err;
+    }
     if (!characteristic) {
       try { gatt.disconnect(); } catch { /* ignore */ }
       throw new WebSerialPrinterError(
@@ -189,25 +230,50 @@ export class BluetoothPrinter {
     gatt: NonNullable<BluetoothDevice['gatt']>,
     config: PrinterConfig
   ): Promise<BluetoothRemoteGATTCharacteristic | null> {
-    let services;
     let wanted: string | null = null;
     if (config.bleServiceUuid) {
       try {
         wanted = normalizeBleServiceUuid(config.bleServiceUuid);
-      } catch { /* malformed stored value - fall back to full discovery */ }
+      } catch { /* malformed stored value - fall back to known list */ }
     }
+
+    const pickWritable = (
+      chars: BluetoothRemoteGATTCharacteristic[]
+    ): BluetoothRemoteGATTCharacteristic | null =>
+      chars.find(ch => ch.properties.write || ch.properties.writeWithoutResponse) ?? null;
+
+    /**
+     * Fast path: probe only the well-known thermal-printer services (or the
+     * operator-configured one). Each miss fails instantly with NotFoundError,
+     * so this finishes in milliseconds instead of walking every service and
+     * characteristic on slow firmware.
+     */
+    const candidates = wanted ? [wanted] : KNOWN_BLE_PRINTER_SERVICES;
+    for (const uuid of candidates) {
+      try {
+        const service = await gatt.getPrimaryService(uuid);
+        const chars = await service.getCharacteristics();
+        const found = pickWritable(chars);
+        if (found) return found;
+      } catch { /* not this one - try next */ }
+    }
+    if (wanted) {
+      throw new WebSerialPrinterError(
+        'NO_BLE_SERVICE',
+        'Printer does not expose the configured BLE service UUID'
+      );
+    }
+
+    // Slow path fallback: exhaustive discovery of everything we may access.
+    let services;
     try {
-      services = wanted
-        ? [await gatt.getPrimaryService(wanted)]
-        : await gatt.getPrimaryServices();
+      services = await gatt.getPrimaryServices();
     } catch (err) {
       const code = errorCode(err);
       if (code === 'NotFoundError') {
         throw new WebSerialPrinterError(
           'NO_BLE_SERVICE',
-          wanted
-            ? 'Printer does not expose the configured BLE service UUID'
-            : 'No accessible BLE service on printer'
+          'No accessible BLE service on printer'
         );
       }
       throw new WebSerialPrinterError(
@@ -221,9 +287,8 @@ export class BluetoothPrinter {
       try {
         chars = await service.getCharacteristics();
       } catch { /* blocked service - skip */ }
-      for (const ch of chars) {
-        if (ch.properties.write || ch.properties.writeWithoutResponse) return ch;
-      }
+      const found = pickWritable(chars);
+      if (found) return found;
     }
     return null;
   }

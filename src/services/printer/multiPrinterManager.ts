@@ -267,6 +267,12 @@ class MultiPrinterManager {
       );
     }
     if (entry.ble.isConnected()) return;
+    if (entry.state === 'pairing') {
+      throw new WebSerialPrinterError(
+        'BUSY',
+        `${entry.config.name} is already connecting - wait a moment`
+      );
+    }
 
     entry.state = 'pairing';
     entry.lastError = null;
