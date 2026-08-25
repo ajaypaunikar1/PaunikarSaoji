@@ -56,7 +56,7 @@ function logTimingSummary(timing: ConnectionTiming, label: string): void {
   );
 }
 
-const CHUNK_LADDER = [512, 240, 120, 52, 20];
+const CHUNK_LADDER = [120, 52, 20];
 
 /**
  * Inter-chunk pacing so the wire rate stays below the print-engine rate.
@@ -71,7 +71,7 @@ const CHUNK_LADDER = [512, 240, 120, 52, 20];
  * their natural GATT round-trip, while 512-byte bursts need an explicit gap.
  * 1 ms/byte matches KP-307's 9600-baud UART throughput (~1 byte/ms).
  */
-const PACE_MS_PER_BYTE = 1.0;
+const PACE_MS_PER_BYTE = 2.0;
 /** Payloads below this size print fast enough that pacing is unnecessary. */
 const PACE_THRESHOLD_BYTES = 256;
 
