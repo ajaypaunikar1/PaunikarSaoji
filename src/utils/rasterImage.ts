@@ -188,9 +188,8 @@ export async function rasterizeTextLine(
     const chunks: Uint8Array[] = [];
     chunks.push(new Uint8Array([0x1b, 0x33, 24])); // Set line spacing to 24 dots
     
-    let widthToPrint = textW + leftPad;
-    if (widthToPrint % 8 !== 0) widthToPrint += (8 - (widthToPrint % 8));
-    if (widthToPrint > widthDots) widthToPrint = widthDots;
+    // Force full width to prevent firmware parser bugs on cheap printers
+    const widthToPrint = widthDots;
     
     for (let band = 0; band < bands; band++) {
       const bandData = new Uint8Array(widthToPrint * 3);
