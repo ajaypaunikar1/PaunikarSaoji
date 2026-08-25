@@ -7,7 +7,7 @@
 
 export type PrinterRole = 'KITCHEN' | 'BILLING' | 'PARCEL' | 'BAR';
 export type ConnectionType = 'BLUETOOTH' | 'BLE';
-export type EncodingMode = 'auto-raster' | 'utf8-codepage' | 'ascii-fold';
+export type EncodingMode = 'auto-raster' | 'utf8-codepage' | 'ascii-fold' | 'esc-star-raster';
 
 /**
  * GATT services commonly exposed by ESC/POS thermal printers. Web Bluetooth

@@ -357,7 +357,8 @@ const PrinterSettingsPage: React.FC = () => {
                       onChange={e => updateConfig(p.id, { encodingMode: e.target.value as PrinterConfig['encodingMode'] })}
                       className="w-full text-[11px] font-bold bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 cursor-pointer focus:outline-none"
                     >
-                      <option value="auto-raster">Auto (raster Marathi)</option>
+                      <option value="auto-raster">Auto (raster Marathi GSv0)</option>
+                      <option value="esc-star-raster">Auto (raster Marathi ESC*)</option>
                       <option value="utf8-codepage">UTF-8 + code page</option>
                       <option value="ascii-fold">ASCII only (fold)</option>
                     </select>

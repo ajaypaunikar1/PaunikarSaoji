@@ -27,6 +27,8 @@ export interface RasterTextLineOptions {
   fontSize?: number;
   /** Extra feed (dots) after the image to separate lines. */
   feedDots?: number;
+  /** Raster command to use. Defaults to 'gs-v-0'. */
+  rasterMode?: 'gs-v-0' | 'esc-star';
 }
 
 const FONT_NAME = 'Noto Sans Devanagari';
@@ -180,26 +182,65 @@ export async function rasterizeTextLine(
   else if (align === 'right') leftPad = Math.max(0, widthDots - textW);
   else leftPad = 0;
 
-  let widthBytes = Math.ceil((textW + leftPad) / 8);
-  if (widthBytes % 2 !== 0) widthBytes += 1; // many printers want an even byte width
-  const maxBytes = Math.floor(widthDots / 8);
-  if (widthBytes > maxBytes) widthBytes = maxBytes;
+  if (options.rasterMode === 'esc-star') {
+    // ESC * (0x1b 0x2a) 24-dot double density (m=33)
+    const bands = Math.ceil(textH / 24);
+    const chunks: Uint8Array[] = [];
+    chunks.push(new Uint8Array([0x1b, 0x33, 24])); // Set line spacing to 24 dots
+    
+    const widthToPrint = textW + leftPad;
+    
+    for (let band = 0; band < bands; band++) {
+      const bandData = new Uint8Array(widthToPrint * 3);
+      for (let col = 0; col < textW; col++) {
+        const srcX = minX - pad + col;
+        const dstX = leftPad + col;
+        
+        for (let dot = 0; dot < 24; dot++) {
+          const y = band * 24 + dot;
+          const srcY = minY - pad + y;
+          if (srcY >= 0 && srcY < minY - pad + textH && srcX >= 0 && srcX < canvas.width && srcY < canvas.height && isInk(srcX, srcY)) {
+            const byteIdx = (dstX * 3) + Math.floor(dot / 8);
+            const bit = 7 - (dot % 8);
+            bandData[byteIdx] |= (1 << bit);
+          }
+        }
+      }
+      
+      const header = new Uint8Array([
+        0x1b, 0x2a, 33, // m=33
+        widthToPrint & 0xff, (widthToPrint >> 8) & 0xff
+      ]);
+      
+      chunks.push(header);
+      chunks.push(bandData);
+      chunks.push(new Uint8Array([0x0a])); // LF
+    }
+    
+    chunks.push(new Uint8Array([0x1b, 0x32])); // Reset line spacing
+    chunks.push(new Uint8Array([0x1b, 0x4a, feedDots])); // Feed
+    
+    let total = 0;
+    for (const c of chunks) total += c.length;
+    const out = new Uint8Array(total);
+    let offset = 0;
+    for (const c of chunks) {
+      out.set(c, offset);
+      offset += c.length;
+    }
+    return out;
+  }
 
-  const rowBytes = widthBytes * 8;
+  // default to gs-v-0
+  const widthBytes = Math.ceil((textW + leftPad) / 8);
   const data = new Uint8Array(widthBytes * textH);
-
   for (let row = 0; row < textH; row++) {
     const srcY = minY - pad + row;
     for (let col = 0; col < textW; col++) {
       const srcX = minX - pad + col;
       const dstX = leftPad + col;
-      if (dstX >= rowBytes) break;
-      if (
-        srcY < 0 || srcY >= canvas.height ||
-        srcX < 0 || srcX >= canvas.width
-      ) {
-        continue;
-      }
+      if (dstX >= widthBytes * 8) break;
+      if (srcY < 0 || srcY >= canvas.height || srcX < 0 || srcX >= canvas.width) continue;
       if (isInk(srcX, srcY)) {
         data[row * widthBytes + (dstX >> 3)] |= 0x80 >> (dstX & 7);
       }
@@ -209,7 +250,7 @@ export async function rasterizeTextLine(
   const out = gsV0(widthBytes, textH, data);
   const withFeed = new Uint8Array(out.length + 3);
   withFeed.set(out);
-  withFeed[out.length] = 0x1b; // ESC J n -> feed to separate lines
+  withFeed[out.length] = 0x1b; // ESC J n
   withFeed[out.length + 1] = 0x4a;
   withFeed[out.length + 2] = feedDots;
   return withFeed;

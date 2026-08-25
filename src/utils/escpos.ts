@@ -36,7 +36,7 @@ export interface ReceiptOptions {
   /** Waiter name for the bill receipt. */
   waiterName?: string;
   /** How non-ASCII text (Marathi) is encoded. */
-  encodingMode?: 'auto-raster' | 'utf8-codepage' | 'ascii-fold';
+  encodingMode?: 'auto-raster' | 'utf8-codepage' | 'ascii-fold' | 'esc-star-raster';
   /** ESC/POS code page number for utf8-codepage mode. */
   codePage?: number;
 }
@@ -115,7 +115,7 @@ async function renderSegments(segs: Seg[], opts: ReceiptOptions = {}): Promise<U
           ? ESCPOS.ALIGN_RIGHT
           : ESCPOS.ALIGN_LEFT;
 
-    if (isPlainAscii(seg.text) || encodingMode !== 'auto-raster') {
+    if (isPlainAscii(seg.text) || (encodingMode !== 'auto-raster' && encodingMode !== 'esc-star-raster')) {
       let textToPrint = seg.text;
       if (encodingMode === 'ascii-fold') {
         textToPrint = textToPrint.replace(/[^\x20-\x7E]+/g, ' ').replace(/\s+/g, ' ').trim();
@@ -137,7 +137,8 @@ async function renderSegments(segs: Seg[], opts: ReceiptOptions = {}): Promise<U
           widthDots,
           align,
           bold: seg.bold,
-          fontSize: RASTER_PX[seg.size ?? 'normal'][widthDots === PRINTER_DOTS_58 ? 58 : 80]
+          fontSize: RASTER_PX[seg.size ?? 'normal'][widthDots === PRINTER_DOTS_58 ? 58 : 80],
+          rasterMode: encodingMode === 'esc-star-raster' ? 'esc-star' : 'gs-v-0'
         })
       );
     }
