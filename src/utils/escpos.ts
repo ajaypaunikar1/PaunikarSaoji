@@ -65,6 +65,24 @@ export interface ReceiptSettings {
 
 const encoder = new TextEncoder();
 
+/**
+ * Merge duplicate order items (same name + portion + price) by summing qty.
+ * Preserves the original order of first appearance.
+ */
+function groupItems(items: Order['items']): Order['items'] {
+  const seen = new Map<string, Order['items'][number]>();
+  for (const item of items) {
+    const key = `${item.name}||${item.portion ?? ''}||${item.price}`;
+    const existing = seen.get(key);
+    if (existing) {
+      seen.set(key, { ...existing, quantity: existing.quantity + item.quantity });
+    } else {
+      seen.set(key, { ...item });
+    }
+  }
+  return Array.from(seen.values());
+}
+
 const nowIST = () =>
   new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true });
 
@@ -178,7 +196,7 @@ export async function generateKOT(
       ? [{ kind: 'text' as const, text: `Customer: ${order.customerName}`, align: 'center' as Align }]
       : []),
     { kind: 'text', text: '--------------------------------', align: 'center' },
-    ...order.items.flatMap<Seg>(item => [
+    ...groupItems(order.items).flatMap<Seg>(item => [
       { kind: 'text' as const, text: `${item.quantity} x ${item.name}`, bold: true as const, size: 'tall' as const },
       ...(item.portion && item.portion !== 'Single'
         ? [{ kind: 'text' as const, text: `  Portion: ${item.portion.toUpperCase()}`, bold: true as const, size: 'tall' as const }]
@@ -237,7 +255,7 @@ export async function generateBillReceipt(
     { kind: 'text', text: `Invoice Time: ${timeIST()}` },
     { kind: 'text', text: `Payment: ${bill.paymentMethod || 'Cash'}` },
     { kind: 'text', text: '--------------------------------' },
-    ...order.items.flatMap<Seg>(item => [
+    ...groupItems(order.items).flatMap<Seg>(item => [
       {
         kind: 'text' as const,
         text:
