@@ -47,8 +47,6 @@ function ensureFont(): Promise<void> {
   fontReady = (async () => {
     if (typeof document === 'undefined' || !('fonts' in document)) return;
     try {
-      // Variable font: one face per unicode range so mixed Latin+Marathi lines
-      // render with the same typeface in the raster path.
       const devanagari = new FontFace(FONT_NAME, `url(${FONT_DEVANAGARI_URL})`, {
         weight: '100 900',
         unicodeRange: 'U+0900-097F, U+1CD0-1CF9, U+200C-200D, U+20A8, U+20B9, U+20F0, U+25CC, U+A830-A839, U+A8E0-A8FF'
@@ -57,12 +55,23 @@ function ensureFont(): Promise<void> {
         weight: '100 900',
         unicodeRange: 'U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD'
       });
-      await Promise.all([devanagari.load(), latin.load()]);
-      document.fonts.add(devanagari);
-      document.fonts.add(latin);
+
+      const [dResult, lResult] = await Promise.allSettled([devanagari.load(), latin.load()]);
+
+      if (dResult.status === 'rejected') {
+        console.warn('[RASTER] Devanagari font failed to load:', dResult.reason);
+      }
+      if (lResult.status === 'rejected') {
+        console.warn('[RASTER] Latin font failed to load:', lResult.reason);
+      }
+
+      if (dResult.status === 'fulfilled') document.fonts.add(devanagari);
+      if (lResult.status === 'fulfilled') document.fonts.add(latin);
+
+      await document.fonts.ready;
       await document.fonts.load(`16px ${FONT_NAME}`, '\u0915');
-    } catch {
-      /* fall back to whatever system Devanagari font is installed */
+    } catch (err) {
+      console.warn('[RASTER] Font loading error, falling back to system Devanagari fonts:', err);
     }
   })();
   return fontReady;
@@ -156,6 +165,7 @@ export async function rasterizeTextLine(
 
   // Blank line -> just a small feed.
   if (maxX < 0) {
+    console.warn('[RASTER] No ink detected for text:', JSON.stringify(text), '- font may not support these characters');
     return new Uint8Array([0x1b, 0x4a, feedDots]); // ESC J n
   }
 

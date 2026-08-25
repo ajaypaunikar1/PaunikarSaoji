@@ -518,7 +518,7 @@ const Parcel: React.FC = () => {
       <AnimatePresence>
         {printData && (
           <div className="print-area hidden">
-            <div style={{ width: '80mm', padding: '5px', boxSizing: 'border-box', fontFamily: 'Arial, sans-serif' }}>
+            <div style={{ width: '80mm', padding: '5px', boxSizing: 'border-box', fontFamily: "'Nirmala UI', 'Mangal', 'Lohit Devanagari', 'Noto Sans Devanagari', Arial, sans-serif" }}>
               <div style={{ textAlign: 'center', borderBottom: '1px dashed black', paddingBottom: '10px', marginBottom: '10px' }}>
                 {/* Restaurant monogram (no Vite logo) */}
                 <div style={{ marginBottom: '6px' }}>
