@@ -108,7 +108,7 @@ const Billing: React.FC = () => {
 
       // Physical thermal printing via Web Serial (performed on this device).
       // Browser PDF copy remains available via the "Browser Print" button.
-      await printBillThermal(paidBill, selectedOrder, settings);
+      await printBillThermal(paidBill, selectedOrder, settings, waiterName);
 
       // Keep the print data so a PDF/browser copy can be printed if required.
       handleSetPrintData(
@@ -141,7 +141,7 @@ const Billing: React.FC = () => {
       const waiterName = users.find(u => u.id === selectedOrder.waiterId)?.name || 'Staff';
 
       // Physical thermal printing via Web Serial (performed on this device).
-      await printBillThermal(finalBill, selectedOrder, settings);
+      await printBillThermal(finalBill, selectedOrder, settings, waiterName);
 
       handleSetPrintData(
         finalBill,

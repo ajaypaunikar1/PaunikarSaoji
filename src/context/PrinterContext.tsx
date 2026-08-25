@@ -36,7 +36,7 @@ interface PrinterContextType {
   disconnect: () => Promise<void>;
   testPrint: (settings?: ReceiptSettings) => Promise<boolean>;
   printKOT: (order: Order, settings?: ReceiptSettings) => Promise<boolean>;
-  printBill: (bill: Bill, order: Order, settings?: ReceiptSettings) => Promise<boolean>;
+  printBill: (bill: Bill, order: Order, settings?: ReceiptSettings, waiterName?: string) => Promise<boolean>;
   // ----- multi-printer surface -----
   printers: PrinterStatusInfo[];
   connectPrinter: (printerId: string) => Promise<boolean>;
@@ -183,9 +183,9 @@ export const PrinterProvider: React.FC<{ children: ReactNode }> = ({ children })
   );
 
   const printBill = useCallback(
-    async (bill: Bill, order: Order, settings?: ReceiptSettings): Promise<boolean> => {
+    async (bill: Bill, order: Order, settings?: ReceiptSettings, waiterName?: string): Promise<boolean> => {
       try {
-        const data = await generateBillReceipt(bill, order, settings, optsForRole('BILLING'));
+        const data = await generateBillReceipt(bill, order, settings, { ...optsForRole('BILLING'), waiterName });
         const printed = await printerHub.route({
           kind: 'BILL',
           role: 'BILLING',

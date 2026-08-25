@@ -33,6 +33,8 @@ export interface ReceiptOptions {
   cutMode?: 'FULL' | 'PARTIAL';
   /** Paper width - selects printable width AND raster glyph calibration. */
   paperWidth?: 58 | 80;
+  /** Waiter name for the bill receipt. */
+  waiterName?: string;
 }
 
 /**
@@ -61,6 +63,12 @@ const encoder = new TextEncoder();
 
 const nowIST = () =>
   new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true });
+
+const dateIST = () =>
+  new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: '2-digit', year: 'numeric' });
+
+const timeIST = () =>
+  new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true });
 
 type Align = 'left' | 'center' | 'right';
 
@@ -203,12 +211,16 @@ export async function generateBillReceipt(
       : []),
     { kind: 'text', text: 'BILL / INVOICE', align: 'center', bold: true },
     { kind: 'text', text: '--------------------------------', align: 'center' },
-    { kind: 'text', text: `Invoice: #${bill.id ? bill.id.substring(5, 12) : 'PENDING'}` },
-    { kind: 'text', text: bill.isParcel ? 'Order Type: PARCEL' : `Table: T-${bill.tableId}` },
+    { kind: 'text', text: `Bill No: ${bill.id ? bill.id.substring(5, 12) : 'PENDING'}` },
+    { kind: 'text', text: bill.isParcel ? 'Order Type: PARCEL' : `Table: Table ${bill.tableId}` },
     ...(bill.isParcel && order.customerName
       ? [{ kind: 'text' as const, text: `Customer: ${order.customerName}` }]
       : []),
-    { kind: 'text', text: `Date/Time: ${nowIST()}` },
+    ...(opts?.waiterName
+      ? [{ kind: 'text' as const, text: `Waiter: ${opts.waiterName}` }]
+      : []),
+    { kind: 'text', text: `Invoice Date: ${dateIST()}` },
+    { kind: 'text', text: `Invoice Time: ${timeIST()}` },
     { kind: 'text', text: `Payment: ${bill.paymentMethod || 'Cash'}` },
     { kind: 'text', text: '--------------------------------' },
     ...order.items.flatMap<Seg>(item => [
@@ -238,8 +250,11 @@ export async function generateBillReceipt(
       : []),
     { kind: 'text', text: `GRAND TOTAL: Rs.${bill.grandTotal}`, align: 'right', bold: true },
     { kind: 'text', text: '--------------------------------', align: 'right' },
+    { kind: 'text', text: `Payment: ${bill.paymentMethod === 'UPI' ? 'Paid via UPI' : bill.paymentMethod === 'Card' ? 'Paid via Card' : 'Paid in Cash'}`, align: 'center', bold: true },
     { kind: 'text', text: 'Thank you! Visit Again.', align: 'center' },
-    { kind: 'text', text: restName, align: 'center' },
+    ...(phone
+      ? [{ kind: 'text' as const, text: `${restName} • ${phone}`, align: 'center' as Align }]
+      : [{ kind: 'text' as const, text: restName, align: 'center' as Align }]),
     { kind: 'raw', raw: '\n\n\n\n' + cut }
   ];
 

@@ -450,7 +450,8 @@ const TableManagement: React.FC = () => {
                           const bill = await generateBill(selectedTable.id, 0);
                           const order = orders.find(o => o.id === bill.orderId);
                           if (order) {
-                            await printBillThermal(bill, order, settings);
+                            const waiterName = users.find(u => u.id === order.waiterId)?.name || 'Staff';
+                            await printBillThermal(bill, order, settings, waiterName);
                           }
                           toast.success('Bill sent to printer! You can also manage payment on Billing tab.');
                         }}

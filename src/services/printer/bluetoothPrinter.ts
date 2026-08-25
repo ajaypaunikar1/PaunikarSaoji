@@ -69,10 +69,11 @@ const CHUNK_LADDER = [512, 240, 120, 52, 20];
  *
  * The delay scales with chunk size: 20-byte chunks are already spaced by
  * their natural GATT round-trip, while 512-byte bursts need an explicit gap.
+ * 1 ms/byte matches KP-307's 9600-baud UART throughput (~1 byte/ms).
  */
-const PACE_MS_PER_BYTE = 0.03;
+const PACE_MS_PER_BYTE = 1.0;
 /** Payloads below this size print fast enough that pacing is unnecessary. */
-const PACE_THRESHOLD_BYTES = 1024;
+const PACE_THRESHOLD_BYTES = 256;
 
 function paceDelayMs(chunkSize: number): number {
   return Math.round(chunkSize * PACE_MS_PER_BYTE);

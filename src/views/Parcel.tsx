@@ -175,7 +175,7 @@ const Parcel: React.FC = () => {
         const editingOrder = orders.find(o => o.id === editingOrderId);
         const waiterName = users.find(u => u.id === currentUser?.id)?.name || 'Staff';
         if (connected && editingOrder) {
-          await printBillThermal({ ...bill, paymentMethod }, editingOrder, settings);
+          await printBillThermal({ ...bill, paymentMethod }, editingOrder, settings, waiterName);
         }
         setPrintData({
           bill: { ...bill, paymentMethod },
@@ -194,7 +194,7 @@ const Parcel: React.FC = () => {
       await payBill(bill.id, paymentMethod);
       const waiterName = users.find(u => u.id === currentUser?.id)?.name || 'Staff';
       if (connected) {
-        await printBillThermal({ ...bill, paymentMethod }, placed, settings);
+        await printBillThermal({ ...bill, paymentMethod }, placed, settings, waiterName);
       }
       setPrintData({
         bill: { ...bill, paymentMethod },

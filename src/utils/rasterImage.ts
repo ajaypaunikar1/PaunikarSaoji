@@ -109,23 +109,25 @@ export async function rasterizeTextLine(
   const { widthDots } = options;
   const align = options.align ?? 'left';
   const bold = options.bold ?? false;
-  const feedDots = options.feedDots ?? 6;
+  const feedDots = options.feedDots ?? 8;
   let fontSize = options.fontSize ?? (widthDots >= 576 ? 32 : 26);
 
   await ensureFont();
 
   const canvas = document.createElement('canvas');
   canvas.width = widthDots;
-  canvas.height = Math.ceil(fontSize * 1.7) + 10;
+  canvas.height = Math.ceil(fontSize * 2.5) + 20;
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('Canvas 2D context is not available');
 
   const draw = (size: number) => {
     ctx.font = `${bold ? 700 : 400} ${size}px ${FONT_FAMILY}`;
-    ctx.textBaseline = 'top';
+    ctx.textBaseline = 'alphabetic';
     ctx.fillStyle = '#000';
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillText(text, 0, 4);
+    const m = ctx.measureText(text);
+    const ascent = m.actualBoundingBoxAscent || size;
+    ctx.fillText(text, 0, ascent + 4);
   };
 
   draw(fontSize);
