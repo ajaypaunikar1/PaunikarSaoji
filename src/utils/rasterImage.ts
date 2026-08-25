@@ -188,7 +188,9 @@ export async function rasterizeTextLine(
     const chunks: Uint8Array[] = [];
     chunks.push(new Uint8Array([0x1b, 0x33, 24])); // Set line spacing to 24 dots
     
-    const widthToPrint = textW + leftPad;
+    let widthToPrint = textW + leftPad;
+    if (widthToPrint % 8 !== 0) widthToPrint += (8 - (widthToPrint % 8));
+    if (widthToPrint > widthDots) widthToPrint = widthDots;
     
     for (let band = 0; band < bands; band++) {
       const bandData = new Uint8Array(widthToPrint * 3);
@@ -232,7 +234,11 @@ export async function rasterizeTextLine(
   }
 
   // default to gs-v-0
-  const widthBytes = Math.ceil((textW + leftPad) / 8);
+  let widthBytes = Math.ceil((textW + leftPad) / 8);
+  if (widthBytes % 4 !== 0) widthBytes += (4 - (widthBytes % 4));
+  const maxBytes = Math.floor(widthDots / 8);
+  if (widthBytes > maxBytes) widthBytes = maxBytes;
+  
   const data = new Uint8Array(widthBytes * textH);
   for (let row = 0; row < textH; row++) {
     const srcY = minY - pad + row;
