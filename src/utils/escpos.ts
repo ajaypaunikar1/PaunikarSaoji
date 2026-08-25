@@ -35,6 +35,10 @@ export interface ReceiptOptions {
   paperWidth?: 58 | 80;
   /** Waiter name for the bill receipt. */
   waiterName?: string;
+  /** How non-ASCII text (Marathi) is encoded. */
+  encodingMode?: 'auto-raster' | 'utf8-codepage' | 'ascii-fold';
+  /** ESC/POS code page number for utf8-codepage mode. */
+  codePage?: number;
 }
 
 /**
@@ -89,8 +93,13 @@ type Seg =
  */
 async function renderSegments(segs: Seg[], opts: ReceiptOptions = {}): Promise<Uint8Array> {
   const widthDots = opts.paperWidth === 58 ? PRINTER_DOTS_58 : PRINTER_DOTS_80;
+  const encodingMode = opts.encodingMode ?? 'auto-raster';
   const chunks: Uint8Array[] = [];
   const push = (str: string) => chunks.push(encoder.encode(str));
+
+  if (encodingMode === 'utf8-codepage' && opts.codePage !== undefined) {
+    chunks.push(new Uint8Array([0x1b, 0x74, opts.codePage]));
+  }
 
   for (const seg of segs) {
     if (seg.kind === 'raw') {
@@ -106,13 +115,17 @@ async function renderSegments(segs: Seg[], opts: ReceiptOptions = {}): Promise<U
           ? ESCPOS.ALIGN_RIGHT
           : ESCPOS.ALIGN_LEFT;
 
-    if (isPlainAscii(seg.text)) {
+    if (isPlainAscii(seg.text) || encodingMode !== 'auto-raster') {
+      let textToPrint = seg.text;
+      if (encodingMode === 'ascii-fold') {
+        textToPrint = textToPrint.replace(/[^\x20-\x7E]+/g, ' ').replace(/\s+/g, ' ').trim();
+      }
       const size: TextSize = seg.size ?? 'normal';
       let s = alignCmd;
       if (seg.bold) s += ESCPOS.TEXT_BOLD_ON;
       if (size === 'tall') s += ESCPOS.TEXT_TALL;
       if (size === 'double') s += ESCPOS.TEXT_DOUBLE_SIZE;
-      s += seg.text + '\n';
+      s += textToPrint + '\n';
       if (size !== 'normal') s += ESCPOS.TEXT_NORMAL;
       if (seg.bold) s += ESCPOS.TEXT_BOLD_OFF;
       push(s);

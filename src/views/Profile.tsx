@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import { Shield, Settings as SettingsIcon, Save, Key, User, Eye, EyeOff, Store, Phone } from 'lucide-react';
+import { Shield, Settings as SettingsIcon, Save, Key, User, Eye, EyeOff, Store, Phone, Printer } from 'lucide-react';
+import Link from 'next/link';
 import { toast } from 'sonner';
 
 const Profile: React.FC = () => {
@@ -317,6 +318,16 @@ const Profile: React.FC = () => {
                       className="w-4 h-4 accent-indigo-600"
                     />
                   </label>
+
+                  <div className="flex items-center justify-between p-3 bg-slate-50 border border-slate-100 rounded-xl">
+                    <div>
+                      <span className="text-xs font-bold text-slate-800 block">Printer Configuration</span>
+                      <span className="text-[10px] text-slate-500">Manage Bluetooth receipt printers and layout settings.</span>
+                    </div>
+                    <Link href="/admin/printer" className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition shadow-sm flex items-center gap-1.5 cursor-pointer">
+                      <Printer size={14} /> Printer Settings
+                    </Link>
+                  </div>
                 </div>
               </div>
 

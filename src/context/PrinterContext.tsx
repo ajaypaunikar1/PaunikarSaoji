@@ -107,7 +107,9 @@ export const PrinterProvider: React.FC<{ children: ReactNode }> = ({ children })
       const config = printerHub.resolveForRole(role);
       return {
         cutMode: config?.cutMode ?? 'FULL',
-        paperWidth: config?.paperWidth ?? 80
+        paperWidth: config?.paperWidth ?? 80,
+        encodingMode: config?.encodingMode ?? 'auto-raster',
+        codePage: config?.codePage
       };
     },
     []
@@ -243,7 +245,9 @@ export const PrinterProvider: React.FC<{ children: ReactNode }> = ({ children })
           settings,
           {
             cutMode: config?.cutMode ?? 'FULL',
-            paperWidth: config?.paperWidth ?? 80
+            paperWidth: config?.paperWidth ?? 80,
+            encodingMode: config?.encodingMode ?? 'auto-raster',
+            codePage: config?.codePage
           },
           { name: config?.name ?? 'Printer', role: String(config?.role ?? 'UNKNOWN') }
         );
