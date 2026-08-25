@@ -217,6 +217,15 @@ export async function generateKOT(
 }
 
 /**
+ * Build a single fixed-width row with left text and right text.
+ * Total width = ~32 chars for 58 mm, ~42 chars for 80 mm paper.
+ */
+function padRow(left: string, right: string, cols = 32): string {
+  const gap = Math.max(1, cols - left.length - right.length);
+  return left + ' '.repeat(gap) + right;
+}
+
+/**
  * Generate a Bill Receipt / Tax Invoice as raw ESC/POS bytes.
  * Pure function - no transport side effects. Lines containing Marathi
  * (Devanagari) text are rasterized so they print correctly.
@@ -243,16 +252,18 @@ export async function generateBillReceipt(
       : []),
     { kind: 'text', text: 'BILL / INVOICE', align: 'center', bold: true },
     { kind: 'text', text: '--------------------------------', align: 'center' },
-    { kind: 'text', text: `Bill No: ${bill.id ? bill.id.substring(5, 12) : 'PENDING'}` },
-    { kind: 'text', text: bill.isParcel ? 'Order Type: PARCEL' : `Table: Table ${bill.tableId}` },
+    {
+      kind: 'text' as const,
+      text: bill.isParcel
+        ? padRow(`Bill No: ${bill.id ? bill.id.substring(5, 12) : 'PENDING'}`, 'PARCEL', opts?.paperWidth === 58 ? 32 : 42)
+        : padRow(`Bill No: ${bill.id ? bill.id.substring(5, 12) : 'PENDING'}`, `T-${bill.tableId}`, opts?.paperWidth === 58 ? 32 : 42)
+    },
     ...(bill.isParcel && order.customerName
       ? [{ kind: 'text' as const, text: `Customer: ${order.customerName}` }]
       : []),
     ...(opts?.waiterName
       ? [{ kind: 'text' as const, text: `Waiter: ${opts.waiterName}` }]
       : []),
-    { kind: 'text', text: `Invoice Date: ${dateIST()}` },
-    { kind: 'text', text: `Invoice Time: ${timeIST()}` },
     { kind: 'text', text: `Payment: ${bill.paymentMethod || 'Cash'}` },
     { kind: 'text', text: '--------------------------------' },
     ...groupItems(order.items).flatMap<Seg>(item => [
