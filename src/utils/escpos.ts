@@ -45,9 +45,9 @@ export interface ReceiptOptions {
  * against a physical KP-307.
  */
 const RASTER_PX: Record<'normal' | 'tall' | 'double', Record<58 | 80, number>> = {
-  normal: { 80: 28, 58: 23 },
-  tall: { 80: 44, 58: 37 },
-  double: { 80: 56, 58: 47 }
+  normal: { 80: 26, 58: 21 },
+  tall: { 80: 40, 58: 34 },
+  double: { 80: 52, 58: 44 }
 };
 
 export interface ReceiptSettings {
