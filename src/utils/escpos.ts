@@ -262,9 +262,7 @@ export async function generateBillReceipt(
     ...(bill.isParcel && order.customerName
       ? [{ kind: 'text' as const, text: `Customer: ${order.customerName}` }]
       : []),
-    ...(opts?.waiterName
-      ? [{ kind: 'text' as const, text: `Waiter: ${opts.waiterName}` }]
-      : []),
+
     { kind: 'text', text: `Payment: ${bill.paymentMethod || 'Cash'}` },
     { kind: 'text', text: '--------------------------------' },
     ...groupItems(order.items).flatMap<Seg>(item => [
@@ -296,9 +294,7 @@ export async function generateBillReceipt(
     { kind: 'text', text: '--------------------------------', align: 'right' },
     { kind: 'text', text: `Payment: ${bill.paymentMethod === 'UPI' ? 'Paid via UPI' : bill.paymentMethod === 'Card' ? 'Paid via Card' : 'Paid in Cash'}`, align: 'center', bold: true },
     { kind: 'text', text: 'Thank you! Visit Again.', align: 'center' },
-    ...(phone
-      ? [{ kind: 'text' as const, text: `${restName} • ${phone}`, align: 'center' as Align }]
-      : [{ kind: 'text' as const, text: restName, align: 'center' as Align }]),
+
     { kind: 'raw', raw: '\n\n\n\n' + cut }
   ];
 
