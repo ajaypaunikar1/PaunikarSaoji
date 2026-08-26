@@ -258,6 +258,7 @@ export async function generateBillReceipt(
         ? padRow(`Bill No: ${bill.id ? bill.id.substring(5, 12) : 'PENDING'}`, 'PARCEL', opts?.paperWidth === 58 ? 32 : 42)
         : padRow(`Bill No: ${bill.id ? bill.id.substring(5, 12) : 'PENDING'}`, `T-${bill.tableId}`, opts?.paperWidth === 58 ? 32 : 42)
     },
+    { kind: 'text' as const, text: `Date: ${dateIST()}  Time: ${timeIST()}` },
     ...(bill.isParcel && order.customerName
       ? [{ kind: 'text' as const, text: `Customer: ${order.customerName}` }]
       : []),
@@ -322,9 +323,9 @@ export async function generateTestPrint(
     { kind: 'text', text: 'PRINTER TEST', align: 'center', bold: true, size: 'double' },
     ...(identity
       ? [
-          { kind: 'text', text: '================================', align: 'center' },
-          { kind: 'text', text: identity.name.toUpperCase(), align: 'center', bold: true },
-          { kind: 'text', text: `ROLE: ${identity.role}`, align: 'center', bold: true }
+          { kind: 'text' as const, text: '================================', align: 'center' as Align },
+          { kind: 'text' as const, text: identity.name.toUpperCase(), align: 'center' as Align, bold: true },
+          { kind: 'text' as const, text: `ROLE: ${identity.role}`, align: 'center' as Align, bold: true }
         ]
       : []),
     { kind: 'text', text: '================================', align: 'center' },
