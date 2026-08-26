@@ -98,7 +98,8 @@ const KDS: React.FC = () => {
       copies = order.items;
     }
 
-    printKOTThermal({ ...order, items: copies }, settings);
+    // Only open the preview modal — thermal print fires when user clicks "Thermal Print"
+    // inside the modal. Do NOT call printKOTThermal here to avoid double printing.
     setPrintKOTData({ ...order, items: copies });
   };
 

@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { translations } from '../translations/translations';
 import { 
-  TrendingUp, Calendar, Download, 
+  TrendingUp, Calendar, Download, ShoppingBag,
   IndianRupee, ClipboardList, Clock, Users, ArrowUpRight
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -104,7 +104,12 @@ const Reports: React.FC = () => {
   const orderMetrics = useMemo(() => {
     let totalRevenue = 0;
     let totalDiscount = 0;
+    let totalContainerCharge = 0;
     let totalOrders = filteredOrders.length;
+    // Parcel-specific breakdown
+    let parcelOrders = 0;
+    let parcelRevenue = 0;
+    let parcelContainerCharge = 0;
 
     filteredOrders.forEach(ord => {
       const bill = bills.find(b => b.orderId === ord.id);
@@ -112,16 +117,23 @@ const Reports: React.FC = () => {
         if (bill.paymentStatus === 'Paid') {
           totalRevenue += bill.grandTotal;
           totalDiscount += bill.discount;
+          totalContainerCharge += bill.containerCharge || 0;
+          if (ord.isParcel || bill.isParcel) {
+            parcelOrders++;
+            parcelRevenue += bill.grandTotal;
+            parcelContainerCharge += bill.containerCharge || 0;
+          }
         }
       } else {
         if (ord.status === 'Served') {
           totalRevenue += ord.grandTotal;
         }
+        if (ord.isParcel) parcelOrders++;
       }
     });
 
     const avgOrderValue = totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0;
-    return { totalRevenue, totalDiscount, totalOrders, avgOrderValue };
+    return { totalRevenue, totalDiscount, totalContainerCharge, totalOrders, avgOrderValue, parcelOrders, parcelRevenue, parcelContainerCharge };
   }, [filteredOrders, bills]);
 
   // Product Metrics
@@ -165,7 +177,7 @@ const Reports: React.FC = () => {
 
   // CSV Export handlers
   const handleExportOrdersCSV = () => {
-    let csv = 'Order ID,Table ID,Waiter,Date/Time,Items,Subtotal,Discount,Grand Total,Status,Payment Method,Payment Status\n';
+    let csv = 'Order ID,Table ID,Waiter,Date/Time,Items,Subtotal,Discount,Container Charge,Grand Total,Status,Payment Method,Payment Status\n';
     
     filteredOrders.forEach(ord => {
       const bill = bills.find(b => b.orderId === ord.id);
@@ -175,11 +187,12 @@ const Reports: React.FC = () => {
       
       const subtotal = bill ? bill.subtotal : ord.grandTotal;
       const discount = bill ? bill.discount : 0;
+      const containerCharge = bill ? (bill.containerCharge || 0) : 0;
       const grandTotal = bill ? bill.grandTotal : ord.grandTotal;
       const paymentMethod = bill && bill.paymentMethod ? bill.paymentMethod : '-';
       const paymentStatus = bill ? bill.paymentStatus : 'Unbilled';
 
-      csv += `"${ord.id}","${ord.tableId}","${waiterName}","${dateStr}","${itemsList}",${subtotal},${discount},${grandTotal},"${ord.status}","${paymentMethod}","${paymentStatus}"\n`;
+      csv += `"${ord.id}","${ord.tableId}","${waiterName}","${dateStr}","${itemsList}",${subtotal},${discount},${containerCharge},${grandTotal},"${ord.status}","${paymentMethod}","${paymentStatus}"\n`;
     });
 
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -365,6 +378,14 @@ const Reports: React.FC = () => {
               </div>
               <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-500"><IndianRupee size={18} /></div>
             </div>
+
+            <div className="p-4 bg-amber-50/50 border border-amber-200/60 rounded-3xl shadow-xs flex items-center justify-between">
+              <div>
+                <span className="text-[10px] uppercase font-bold text-amber-700 block mb-1">{language === 'en' ? 'Container Charges' : 'कंटेनर शुल्क'}</span>
+                <span className="text-xl font-black text-slate-800">{formatCurrency(orderMetrics.totalContainerCharge)}</span>
+              </div>
+              <div className="w-10 h-10 rounded-xl bg-amber-100/50 flex items-center justify-center text-amber-700"><IndianRupee size={18} /></div>
+            </div>
           </div>
 
           {/* Orders Table Container */}
@@ -391,6 +412,7 @@ const Reports: React.FC = () => {
                     <th className="p-4">{language === 'en' ? 'Items' : 'पदार्थ'}</th>
                     <th className="p-4 text-right">{t.subtotal}</th>
                     <th className="p-4 text-right">{t.discount}</th>
+                    <th className="p-4 text-right">{language === 'en' ? 'Container' : 'कंटेनर'}</th>
                     <th className="p-4 text-right pr-6">{t.grandTotal}</th>
                     <th className="p-4 text-center">{t.orderStatus}</th>
                     <th className="p-4 text-center">{t.payment}</th>
@@ -406,13 +428,14 @@ const Reports: React.FC = () => {
                       const bill = bills.find(b => b.orderId === ord.id);
                       const subtotal = bill ? bill.subtotal : ord.grandTotal;
                       const discount = bill ? bill.discount : 0;
+                      const containerCharge = bill ? (bill.containerCharge || 0) : 0;
                       const grandTotal = bill ? bill.grandTotal : ord.grandTotal;
                       const dateStr = (ord as any).createdAt ? new Date((ord as any).createdAt).toLocaleString() : ord.timestamp;
 
                       return (
                         <tr key={ord.id} className="border-b border-slate-100 hover:bg-slate-50/20 text-xs text-slate-700">
                           <td className="p-4 pl-6 font-bold text-slate-900 font-mono">{ord.id.substring(0, 12)}</td>
-                          <td className="p-4 font-bold text-slate-900 font-mono">T-{ord.tableId}</td>
+                          <td className="p-4 font-bold text-slate-900 font-mono">{ord.isParcel ? 'PARCEL' : `T-${ord.tableId}`}</td>
                           <td className="p-4 font-bold">{getUserName(ord.waiterId)}</td>
                           <td className="p-4 text-slate-500 font-mono">{dateStr}</td>
                           <td className="p-4 max-w-xs truncate" title={ord.items.map(i => `${i.name} (${i.portion} x${i.quantity})`).join(', ')}>
@@ -420,6 +443,7 @@ const Reports: React.FC = () => {
                           </td>
                           <td className="p-4 text-right font-mono">{formatCurrency(subtotal)}</td>
                           <td className="p-4 text-right text-rose-600 font-mono">-{formatCurrency(discount)}</td>
+                          <td className="p-4 text-right text-amber-700 font-mono">{containerCharge > 0 ? `+${formatCurrency(containerCharge)}` : '-'}</td>
                           <td className="p-4 text-right font-black text-slate-900 font-mono pr-6">{formatCurrency(grandTotal)}</td>
                           <td className="p-4 text-center">
                             <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase border ${
@@ -483,6 +507,58 @@ const Reports: React.FC = () => {
                   )}
                 </tbody>
               </table>
+            </div>
+          </div>
+
+          {/* Parcel Summary */}
+          <div className="bg-white border border-orange-200/60 rounded-3xl overflow-hidden shadow-sm">
+            <div className="p-5 border-b border-orange-100 bg-orange-50/40 flex items-center gap-2">
+              <ShoppingBag size={15} className="text-orange-600" />
+              <h3 className="text-xs font-black uppercase text-orange-800 tracking-wider">
+                {language === 'en' ? 'Parcel / Takeaway Summary' : 'पार्सल सारांश'}
+              </h3>
+            </div>
+            <div className="p-5 grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="p-4 bg-orange-50/60 border border-orange-200/50 rounded-2xl flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-orange-700 block mb-1">
+                    {language === 'en' ? 'Parcel Orders' : 'पार्सल ऑर्डर्स'}
+                  </span>
+                  <span className="text-2xl font-black text-slate-800">{orderMetrics.parcelOrders}</span>
+                </div>
+                <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center text-orange-600">
+                  <ShoppingBag size={18} />
+                </div>
+              </div>
+
+              <div className="p-4 bg-emerald-50/60 border border-emerald-200/50 rounded-2xl flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-emerald-700 block mb-1">
+                    {language === 'en' ? 'Parcel Revenue (Paid)' : 'पार्सल महसूल'}
+                  </span>
+                  <span className="text-2xl font-black text-slate-800">{formatCurrency(orderMetrics.parcelRevenue)}</span>
+                </div>
+                <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-700">
+                  <IndianRupee size={18} />
+                </div>
+              </div>
+
+              <div className="p-4 bg-amber-50/60 border border-amber-200/50 rounded-2xl flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-amber-700 block mb-1">
+                    {language === 'en' ? 'Container Charges (Parcel)' : 'कंटेनर शुल्क (पार्सल)'}
+                  </span>
+                  <span className="text-2xl font-black text-slate-800">{formatCurrency(orderMetrics.parcelContainerCharge)}</span>
+                  <span className="text-[9px] text-amber-600 font-bold block mt-0.5">
+                    {orderMetrics.parcelContainerCharge > 0
+                      ? `${Math.round(orderMetrics.parcelContainerCharge / 10)} container(s) × ₹10`
+                      : language === 'en' ? 'No container charges' : 'कोणतेही शुल्क नाही'}
+                  </span>
+                </div>
+                <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center text-amber-700">
+                  <IndianRupee size={18} />
+                </div>
+              </div>
             </div>
           </div>
         </div>
