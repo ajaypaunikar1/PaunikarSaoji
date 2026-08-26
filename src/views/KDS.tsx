@@ -298,6 +298,7 @@ const KDS: React.FC = () => {
       <AnimatePresence>
         {printKOTData && (
           <div className="print-area hidden">
+            <div style={{ width: '80mm', padding: '5px', boxSizing: 'border-box', fontFamily: "'Nirmala UI', 'Mangal', 'Lohit Devanagari', 'Noto Sans Devanagari', Arial, sans-serif" }}>
             <div style={{ textAlign: 'center', borderBottom: '1px dashed black', paddingBottom: '10px', marginBottom: '10px' }}>
               <h2 style={{ margin: '0', fontSize: '16px', fontWeight: 'bold' }}>PAUNIKAR SAOJI RESTAURANT</h2>
               <span style={{ fontSize: '11px', textTransform: 'uppercase' }}>KOT TICKET (किचन ऑर्डर तिकीट)</span>
@@ -365,7 +366,9 @@ const KDS: React.FC = () => {
             <div style={{ borderTop: '1px dashed black', marginTop: '10px', paddingTop: '5px', textAlign: 'center', fontSize: '9px' }}>
               Printed on: {new Date().toLocaleString()} &bull; Order Synced
             </div>
+            </div>
           </div>
+
         )}
       </AnimatePresence>
 
