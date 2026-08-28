@@ -113,6 +113,33 @@ const WaiterPortal: React.FC = () => {
     setOrderingTable(null);
   };
 
+  // Persist the current basket to the saved draft for this table, then close the panel.
+  // The draft survives a panel close so nothing is lost on re-open.
+  const closeOrdersPanel = () => {
+    if (orderingTable && basket.length > 0) {
+      saveDraft();
+    }
+    setOrderingTable(null);
+  };
+
+  // Restore a previously saved draft basket when re-opening the same table.
+  const restoreDraftForTable = (tableId: number | string) => {
+    const saved = localStorage.getItem(DRAFT_KEY);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed.basket && parsed.tableId === tableId) {
+          setBasket(parsed.basket);
+          toast.success(t.draftLoaded);
+          return;
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    setBasket([]);
+  };
+
   // Leave Form State
   const [leaveReason, setLeaveReason] = useState('');
   const [leaveStart, setLeaveStart] = useState('');
@@ -176,9 +203,12 @@ const WaiterPortal: React.FC = () => {
       return;
     }
     const clamped = Math.min(999, Math.max(1, Math.floor(qty)));
-    setBasket(prev => prev.map((item, idx) =>
-      idx === index ? { ...item, quantity: clamped } : item
-    ));
+    setBasket(prev => {
+      if (qty <= 0) return prev.filter((_, idx) => idx !== index);
+      return prev.map((item, idx) =>
+        idx === index ? { ...item, quantity: clamped } : item
+      );
+    });
   };
 
   const updateBasketNotes = (index: number, note: string) => {
@@ -355,7 +385,7 @@ const WaiterPortal: React.FC = () => {
                             }
                             if (tbl.status === 'Available' || tbl.status === 'Occupied' || tbl.status === 'Billing') {
                               setOrderingTable(tbl);
-                              setBasket([]);
+                              restoreDraftForTable(tbl.id);
                             } else {
                               toast.info(`Table status: ${tbl.status}`);
                             }
@@ -414,7 +444,7 @@ const WaiterPortal: React.FC = () => {
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
                     <button 
-                      onClick={clearDraft}
+                      onClick={closeOrdersPanel}
                       className="px-2.5 py-1 text-[11px] bg-white border border-slate-200 rounded font-bold cursor-pointer hover:bg-slate-50"
                     >
                       ← {t.back}
@@ -553,6 +583,7 @@ const WaiterPortal: React.FC = () => {
                               <div className="flex items-center gap-2">
                                 <QtyStepper
                                   value={item.quantity}
+                                  min={0}
                                   onChange={next => setBasketQty(idx, next)}
                                 />
                               </div>

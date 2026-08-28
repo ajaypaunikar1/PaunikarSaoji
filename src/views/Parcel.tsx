@@ -366,7 +366,7 @@ const Parcel: React.FC = () => {
                         <span className="text-[9px] text-emerald-700 font-bold capitalize">{c.portion} · {formatCurrency(c.price)}</span>
                       </div>
                       <div className="flex items-center gap-1.5">
-                        <QtyStepper value={c.quantity} onChange={next => setCartQty(idx, next)} />
+                        <QtyStepper value={c.quantity} min={0} onChange={next => setCartQty(idx, next)} />
                         <button onClick={() => removeFromCart(idx)} className="ml-1 text-rose-400 hover:text-rose-600 cursor-pointer"><Trash2 size={12} /></button>
                       </div>
                     </div>

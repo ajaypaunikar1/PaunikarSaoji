@@ -113,13 +113,14 @@ const Reports: React.FC = () => {
 
     filteredOrders.forEach(ord => {
       const bill = bills.find(b => b.orderId === ord.id);
+      const isParcel = !!ord.isParcel || !!bill?.isParcel;
+      if (isParcel) parcelOrders++;
       if (bill) {
         if (bill.paymentStatus === 'Paid') {
           totalRevenue += bill.grandTotal;
           totalDiscount += bill.discount;
           totalContainerCharge += bill.containerCharge || 0;
-          if (ord.isParcel || bill.isParcel) {
-            parcelOrders++;
+          if (isParcel) {
             parcelRevenue += bill.grandTotal;
             parcelContainerCharge += bill.containerCharge || 0;
           }
@@ -127,8 +128,8 @@ const Reports: React.FC = () => {
       } else {
         if (ord.status === 'Served') {
           totalRevenue += ord.grandTotal;
+          if (isParcel) parcelRevenue += ord.grandTotal;
         }
-        if (ord.isParcel) parcelOrders++;
       }
     });
 

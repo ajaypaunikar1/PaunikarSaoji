@@ -126,23 +126,23 @@ const INITIAL_USERS: User[] = [
 const INITIAL_MENU: MenuItem[] = [
   // 1. वेज (Vegetarian Curries)
   { id: 'm_veg_1', name: 'पाटवडी (Patvadi)', category: 'Vegetarian', portionMode: 'Single', price: 250, variants: [], prepTime: 15, isAvailable: true },
-  { id: 'm_veg_2', name: 'डाळकांदा (Dal Kanda)', category: 'Vegetarian', portionMode: 'Single', price: 250, variants: [], prepTime: 15, isAvailable: true },
-  { id: 'm_veg_3', name: 'शेवभाजी (Shev Bhaji)', category: 'Vegetarian', portionMode: 'Single', price: 250, variants: [], prepTime: 12, isAvailable: true },
+  { id: 'm_veg_2', name: 'डाळ कांदा (Dal Kanda)', category: 'Vegetarian', portionMode: 'Single', price: 250, variants: [], prepTime: 15, isAvailable: true },
+  { id: 'm_veg_3', name: 'शेव भाजी (Shev Bhaji)', category: 'Vegetarian', portionMode: 'Single', price: 250, variants: [], prepTime: 12, isAvailable: true },
   { id: 'm_veg_4', name: 'पनीर बटर मसाला (Paneer Butter Masala)', category: 'Vegetarian', portionMode: 'Single', price: 280, variants: [], prepTime: 15, isAvailable: true },
-  { id: 'm_veg_5', name: 'कोल्हापूरी पनीर (Kolhapuri Paneer)', category: 'Vegetarian', portionMode: 'Single', price: 280, variants: [], prepTime: 15, isAvailable: true },
+  { id: 'm_veg_5', name: 'कोल्हापुरी पनीर (Kolhapuri Paneer)', category: 'Vegetarian', portionMode: 'Single', price: 280, variants: [], prepTime: 15, isAvailable: true },
   { id: 'm_veg_6', name: 'पनीर मसाला (Paneer Masala)', category: 'Vegetarian', portionMode: 'Single', price: 280, variants: [], prepTime: 15, isAvailable: true },
   { id: 'm_veg_7', name: 'पालक पनीर (Palak Paneer)', category: 'Vegetarian', portionMode: 'Single', price: 300, variants: [], prepTime: 15, isAvailable: true },
   { id: 'm_veg_8', name: 'पनीर खसखस (Paneer Khas Khas)', category: 'Vegetarian', portionMode: 'Single', price: 350, variants: [], prepTime: 18, isAvailable: true },
-  { id: 'm_veg_9', name: 'दाल फ्राय (Dal Fry)', category: 'Vegetarian', portionMode: 'Single', price: 200, variants: [], prepTime: 10, isAvailable: true },
-  { id: 'm_veg_10', name: 'दाल तडका (Dal Tadka)', category: 'Vegetarian', portionMode: 'Single', price: 230, variants: [], prepTime: 12, isAvailable: true },
-  { id: 'm_veg_11', name: 'टमाटर चटणी (Tamatar Chutney)', category: 'Vegetarian', portionMode: 'Single', price: 250, variants: [], prepTime: 12, isAvailable: true },
+  { id: 'm_veg_9', name: 'डाळ फ्राय (Dal Fry)', category: 'Vegetarian', portionMode: 'Single', price: 200, variants: [], prepTime: 10, isAvailable: true },
+  { id: 'm_veg_10', name: 'डाळ तडका (Dal Tadka)', category: 'Vegetarian', portionMode: 'Single', price: 230, variants: [], prepTime: 12, isAvailable: true },
+  { id: 'm_veg_11', name: 'टोमॅटो चटणी (Tomato Chutney)', category: 'Vegetarian', portionMode: 'Single', price: 250, variants: [], prepTime: 12, isAvailable: true },
   { id: 'm_veg_12', name: 'पनीर भुर्जी (Paneer Bhurji)', category: 'Vegetarian', portionMode: 'Single', price: 320, variants: [], prepTime: 15, isAvailable: true },
 
   // 2. अंडा करी (Egg Curry)
   { id: 'm_egg_1', name: 'वेज अंडाकरी (Veg Egg Curry)', category: 'Egg Curry', portionMode: 'Single', price: 180, variants: [], prepTime: 15, isAvailable: true },
-  { id: 'm_egg_2', name: 'वेज फ्राय अंडाकरी (Veg Fry Egg Curry)', category: 'Egg Curry', portionMode: 'Single', price: 200, variants: [], prepTime: 15, isAvailable: true },
-  { id: 'm_egg_3', name: 'फ्राय अंडाकरी नॉनव्हेज (Fry Egg Curry Non-Veg)', category: 'Egg Curry', portionMode: 'Single', price: 220, variants: [], prepTime: 15, isAvailable: true },
-  { id: 'm_egg_4', name: 'अंडाकरी नॉनव्हेज (Egg Curry Non-Veg)', category: 'Egg Curry', portionMode: 'Single', price: 200, variants: [], prepTime: 15, isAvailable: true },
+  { id: 'm_egg_2', name: 'वेज अंडाकरी फ्राय (Veg Egg Curry Fry)', category: 'Egg Curry', portionMode: 'Single', price: 200, variants: [], prepTime: 15, isAvailable: true },
+  { id: 'm_egg_3', name: 'फ्राय अंडाकरी नॉन-व्हेज (Fry Egg Curry Non-Veg)', category: 'Egg Curry', portionMode: 'Single', price: 220, variants: [], prepTime: 15, isAvailable: true },
+  { id: 'm_egg_4', name: 'अंडाकरी नॉन-व्हेज (Egg Curry Non-Veg)', category: 'Egg Curry', portionMode: 'Single', price: 200, variants: [], prepTime: 15, isAvailable: true },
 
   // 3. चपाती (Breads)
   { id: 'm_bread_1', name: 'रोटी (Roti)', category: 'Breads', portionMode: 'Single', price: 15, variants: [], prepTime: 3, isAvailable: true },
@@ -152,11 +152,11 @@ const INITIAL_MENU: MenuItem[] = [
   { id: 'm_bread_5', name: 'बटर पराठा (Butter Paratha)', category: 'Breads', portionMode: 'Single', price: 30, variants: [], prepTime: 5, isAvailable: true },
   { id: 'm_bread_6', name: 'घी पराठा (Ghee Paratha)', category: 'Breads', portionMode: 'Single', price: 30, variants: [], prepTime: 5, isAvailable: true },
   { id: 'm_bread_7', name: 'तेल पराठा (Oil Paratha)', category: 'Breads', portionMode: 'Single', price: 30, variants: [], prepTime: 5, isAvailable: true },
-  { id: 'm_bread_8', name: 'भाकर (Bhakar)', category: 'Breads', portionMode: 'Single', price: 35, variants: [], prepTime: 6, isAvailable: true },
+  { id: 'm_bread_8', name: 'भाकरी (Bhakri)', category: 'Breads', portionMode: 'Single', price: 35, variants: [], prepTime: 6, isAvailable: true },
 
   // 4. राईस (Rice)
   { id: 'm_rice_1', name: 'स्टीम राईस (Steam Rice)', category: 'Rice', portionMode: 'Variant', price: 0, variants: [{ name: 'Half', price: 50, prepTime: 8 }, { name: 'Full', price: 80, prepTime: 12 }], prepTime: 10, isAvailable: true },
-  { id: 'm_rice_2', name: 'जिरा राईस (Jeera Rice)', category: 'Rice', portionMode: 'Variant', price: 0, variants: [{ name: 'Half', price: 60, prepTime: 8 }, { name: 'Full', price: 100, prepTime: 12 }], prepTime: 10, isAvailable: true },
+  { id: 'm_rice_2', name: 'जीरा राईस (Jeera Rice)', category: 'Rice', portionMode: 'Variant', price: 0, variants: [{ name: 'Half', price: 60, prepTime: 8 }, { name: 'Full', price: 100, prepTime: 12 }], prepTime: 10, isAvailable: true },
   { id: 'm_rice_3', name: 'गार्लिक राईस (Garlic Rice)', category: 'Rice', portionMode: 'Variant', price: 0, variants: [{ name: 'Half', price: 80, prepTime: 10 }, { name: 'Full', price: 120, prepTime: 15 }], prepTime: 12, isAvailable: true },
 
   // 5. पापड (Papad)
@@ -167,45 +167,45 @@ const INITIAL_MENU: MenuItem[] = [
   // 6. नॉनवेज स्टार्टर (Starters)
   { id: 'm_nst_1', name: 'फिश फ्राय (Fish Fry)', category: 'Starters', portionMode: 'Single', price: 350, variants: [], prepTime: 15, isAvailable: true },
   { id: 'm_nst_2', name: 'सुखा झिंगा (Sukha Zinga / Dry Prawns)', category: 'Starters', portionMode: 'Single', price: 380, variants: [], prepTime: 15, isAvailable: true },
-  { id: 'm_nst_3', name: 'खिमा कलेजी (Kheema Kaleji Starter)', category: 'Starters', portionMode: 'Single', price: 390, variants: [], prepTime: 15, isAvailable: true },
-  { id: 'm_nst_4', name: 'गारलिक खिमा (Garlic Kheema)', category: 'Starters', portionMode: 'Single', price: 410, variants: [], prepTime: 15, isAvailable: true },
-  { id: 'm_nst_5', name: 'मुंडरी स्टार्टर (Mundari Starter)', category: 'Starters', portionMode: 'Single', price: 320, variants: [], prepTime: 15, isAvailable: true },
-  { id: 'm_nst_6', name: 'ग्रिन मटन (Green Mutton)', category: 'Starters', portionMode: 'Single', price: 380, variants: [], prepTime: 18, isAvailable: true },
-  { id: 'm_nst_7', name: 'गारलिक ग्रिन मटन (Garlic Green Mutton)', category: 'Starters', portionMode: 'Single', price: 400, variants: [], prepTime: 18, isAvailable: true },
+  { id: 'm_nst_3', name: 'खिमा कलेजी (Kheema Kaleji)', category: 'Starters', portionMode: 'Single', price: 390, variants: [], prepTime: 15, isAvailable: true },
+  { id: 'm_nst_4', name: 'गार्लिक खिमा (Garlic Kheema)', category: 'Starters', portionMode: 'Single', price: 410, variants: [], prepTime: 15, isAvailable: true },
+  { id: 'm_nst_5', name: 'सुंदरी स्टार्टर (Sundari Starter)', category: 'Starters', portionMode: 'Single', price: 320, variants: [], prepTime: 15, isAvailable: true },
+  { id: 'm_nst_6', name: 'ग्रीन मटन (Green Mutton)', category: 'Starters', portionMode: 'Single', price: 380, variants: [], prepTime: 18, isAvailable: true },
+  { id: 'm_nst_7', name: 'गार्लिक ग्रीन मटन (Garlic Green Mutton)', category: 'Starters', portionMode: 'Single', price: 400, variants: [], prepTime: 18, isAvailable: true },
   { id: 'm_nst_8', name: 'सुखा मटन (Sukha Mutton / Dry Mutton)', category: 'Starters', portionMode: 'Single', price: 380, variants: [], prepTime: 18, isAvailable: true },
-  { id: 'm_nst_9', name: 'गारलिक मटन (Garlic Mutton)', category: 'Starters', portionMode: 'Single', price: 400, variants: [], prepTime: 18, isAvailable: true },
+  { id: 'm_nst_9', name: 'गार्लिक मटन (Garlic Mutton)', category: 'Starters', portionMode: 'Single', price: 400, variants: [], prepTime: 18, isAvailable: true },
   { id: 'm_nst_10', name: 'सुखा खुर (Sukha Khur / Dry Trotters)', category: 'Starters', portionMode: 'Single', price: 400, variants: [], prepTime: 20, isAvailable: true },
   { id: 'm_nst_11', name: 'चिकन सुखा (Chicken Sukha / Dry Chicken)', category: 'Starters', portionMode: 'Single', price: 380, variants: [], prepTime: 15, isAvailable: true },
-  { id: 'm_nst_12', name: 'गारलिक सुखा चिकन (Garlic Sukha Chicken)', category: 'Starters', portionMode: 'Single', price: 400, variants: [], prepTime: 15, isAvailable: true },
-  { id: 'm_nst_13', name: 'गास्लीक कत्तीचा चिकन (Gaslik Katticha Chicken)', category: 'Starters', portionMode: 'Single', price: 470, variants: [], prepTime: 18, isAvailable: true },
-  { id: 'm_nst_14', name: 'सुखा चिकन कत्तीचा (Sukha Chicken Katticha)', category: 'Starters', portionMode: 'Single', price: 450, variants: [], prepTime: 18, isAvailable: true },
+  { id: 'm_nst_12', name: 'गार्लिक सुखा चिकन (Garlic Sukha Chicken)', category: 'Starters', portionMode: 'Single', price: 400, variants: [], prepTime: 15, isAvailable: true },
+  { id: 'm_nst_13', name: 'गार्लिक काटीचा चिकन (Garlic Katicha Chicken)', category: 'Starters', portionMode: 'Single', price: 470, variants: [], prepTime: 18, isAvailable: true },
+  { id: 'm_nst_14', name: 'सुखा काटीचा चिकन (Sukha Katicha Chicken)', category: 'Starters', portionMode: 'Single', price: 450, variants: [], prepTime: 18, isAvailable: true },
   { id: 'm_nst_15', name: 'मसाला सावजी चिकन (Masala Saoji Chicken)', category: 'Starters', portionMode: 'Single', price: 350, variants: [], prepTime: 15, isAvailable: true },
 
   // 7. करी (Curries)
-  { id: 'm_cur_1', name: 'झिंगा करी (Zinga Curry / Prawns Curry)', category: 'Curries', portionMode: 'Variant', price: 0, variants: [{ name: 'Half', price: 280, prepTime: 12 }, { name: 'Full', price: 380, prepTime: 18 }], prepTime: 15, isAvailable: true },
-  { id: 'm_cur_2', name: 'मुंडरी करी (Mundari Curry)', category: 'Curries', portionMode: 'Variant', price: 0, variants: [{ name: 'Half', price: 220, prepTime: 12 }, { name: 'Full', price: 320, prepTime: 18 }], prepTime: 15, isAvailable: true },
+  { id: 'm_cur_1', name: 'झिंगा करी (Prawns Curry)', category: 'Curries', portionMode: 'Variant', price: 0, variants: [{ name: 'Half', price: 280, prepTime: 12 }, { name: 'Full', price: 380, prepTime: 18 }], prepTime: 15, isAvailable: true },
+  { id: 'm_cur_2', name: 'सुंदरी करी (Sundari Curry)', category: 'Curries', portionMode: 'Variant', price: 0, variants: [{ name: 'Half', price: 220, prepTime: 12 }, { name: 'Full', price: 320, prepTime: 18 }], prepTime: 15, isAvailable: true },
   { id: 'm_cur_3', name: 'खिमा कलेजी करी (Kheema Kaleji Curry)', category: 'Curries', portionMode: 'Single', price: 390, variants: [], prepTime: 15, isAvailable: true },
-  { id: 'm_cur_4', name: 'गास्लीक खिमा कलेजी (Gaslik Kheema Kaleji)', category: 'Curries', portionMode: 'Single', price: 410, variants: [], prepTime: 15, isAvailable: true },
+  { id: 'm_cur_4', name: 'गार्लिक खिमा कलेजी (Garlic Kheema Kaleji)', category: 'Curries', portionMode: 'Single', price: 410, variants: [], prepTime: 15, isAvailable: true },
   { id: 'm_cur_5', name: 'खिमा मटन (Kheema Mutton)', category: 'Curries', portionMode: 'Single', price: 390, variants: [], prepTime: 18, isAvailable: true },
   { id: 'm_cur_6', name: 'मटन करी (Mutton Curry)', category: 'Curries', portionMode: 'Variant', price: 0, variants: [{ name: 'Half', price: 280, prepTime: 15 }, { name: 'Full', price: 380, prepTime: 20 }], prepTime: 18, isAvailable: true },
-  { id: 'm_cur_7', name: 'गास्लीक मटन करी (Gaslik Mutton Curry)', category: 'Curries', portionMode: 'Variant', price: 0, variants: [{ name: 'Half', price: 300, prepTime: 15 }, { name: 'Full', price: 400, prepTime: 20 }], prepTime: 18, isAvailable: true },
+  { id: 'm_cur_7', name: 'गार्लिक मटन करी (Garlic Mutton Curry)', category: 'Curries', portionMode: 'Variant', price: 0, variants: [{ name: 'Half', price: 300, prepTime: 15 }, { name: 'Full', price: 400, prepTime: 20 }], prepTime: 18, isAvailable: true },
   { id: 'm_cur_8', name: 'चिकन करी (Chicken Curry)', category: 'Curries', portionMode: 'Variant', price: 0, variants: [{ name: 'Half', price: 280, prepTime: 12 }, { name: 'Full', price: 380, prepTime: 18 }], prepTime: 15, isAvailable: true },
-  { id: 'm_cur_9', name: 'गास्लीक चिकन करी (Gaslik Chicken Curry)', category: 'Curries', portionMode: 'Variant', price: 0, variants: [{ name: 'Half', price: 300, prepTime: 12 }, { name: 'Full', price: 400, prepTime: 18 }], prepTime: 15, isAvailable: true },
+  { id: 'm_cur_9', name: 'गार्लिक चिकन करी (Garlic Chicken Curry)', category: 'Curries', portionMode: 'Variant', price: 0, variants: [{ name: 'Half', price: 300, prepTime: 12 }, { name: 'Full', price: 400, prepTime: 18 }], prepTime: 15, isAvailable: true },
   { id: 'm_cur_10', name: 'खुर करी (Khur Curry / Trotters Curry)', category: 'Curries', portionMode: 'Variant', price: 0, variants: [{ name: 'Half', price: 290, prepTime: 18 }, { name: 'Full', price: 400, prepTime: 25 }], prepTime: 20, isAvailable: true },
-  { id: 'm_cur_11', name: 'गास्लीक खुर करी (Gaslik Khur Curry)', category: 'Curries', portionMode: 'Variant', price: 0, variants: [{ name: 'Half', price: 300, prepTime: 18 }, { name: 'Full', price: 420, prepTime: 25 }], prepTime: 20, isAvailable: true },
-  { id: 'm_cur_12', name: 'कातीचा कोंबडा (Katicha Kombda)', category: 'Curries', portionMode: 'Single', price: 450, variants: [], prepTime: 18, isAvailable: true },
-  { id: 'm_cur_13', name: 'गास्लीक कातीचा कोंबडा (Gaslik Katicha Kombda)', category: 'Curries', portionMode: 'Single', price: 470, variants: [], prepTime: 18, isAvailable: true },
+  { id: 'm_cur_11', name: 'गार्लिक खुर करी (Garlic Khur Curry)', category: 'Curries', portionMode: 'Variant', price: 0, variants: [{ name: 'Half', price: 300, prepTime: 18 }, { name: 'Full', price: 420, prepTime: 25 }], prepTime: 20, isAvailable: true },
+  { id: 'm_cur_12', name: 'काटीचा कोंबडा (Katicha Kombda)', category: 'Curries', portionMode: 'Single', price: 450, variants: [], prepTime: 18, isAvailable: true },
+  { id: 'm_cur_13', name: 'गार्लिक काटीचा कोंबडा (Garlic Katicha Kombda)', category: 'Curries', portionMode: 'Single', price: 470, variants: [], prepTime: 18, isAvailable: true },
   { id: 'm_cur_14', name: 'मसाला सावजी चिकन करी (Masala Saoji Chicken Curry)', category: 'Curries', portionMode: 'Variant', price: 0, variants: [{ name: 'Half', price: 220, prepTime: 12 }, { name: 'Full', price: 350, prepTime: 18 }], prepTime: 15, isAvailable: true },
 
   // 8. हांडी (Handi Dishes)
   { id: 'm_handi_1', name: 'मटन हांडी (Mutton Handi)', category: 'Handi Dishes', portionMode: 'Variant', price: 0, variants: [{ name: 'Half', price: 650, prepTime: 20 }, { name: 'Full', price: 1200, prepTime: 30 }], prepTime: 25, isAvailable: true },
-  { id: 'm_handi_2', name: 'मटन हांडी सुखा (Mutton Handi Sukha)', category: 'Handi Dishes', portionMode: 'Variant', price: 0, variants: [{ name: 'Half', price: 650, prepTime: 20 }, { name: 'Full', price: 1200, prepTime: 30 }], prepTime: 25, isAvailable: true },
+  { id: 'm_handi_2', name: 'सुखा मटन हांडी (Sukha Mutton Handi)', category: 'Handi Dishes', portionMode: 'Variant', price: 0, variants: [{ name: 'Half', price: 650, prepTime: 20 }, { name: 'Full', price: 1200, prepTime: 30 }], prepTime: 25, isAvailable: true },
   { id: 'm_handi_3', name: 'चिकन हांडी (Chicken Handi)', category: 'Handi Dishes', portionMode: 'Variant', price: 0, variants: [{ name: 'Half', price: 650, prepTime: 18 }, { name: 'Full', price: 1200, prepTime: 28 }], prepTime: 22, isAvailable: true },
   { id: 'm_handi_4', name: 'सुखा चिकन हांडी (Sukha Chicken Handi)', category: 'Handi Dishes', portionMode: 'Variant', price: 0, variants: [{ name: 'Half', price: 650, prepTime: 18 }, { name: 'Full', price: 1200, prepTime: 28 }], prepTime: 22, isAvailable: true },
   { id: 'm_handi_5', name: 'खुर हांडी (Khur Handi)', category: 'Handi Dishes', portionMode: 'Variant', price: 0, variants: [{ name: 'Half', price: 700, prepTime: 22 }, { name: 'Full', price: 1300, prepTime: 35 }], prepTime: 30, isAvailable: true },
   { id: 'm_handi_6', name: 'सुखा खुर हांडी (Sukha Khur Handi)', category: 'Handi Dishes', portionMode: 'Variant', price: 0, variants: [{ name: 'Half', price: 700, prepTime: 22 }, { name: 'Full', price: 1300, prepTime: 35 }], prepTime: 30, isAvailable: true },
-  { id: 'm_handi_7', name: 'कातीचा कोंबडा हांडी (Katicha Kombda Handi)', category: 'Handi Dishes', portionMode: 'Variant', price: 0, variants: [{ name: 'Half', price: 850, prepTime: 25 }, { name: 'Full', price: 1600, prepTime: 40 }], prepTime: 35, isAvailable: true },
-  { id: 'm_handi_8', name: 'सुखा कातीचा कोंबडा हांडी (Sukha Katicha Kombda Handi)', category: 'Handi Dishes', portionMode: 'Variant', price: 0, variants: [{ name: 'Half', price: 850, prepTime: 25 }, { name: 'Full', price: 1600, prepTime: 40 }], prepTime: 35, isAvailable: true }
+  { id: 'm_handi_7', name: 'काटीचा कोंबडा हांडी (Katicha Kombda Handi)', category: 'Handi Dishes', portionMode: 'Variant', price: 0, variants: [{ name: 'Half', price: 850, prepTime: 25 }, { name: 'Full', price: 1600, prepTime: 40 }], prepTime: 35, isAvailable: true },
+  { id: 'm_handi_8', name: 'सुखा काटीचा कोंबडा हांडी (Sukha Katicha Kombda Handi)', category: 'Handi Dishes', portionMode: 'Variant', price: 0, variants: [{ name: 'Half', price: 850, prepTime: 25 }, { name: 'Full', price: 1600, prepTime: 40 }], prepTime: 35, isAvailable: true }
 ];
 
 const INITIAL_TABLES: Table[] = Array.from({ length: 24 }, (_, i) => {

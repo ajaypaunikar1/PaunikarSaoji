@@ -200,7 +200,7 @@ const Billing: React.FC = () => {
   };
 
   // Submit Cancellation Request to Manager or Cancel Directly
-  const triggerCancelRequest = (itemId: string, itemName: string, portion: string, quantity: number) => {
+  const triggerCancelRequest = async (itemId: string, itemName: string, portion: string, quantity: number) => {
     if (!selectedOrder || !cancelReason.trim()) {
       toast.error('Please enter a cancellation reason');
       return;
@@ -213,6 +213,16 @@ const Billing: React.FC = () => {
         .map(item => item.id === itemId ? { ...item, quantity: item.quantity - 1 } : item)
         .filter(item => item.quantity > 0);
       updateOrder(selectedOrder.id, { items: updatedItems });
+      if (updatedItems.length === 0) {
+        // No items left on the order — release the table back to Available.
+        if (selectedTableId) {
+          await clearTable(selectedTableId);
+          setSelectedTableId(null);
+        }
+        setSelectedParcelId(null);
+        setPaymentMethod(null);
+        setPrintBillData(null);
+      }
       toast.success(`1 x ${itemName} removed successfully`);
     } else {
       // Encode quantity so approval can do a partial cancel: "Name (Full) x2"

@@ -27,7 +27,7 @@ const TableManagement: React.FC = () => {
   const { 
     tables, orders, menuItems, language, mergedGroups, zones,
     addOrder, updateOrder, mergeTables, splitTables, 
-    transferTable, generateBill, payBill, setTableStatus, users, assignWaiter,
+    transferTable, generateBill, payBill, setTableStatus, users, assignWaiter, clearTable,
     addTable, removeTable, addZone, removeZone, unmergeTables, settings
   } = useApp();
   const { printBill: printBillThermal } = usePrinter();
@@ -93,19 +93,47 @@ const TableManagement: React.FC = () => {
     cleaning: zoneTables.filter(t => t.status === 'Cleaning').length,
   }), [zoneTables]);
 
+  // Draft persistence for the order basket — survives closing the modal or
+  // switching tables so added items are never lost before KOT is sent.
+  const DRAFT_KEY = 'rms_admin_table_order_basket';
+
+  const saveOrderDraft = () => {
+    if (!selectedTable || orderItemsList.length === 0) return;
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({ tableId: selectedTable.id, items: orderItemsList }));
+  };
+
+  const loadOrderDraft = (tableId: number) => {
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed.tableId === tableId && Array.isArray(parsed.items)) {
+          setOrderItemsList(parsed.items);
+          toast.success(language === 'en' ? `Draft restored for Table ${tableId}` : `टेबल ${tableId} साठी ड्राफ्ट पुनर्संचयित केला`);
+          return;
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    setOrderItemsList([]);
+  };
+
   const handleTableClick = (table: Table) => {
     if (isEditMode) return;
+    saveOrderDraft();
     setSelectedTable(table);
     setActiveAction('details');
     setGuestCount(table.guests || 2);
-    setOrderItemsList([]);
     setMergeSources([]);
     setTransferTarget(null);
     setSplitTarget(null);
     setSplitItemsCheck([]);
+    loadOrderDraft(table.id);
   };
 
   const closeDetails = () => {
+    saveOrderDraft();
     setSelectedTable(null);
     setActiveAction(null);
   };
@@ -157,12 +185,15 @@ const TableManagement: React.FC = () => {
     }));
   };
 
-  /** Absolute quantity setter for direct numeric entry in the basket. */
+  /** Absolute quantity setter for direct numeric entry in the basket (0 removes the line). */
   const handleSetItemQty = (index: number, qty: number) => {
     const clamped = Math.min(999, Math.max(1, Math.floor(qty)));
-    setOrderItemsList(prev => prev.map((item, idx) =>
-      idx === index ? { ...item, quantity: clamped } : item
-    ));
+    setOrderItemsList(prev => {
+      if (qty <= 0) return prev.filter((_, idx) => idx !== index);
+      return prev.map((item, idx) =>
+        idx === index ? { ...item, quantity: clamped } : item
+      );
+    });
   };
 
   const handleUpdateActiveOrderItemQty = (itemIndex: number, amt: number) => {
@@ -175,6 +206,12 @@ const TableManagement: React.FC = () => {
       return item;
     }).filter(i => i.quantity > 0);
     updateOrder(activeOrder.id, { items: updatedItems });
+    if (updatedItems.length === 0 && selectedTable) {
+      clearTable(selectedTable.id);
+      closeDetails();
+      toast.success(`Table ${selectedTable.id} cleared — no items left`);
+      return;
+    }
     toast.success('Order quantity updated');
   };
 
@@ -182,6 +219,12 @@ const TableManagement: React.FC = () => {
     if (!activeOrder) return;
     const updatedItems = activeOrder.items.filter((_, idx) => idx !== itemIndex);
     updateOrder(activeOrder.id, { items: updatedItems });
+    if (updatedItems.length === 0 && selectedTable) {
+      clearTable(selectedTable.id);
+      closeDetails();
+      toast.success(`Table ${selectedTable.id} cleared — no items left`);
+      return;
+    }
     toast.success('Item removed from order');
   };
 
@@ -243,6 +286,7 @@ const TableManagement: React.FC = () => {
     } else {
       addOrder(selectedTable.id, orderItemsList, '');
     }
+    localStorage.removeItem(DRAFT_KEY);
     setOrderItemsList([]);
     closeDetails();
   };
@@ -270,7 +314,7 @@ const TableManagement: React.FC = () => {
               ))}
             </div>
             <button
-              onClick={() => { setIsEditMode(!isEditMode); setSelectedTable(null); setActiveAction(null); }}
+              onClick={() => { saveOrderDraft(); setIsEditMode(!isEditMode); setSelectedTable(null); setActiveAction(null); }}
               className={`px-3 py-2 rounded-xl text-xs font-bold border transition cursor-pointer flex items-center gap-1.5 ${isEditMode ? 'bg-amber-500 text-white border-amber-500' : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'}`}
             >
               {isEditMode ? <Eye size={13} /> : <Settings size={13} />}
@@ -692,7 +736,7 @@ const TableManagement: React.FC = () => {
                                   <input type="checkbox" checked={!!item.isParcel} onChange={() => handleToggleParcel(idx)} className="w-3 h-3 accent-indigo-600" />
                                   <span className="text-[10px] text-gray-500 font-bold">Parcel</span>
                                 </label>
-                                <QtyStepper value={item.quantity} onChange={next => handleSetItemQty(idx, next)} />
+                                <QtyStepper value={item.quantity} min={0} onChange={next => handleSetItemQty(idx, next)} />
                               </div>
                             </div>
                           ))}
@@ -787,7 +831,7 @@ const TableManagement: React.FC = () => {
               {/* Footer back button */}
               {activeAction !== 'details' && (
                 <div className="pt-4 border-t border-gray-100 mt-4">
-                  <button onClick={() => setActiveAction('details')}
+                  <button onClick={() => { saveOrderDraft(); setActiveAction('details'); }}
                     className="w-full py-2.5 bg-gray-50 border border-gray-200 text-xs font-bold text-gray-500 rounded-xl hover:text-gray-700 cursor-pointer transition flex items-center justify-center">
                     Back to Details
                   </button>
