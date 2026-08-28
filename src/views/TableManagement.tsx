@@ -189,10 +189,14 @@ const TableManagement: React.FC = () => {
   const handleSetItemQty = (index: number, qty: number) => {
     const clamped = Math.min(999, Math.max(1, Math.floor(qty)));
     setOrderItemsList(prev => {
-      if (qty <= 0) return prev.filter((_, idx) => idx !== index);
-      return prev.map((item, idx) =>
-        idx === index ? { ...item, quantity: clamped } : item
-      );
+      const next = qty <= 0
+        ? prev.filter((_, idx) => idx !== index)
+        : prev.map((item, idx) =>
+            idx === index ? { ...item, quantity: clamped } : item
+          );
+      // All items removed — drop the saved draft so it isn't restored on re-open.
+      if (next.length === 0) localStorage.removeItem(DRAFT_KEY);
+      return next;
     });
   };
 
