@@ -5,10 +5,11 @@ import { translations } from '../translations/translations';
 import { 
   Users, CheckCircle2, ShoppingBag, Plus, Trash2,
   ArrowRightLeft, GitMerge, Columns, PlusCircle, X, Check,
-  Settings, Eye, HelpCircle, LayoutGrid, ChevronDown, Printer
+  Settings, Eye, HelpCircle, LayoutGrid, ChevronDown, Printer,
+  Receipt, Wallet, Smartphone, CreditCard, Percent
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import type { Table, PortionType, TableStatus } from '../types/types';
+import type { Table, PortionType, TableStatus, Bill, PaymentMethod } from '../types/types';
 import QtyStepper from '../components/QtyStepper';
 import { resolvePortionPrice } from '../utils/variants';
 import { formatCurrency } from '../utils/currency';
@@ -26,7 +27,7 @@ const TableManagement: React.FC = () => {
   const { 
     tables, orders, menuItems, language, mergedGroups, zones,
     addOrder, updateOrder, mergeTables, splitTables, 
-    transferTable, generateBill, setTableStatus, users, assignWaiter,
+    transferTable, generateBill, payBill, setTableStatus, users, assignWaiter,
     addTable, removeTable, addZone, removeZone, unmergeTables, settings
   } = useApp();
   const { printBill: printBillThermal } = usePrinter();
@@ -34,7 +35,7 @@ const TableManagement: React.FC = () => {
 
   // UI state
   const [selectedTable, setSelectedTable] = useState<Table | null>(null);
-  const [activeAction, setActiveAction] = useState<'details' | 'transfer' | 'merge' | 'split' | 'addItems' | null>(null);
+  const [activeAction, setActiveAction] = useState<'details' | 'transfer' | 'merge' | 'split' | 'addItems' | 'billing' | null>(null);
   const [isEditMode, setIsEditMode] = useState<boolean>(false);
   const [activeZone, setActiveZone] = useState<string>(zones[0] || 'A');
   const [newZoneName, setNewZoneName] = useState<string>('');
@@ -45,6 +46,11 @@ const TableManagement: React.FC = () => {
   const [mergeSources, setMergeSources] = useState<number[]>([]);
   const [splitTarget, setSplitTarget] = useState<number | null>(null);
   const [splitItemsCheck, setSplitItemsCheck] = useState<{ id: string; portion: PortionType; price: number; name: string; quantity: number }[]>([]);
+
+  // Billing panel state
+  const [billDiscountPct, setBillDiscountPct] = useState<number>(0);
+  const [billPaymentMethod, setBillPaymentMethod] = useState<PaymentMethod>('Cash');
+  const [billProcessing, setBillProcessing] = useState<boolean>(false);
   const [orderItemsList, setOrderItemsList] = useState<{ id: string; name: string; portion: PortionType; price: number; quantity: number; specialNotes: string; isParcel?: boolean }[]>([]);
   const [addCategory, setAddCategory] = useState<string>('All');
   const [guestCount, setGuestCount] = useState<number>(2);
@@ -177,6 +183,37 @@ const TableManagement: React.FC = () => {
     const updatedItems = activeOrder.items.filter((_, idx) => idx !== itemIndex);
     updateOrder(activeOrder.id, { items: updatedItems });
     toast.success('Item removed from order');
+  };
+
+  // Full payment & checkout straight from the Tables screen
+  const handleTablePayment = async () => {
+    if (!selectedTable || !activeOrder) {
+      toast.error('No active order to bill');
+      return;
+    }
+    if (billProcessing) return;
+    setBillProcessing(true);
+    try {
+      const discountAmt = Math.round(activeOrder.grandTotal * (billDiscountPct / 100) * 100) / 100;
+      const finalBill: Bill = await generateBill(selectedTable.id, discountAmt);
+      await payBill(finalBill.id, billPaymentMethod);
+
+      // Thermal print (non-blocking so a printer failure never blocks checkout)
+      try {
+        const waiterName = users.find(u => u.id === activeOrder.waiterId)?.name || 'Staff';
+        await printBillThermal({ ...finalBill, paymentMethod: billPaymentMethod }, activeOrder, settings, waiterName);
+      } catch {
+        // Printer unavailable — payment already succeeded
+      }
+
+      toast.success(`Table ${selectedTable.id} paid via ${billPaymentMethod}. Table cleared.`);
+      setBillDiscountPct(0);
+      closeDetails();
+    } catch (err: any) {
+      toast.error(err.message || 'Payment failed');
+    } finally {
+      setBillProcessing(false);
+    }
   };
 
   const executeAddOrder = () => {
@@ -460,9 +497,28 @@ const TableManagement: React.FC = () => {
                         </button>
                       )}
                       {activeOrder && (
-                        <button onClick={() => { generateBill(selectedTable.id, 0); closeDetails(); toast.success('Bill generated. Please navigate to Billing tab.'); }}
+                        <button onClick={async () => {
+                          try {
+                            if (selectedTable.status === 'Billing') {
+                              toast.info('This table is already in Billing. Navigate to the Billing tab to complete checkout.');
+                              closeDetails();
+                              return;
+                            }
+                            await generateBill(selectedTable.id, 0);
+                            closeDetails();
+                            toast.success('Bill generated. Please navigate to Billing tab.');
+                          } catch (err: any) {
+                            toast.error(err.message || 'Failed to generate bill');
+                          }
+                        }}
                           className="p-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer">
                           <CheckCircle2 size={14} /> Checkout
+                        </button>
+                      )}
+                      {activeOrder && (
+                        <button onClick={() => { setBillDiscountPct(0); setBillPaymentMethod('Cash'); setActiveAction('billing'); }}
+                          className="p-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer">
+                          <Receipt size={14} /> Bill & Pay
                         </button>
                       )}
                       {activeOrder && (
@@ -646,6 +702,83 @@ const TableManagement: React.FC = () => {
                     <button onClick={executeAddOrder} disabled={orderItemsList.length === 0}
                       className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl disabled:opacity-50">
                       {activeOrder ? 'Append to Kitchen' : 'Send KOT to Kitchen'}
+                    </button>
+                  </div>
+                )}
+
+                {/* Billing / Payment UI */}
+                {activeAction === 'billing' && activeOrder && (
+                  <div className="space-y-4">
+                    <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Checkout & Payment</h4>
+
+                    {/* Bill breakdown */}
+                    <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4 space-y-2 text-xs">
+                      <div className="flex justify-between text-gray-500">
+                        <span>Subtotal</span>
+                        <span className="font-mono font-bold text-gray-800">{formatCurrency(activeOrder.grandTotal)}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="flex items-center gap-1 font-bold text-gray-700">
+                          <Percent size={11} className="text-emerald-500" /> Discount (%)
+                        </span>
+                        <input
+                          type="number"
+                          min={0}
+                          max={100}
+                          value={billDiscountPct || ''}
+                          onChange={e => setBillDiscountPct(Math.max(0, Math.min(100, parseFloat(e.target.value) || 0)))}
+                          className="w-16 bg-white border border-gray-200 rounded font-mono text-right text-gray-800 p-1 text-xs focus:outline-none focus:border-emerald-500"
+                        />
+                      </div>
+                      <div className="pt-2 border-t border-gray-200 flex justify-between items-center text-sm font-black">
+                        <span className="text-gray-700 uppercase tracking-wider">Grand Total</span>
+                        <span className="text-emerald-600 font-mono">{formatCurrency(Math.max(0, Math.round((activeOrder.grandTotal - (activeOrder.grandTotal * billDiscountPct / 100)) * 100) / 100))}</span>
+                      </div>
+                    </div>
+
+                    {/* Payment method */}
+                    <div className="space-y-2">
+                      <span className="text-[9px] font-bold uppercase text-gray-400 tracking-wider block">Payment Method</span>
+                      <div className="grid grid-cols-3 gap-2">
+                        <button
+                          onClick={() => setBillPaymentMethod('Cash')}
+                          className={`py-2.5 px-2 rounded-xl border-2 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition ${
+                            billPaymentMethod === 'Cash'
+                              ? 'border-emerald-600 bg-emerald-50 text-emerald-900'
+                              : 'border-gray-200 hover:border-gray-300 text-gray-600 bg-white'
+                          }`}
+                        >
+                          <Wallet size={14} /> Cash
+                        </button>
+                        <button
+                          onClick={() => setBillPaymentMethod('UPI')}
+                          className={`py-2.5 px-2 rounded-xl border-2 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition ${
+                            billPaymentMethod === 'UPI'
+                              ? 'border-indigo-600 bg-indigo-50 text-indigo-900'
+                              : 'border-gray-200 hover:border-gray-300 text-gray-600 bg-white'
+                          }`}
+                        >
+                          <Smartphone size={14} /> UPI
+                        </button>
+                        <button
+                          onClick={() => setBillPaymentMethod('Card')}
+                          className={`py-2.5 px-2 rounded-xl border-2 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition ${
+                            billPaymentMethod === 'Card'
+                              ? 'border-amber-600 bg-amber-50 text-amber-900'
+                              : 'border-gray-200 hover:border-gray-300 text-gray-600 bg-white'
+                          }`}
+                        >
+                          <CreditCard size={14} /> Card
+                        </button>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={handleTablePayment}
+                      disabled={billProcessing}
+                      className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs uppercase tracking-wider rounded-xl disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer transition"
+                    >
+                      <Receipt size={15} /> {billProcessing ? 'Processing...' : 'Pay & Checkout'}
                     </button>
                   </div>
                 )}

@@ -101,6 +101,7 @@ interface AppContextType {
   clearAllNotifications: () => void;
   addAuditLog: (action: string) => void;
   setTableStatus: (tableId: number, status: TableStatus) => void;
+  clearTable: (tableId: number) => Promise<void>;
   assignWaiter: (tableId: number, waiterId: string | null) => void;
   deleteEmployee: (empId: string) => void;
   saveAttendance: (employeeId: string, date: string, status: 'Present' | 'Late' | 'Absent', clockIn?: string, clockOut?: string) => void;
@@ -579,6 +580,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             if (isAborted) return;
             setOrders(data);
           });
+          socket.on('bills_sync', (data: Bill[]) => {
+            if (isAborted) return;
+            setBills(data.map((b: any) => ({ ...b, id: b.id || b._id })));
+          });
           socket.on('order_created', (data: Order) => {
             if (isAborted) return;
             playNotificationSound();
@@ -862,6 +867,44 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       } catch (e) {
         console.error(e);
       }
+    }
+  };
+
+  // Bug-recovery escape hatch: force a stuck table back to Available. Clears its
+  // orderId/waiterId/guests, voids any pending bill, and marks the order Served.
+  const clearTable = async (tableId: number): Promise<void> => {
+    const table = tables.find(t => t.id === tableId);
+    const orderId = table?.orderId;
+
+    // Optimistically clear locally
+    setTables(prev => prev.map(t => t.id === tableId ? {
+      ...t, status: 'Available', orderId: undefined, waiterId: undefined, guests: 0
+    } : t));
+    setMergedGroups(prev => prev.map(g => g.filter(id => id !== tableId)).filter(g => g.length > 0));
+
+    if (orderId) {
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'Served' } : o));
+      // Void the pending bill for this order if one exists
+      const pendingBill = bills.find(b => b.orderId === orderId && b.paymentStatus === 'Pending');
+      if (pendingBill) {
+        setBills(prev => prev.map(b => b.id === pendingBill.id
+          ? { ...b, paymentStatus: 'Paid', paymentMethod: b.paymentMethod || 'Cash' }
+          : b));
+      }
+    }
+
+    if (isBackendMode) {
+      try {
+        await fetch(`${API_BASE}/billing/clear-table/${tableId}`, {
+          method: 'POST',
+          headers: getHeaders()
+        });
+        loadDatabaseData();
+      } catch (e) {
+        console.error(e);
+      }
+    } else {
+      addAuditLog(`Force-cleared Table ${tableId}` + (orderId ? ` (Order ${orderId})` : ''));
     }
   };
 
@@ -1522,8 +1565,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         body: JSON.stringify({ paymentMethod: method })
       }).then(r => r.json());
       if (res.success) {
-        // Optimistically update the UI to avoid lag
-        const bill = bills.find(b => b.id === billId) || res.data;
+        // Use the bill returned by the server (falling back to local state) so the
+        // table can be cleared optimistically even if `bills` is still stale.
+        const bill = res.data || bills.find(b => b.id === billId);
         if (bill && bill.tableId) {
           setTables(prev => prev.map(t => t.id === bill.tableId ? {
             ...t, status: 'Available', orderId: undefined, waiterId: undefined, guests: 0
@@ -2157,7 +2201,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       rejectLeave, markAttendance, clockOut, requestCancellation, approveCancellation,
       rejectCancellation, addEmployee, updateEmployee, changeLanguage, addMenuItem,
       updateMenuItem, deleteMenuItem, clearNotification, clearAllNotifications, addAuditLog, setTableStatus,
-      assignWaiter, deleteEmployee, saveAttendance, addTable, removeTable, updateTableLayout,
+      clearTable, assignWaiter, deleteEmployee, saveAttendance, addTable, removeTable, updateTableLayout,
       addZone, removeZone, unmergeTables, resetAllOrders, settings, updateSettings, systemStatus,
       allCategories, addCategory, deleteCategory
     }}>

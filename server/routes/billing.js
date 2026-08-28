@@ -155,7 +155,9 @@ router.post('/:id/pay', protect, async (req, res) => {
     io.emit('tables_sync', await Table.find().sort({ _id: 1 }));
     io.emit('orders_sync', await Order.find());
 
-    res.json({ success: true, message: 'Checkout complete, payment processed' });
+    // Return the updated bill so the client can clear the table optimistically
+    // even before the socket event / next poll arrives.
+    res.json({ success: true, data: bill, message: 'Checkout complete, payment processed' });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -205,6 +207,56 @@ router.post('/reset-checkout/:tableId', protect, async (req, res) => {
     io.emit('tables_sync', await Table.find().sort({ _id: 1 }));
 
     res.json({ success: true, data: table, message: `Table ${tableId} status reset to ${newStatus}` });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// @route   POST /api/billing/clear-table/:tableId
+// @desc    Bug-recovery: force release a stuck table back to Available. Clears
+//          orderId/waiterId/guests, voids pending bills for its order(s), and
+//          marks the order(s) as Served so KDS drops them.
+router.post('/clear-table/:tableId', protect, async (req, res) => {
+  try {
+    const tableId = Number(req.params.tableId);
+    const table = await Table.findById(tableId);
+    if (!table) return res.status(404).json({ success: false, message: 'Table not found' });
+
+    const freedOrderIds = [];
+
+    if (table.orderId) {
+      freedOrderIds.push(table.orderId);
+      // Void any pending bills tied to this order
+      await Bill.updateMany(
+        { orderId: table.orderId, paymentStatus: 'Pending' },
+        { $set: { paymentStatus: 'Paid', paymentMethod: 'Cash' } }
+      );
+    }
+
+    table.status = 'Available';
+    table.orderId = null;
+    table.waiterId = null;
+    table.guests = 0;
+    await table.save();
+
+    for (const oid of freedOrderIds) {
+      await Order.findByIdAndUpdate(oid, { status: 'Served' });
+    }
+
+    const io = req.app.get('io');
+    io.emit('tables_sync', await Table.find().sort({ _id: 1 }));
+    io.emit('orders_sync', await Order.find());
+    io.emit('bills_sync', await Bill.find());
+    const notif = await Notification.create({
+      title: `Table ${tableId} Force-Cleared`,
+      message: 'Table reset to Available (bug recovery)',
+      type: 'Billing',
+      timestamp: new Date().toLocaleTimeString(),
+      read: false
+    });
+    io.emit('notification_received', notif);
+
+    res.json({ success: true, data: table, message: `Table ${tableId} force-cleared to Available` });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

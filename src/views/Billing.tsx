@@ -5,7 +5,7 @@ import RolePrinterButton from '../components/RolePrinterButton';
 import { translations } from '../translations/translations';
 import { 
   Receipt, CreditCard, Wallet, Smartphone,
-  Printer, Percent, Calculator, PackageCheck, FileText
+  Printer, Percent, Calculator, PackageCheck, FileText, Trash2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Bill, PaymentMethod } from '../types/types';
@@ -15,7 +15,7 @@ import { toast } from 'sonner';
 const Billing: React.FC = () => {
   const { 
     tables, orders, generateBill, generateParcelBill, payBill, bills, language,
-    requestCancellation, users, settings, currentUser, updateOrder
+    requestCancellation, users, settings, currentUser, updateOrder, clearTable
   } = useApp();
   const { printBill: printBillThermal, connected } = usePrinter();
   const t = translations[language];
@@ -128,6 +128,29 @@ const Billing: React.FC = () => {
     }
   };
 
+  // Bug-recovery: force-release a stuck table back to Available
+  const handleClearTable = (tableId: number) => {
+    toast.warning(`Force-clear Table ${tableId}? This resets it to Available and voids its pending bill.`, {
+      action: {
+        label: 'Yes, Clear',
+        onClick: async () => {
+          try {
+            await clearTable(tableId);
+            if (selectedTableId === tableId) {
+              setSelectedTableId(null);
+              setPaymentMethod(null);
+              setPrintBillData(null);
+            }
+            toast.success(`Table ${tableId} cleared to Available`);
+          } catch (err: any) {
+            toast.error(err.message || 'Failed to clear table');
+          }
+        }
+      },
+      duration: 8000,
+    });
+  };
+
   // Standalone Printer Trigger (Print Bill without checking out)
   // Prints the in-memory preview bill — no DB record is created, so prebill
   // prints never pollute pending-dues / reports.
@@ -236,7 +259,7 @@ const Billing: React.FC = () => {
                       setSelectedParcelId(null);
                       setDiscountPct(0);
                     }}
-                    className={`p-4 rounded-2xl border transition duration-300 flex justify-between items-center cursor-pointer ${
+                    className={`p-4 rounded-2xl border transition duration-300 flex justify-between items-center cursor-pointer group ${
                       isSelected 
                         ? 'bg-emerald-500/10 border-emerald-500 text-slate-900 shadow-sm' 
                         : isWaitingPayment
@@ -249,15 +272,25 @@ const Billing: React.FC = () => {
                       <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold mt-1">Zone {tbl.zone}</p>
                     </div>
 
-                    <div className="text-right">
-                      {order && <div className="text-xs font-bold text-slate-800 font-mono">{formatCurrency(order.grandTotal)}</div>}
-                      <span className={`text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded border mt-1.5 inline-block ${
-                        isWaitingPayment 
-                          ? 'bg-cyan-100 border-cyan-200 text-cyan-700' 
-                          : 'bg-emerald-100 border-emerald-200 text-emerald-700'
-                      }`}>
-                        {isWaitingPayment ? 'Checkout Requested' : 'Seated'}
-                      </span>
+                    <div className="flex items-center gap-2">
+                      <div className="text-right">
+                        {order && <div className="text-xs font-bold text-slate-800 font-mono">{formatCurrency(order.grandTotal)}</div>}
+                        <span className={`text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded border mt-1.5 inline-block ${
+                          isWaitingPayment 
+                            ? 'bg-cyan-100 border-cyan-200 text-cyan-700' 
+                            : 'bg-emerald-100 border-emerald-200 text-emerald-700'
+                        }`}>
+                          {isWaitingPayment ? 'Checkout Requested' : 'Seated'}
+                        </span>
+                      </div>
+                      {/* Bug-recovery: force release a stuck table */}
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleClearTable(tbl.id); }}
+                        title="Force-clear this table (bug recovery)"
+                        className="p-1.5 rounded-lg bg-rose-50 border border-rose-100 text-rose-500 hover:bg-rose-500 hover:text-white opacity-60 group-hover:opacity-100 transition cursor-pointer"
+                      >
+                        <Trash2 size={13} />
+                      </button>
                     </div>
                   </div>
                 );
