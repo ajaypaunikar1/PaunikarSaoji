@@ -446,147 +446,156 @@ const TableManagement: React.FC = () => {
         </div>
       </div>
 
-      {/* ====== DETAIL / ACTION MODAL ====== */}
+      {/* ====== DETAIL / ACTION PANEL (FULL SCREEN) ====== */}
       <AnimatePresence>
         {selectedTable && (
-          <>
-            <div className="fixed inset-0 bg-black/50 backdrop-blur-xs z-40" onClick={closeDetails} />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-white border border-gray-100 z-50 p-6 rounded-3xl shadow-2xl overflow-y-auto max-h-[85vh] text-gray-850"
-            >
-              {/* Header */}
-              <div className="flex justify-between items-center pb-4 border-b border-gray-100 mb-4">
-                <div>
-                  <h3 className="text-sm font-extrabold text-gray-900 flex items-center gap-2">
-                    <ShoppingBag size={16} className="text-indigo-600" />
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 24 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
+            className="fixed inset-0 z-50 bg-white flex flex-col overflow-hidden"
+          >
+            {/* Header bar */}
+            <div className="shrink-0 flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <ShoppingBag size={15} className="text-indigo-600" />
+                  <h3 className="text-sm font-extrabold text-gray-900">
                     {t.tableNo.replace('{no}', selectedTable.id.toString())}
                   </h3>
-                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mt-0.5">
-                    Zone {selectedTable.zone} &bull; {selectedTable.status}
-                  </p>
                 </div>
-                <button onClick={closeDetails} className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600 cursor-pointer">
-                  <X size={16} />
-                </button>
+                <span className="h-4 w-px bg-gray-200" />
+                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">
+                  Zone {selectedTable.zone} &bull; {selectedTable.status}
+                </p>
               </div>
+              <button onClick={closeDetails} className="p-2 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 cursor-pointer">
+                <X size={18} />
+              </button>
+            </div>
 
-              {/* Body */}
-              <div className="space-y-4">
+            {/* Body */}
+            <div className="flex-1 overflow-y-auto px-6 py-6">
+              <div className="max-w-5xl mx-auto space-y-6">
                 {activeAction === 'details' && (
-                  <>
-                    {!activeOrder && (
-                      <div className="p-3 bg-gray-50 rounded-xl border border-gray-100">
-                        <label className="text-[9px] font-bold uppercase text-gray-400 tracking-wider block mb-2">Guests Count</label>
-                        <div className="flex gap-1.5 flex-wrap">
-                          {[1,2,3,4,6,8].map(n => (
-                            <button key={n} onClick={() => setGuestCount(n)}
-                              className={`w-8 h-8 rounded-lg text-xs font-bold border transition cursor-pointer ${guestCount === n ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'}`}>
-                              {n}
-                            </button>
-                          ))}
+                  <div className="grid gap-6 lg:grid-cols-2 items-start">
+                    {/* Left: guests + order */}
+                    <div className="space-y-4">
+                      {!activeOrder && (
+                        <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                          <label className="text-[9px] font-bold uppercase text-gray-400 tracking-wider block mb-2">Guests Count</label>
+                          <div className="flex gap-1.5 flex-wrap">
+                            {[1,2,3,4,6,8].map(n => (
+                              <button key={n} onClick={() => setGuestCount(n)}
+                                className={`w-9 h-9 rounded-lg text-xs font-bold border transition cursor-pointer ${guestCount === n ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'}`}>
+                                {n}
+                              </button>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
 
-                    {activeOrder ? (
-                      <div className="space-y-3">
-                        <div className="flex justify-between text-[9px] font-bold text-gray-400 uppercase tracking-wider">
-                          <span>Running Items</span>
-                          <span>{activeOrder.timestamp}</span>
-                        </div>
-                        <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
-                          {activeOrder.items.map((item, idx) => (
-                            <div key={idx} className="p-2.5 bg-gray-50 rounded-xl border border-gray-100 flex justify-between items-center text-xs">
-                              <div>
-                                <span className="font-bold text-gray-800">{item.name}</span>
-                                <span className="ml-1.5 text-[9px] bg-indigo-50 text-indigo-600 font-bold px-1.5 py-0.5 rounded capitalize">{item.portion}</span>
-                                <div className="text-[10px] text-gray-400 font-mono mt-0.5">{formatCurrency(item.price)} each</div>
+                      {activeOrder ? (
+                        <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                          <div className="flex justify-between text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-2">
+                            <span>Running Items</span>
+                            <span>{activeOrder.timestamp}</span>
+                          </div>
+                          <div className="space-y-2 max-h-[45vh] overflow-y-auto pr-1">
+                            {activeOrder.items.map((item, idx) => (
+                              <div key={idx} className="p-2.5 bg-gray-50 rounded-xl border border-gray-100 flex justify-between items-center text-xs">
+                                <div>
+                                  <span className="font-bold text-gray-800">{item.name}</span>
+                                  <span className="ml-1.5 text-[9px] bg-indigo-50 text-indigo-600 font-bold px-1.5 py-0.5 rounded capitalize">{item.portion}</span>
+                                  <div className="text-[10px] text-gray-400 font-mono mt-0.5">{formatCurrency(item.price)} each</div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <button onClick={() => handleUpdateActiveOrderItemQty(idx, -1)} className="w-5 h-5 rounded bg-white border border-gray-200 flex items-center justify-center text-xs font-bold text-gray-700 cursor-pointer">-</button>
+                                  <span className="text-xs font-bold w-4 text-center font-mono">{item.quantity}</span>
+                                  <button onClick={() => handleUpdateActiveOrderItemQty(idx, 1)} className="w-5 h-5 rounded bg-white border border-gray-200 flex items-center justify-center text-xs font-bold text-gray-700 cursor-pointer">+</button>
+                                  <button onClick={() => handleRemoveActiveOrderItem(idx)} className="p-1 rounded text-red-500 hover:bg-red-50 cursor-pointer"><X size={12} /></button>
+                                </div>
                               </div>
-                              <div className="flex items-center gap-2">
-                                <button onClick={() => handleUpdateActiveOrderItemQty(idx, -1)} className="w-5 h-5 rounded bg-white border border-gray-200 flex items-center justify-center text-xs font-bold text-gray-700 cursor-pointer">-</button>
-                                <span className="text-xs font-bold w-4 text-center font-mono">{item.quantity}</span>
-                                <button onClick={() => handleUpdateActiveOrderItemQty(idx, 1)} className="w-5 h-5 rounded bg-white border border-gray-200 flex items-center justify-center text-xs font-bold text-gray-700 cursor-pointer">+</button>
-                                <button onClick={() => handleRemoveActiveOrderItem(idx)} className="p-1 rounded text-red-500 hover:bg-red-50 cursor-pointer"><X size={12} /></button>
-                              </div>
-                            </div>
-                          ))}
+                            ))}
+                          </div>
+                          <div className="pt-3 border-t border-gray-100 flex justify-between items-center text-xs font-bold">
+                            <span>Total</span>
+                            <span className="text-indigo-600 text-sm font-mono">{formatCurrency(activeOrder.grandTotal)}</span>
+                          </div>
                         </div>
-                        <div className="pt-3 border-t border-gray-100 flex justify-between items-center text-xs font-bold">
-                          <span>Total</span>
-                          <span className="text-indigo-600 text-sm font-mono">{formatCurrency(activeOrder.grandTotal)}</span>
+                      ) : (
+                        <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100 text-center text-gray-400">
+                          <p className="text-xs font-medium">No active order for this table.</p>
                         </div>
-                      </div>
-                    ) : (
-                      <div className="text-center py-6 text-gray-400">
-                        <p className="text-xs font-medium">No active order for this table.</p>
-                      </div>
-                    )}
-
-                    <div className="grid grid-cols-2 gap-2 mt-4 pt-4 border-t border-gray-100">
-                      <button onClick={() => setActiveAction('addItems')}
-                        className="p-2.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer">
-                        <PlusCircle size={14} /> Add Items
-                      </button>
-                      {activeOrder && (
-                        <button onClick={async () => {
-                          const bill = await generateBill(selectedTable.id, 0);
-                          const order = orders.find(o => o.id === bill.orderId);
-                          if (order) {
-                            const waiterName = users.find(u => u.id === order.waiterId)?.name || 'Staff';
-                            await printBillThermal(bill, order, settings, waiterName);
-                          }
-                          toast.success('Bill sent to printer! You can also manage payment on Billing tab.');
-                        }}
-                          className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer">
-                          <Printer size={14} /> Print Bill
-                        </button>
-                      )}
-                      {activeOrder && (
-                        <button onClick={async () => {
-                          try {
-                            if (selectedTable.status === 'Billing') {
-                              toast.info('This table is already in Billing. Navigate to the Billing tab to complete checkout.');
-                              closeDetails();
-                              return;
-                            }
-                            await generateBill(selectedTable.id, 0);
-                            closeDetails();
-                            toast.success('Bill generated. Please navigate to Billing tab.');
-                          } catch (err: any) {
-                            toast.error(err.message || 'Failed to generate bill');
-                          }
-                        }}
-                          className="p-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer">
-                          <CheckCircle2 size={14} /> Checkout
-                        </button>
-                      )}
-                      {activeOrder && (
-                        <button onClick={() => { setBillDiscountPct(0); setBillPaymentMethod('Cash'); setActiveAction('billing'); }}
-                          className="p-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer">
-                          <Receipt size={14} /> Bill & Pay
-                        </button>
-                      )}
-                      {activeOrder && (
-                        <button onClick={() => setActiveAction('transfer')}
-                          className="p-2.5 rounded-xl bg-gray-50 border border-gray-205 hover:bg-gray-100 text-gray-700 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer">
-                          <ArrowRightLeft size={14} className="text-cyan-600" /> Transfer
-                        </button>
-                      )}
-                      <button onClick={() => setActiveAction('merge')}
-                        className="p-2.5 rounded-xl bg-gray-50 border border-gray-205 hover:bg-gray-100 text-gray-700 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer">
-                        <GitMerge size={14} className="text-amber-600" /> Merge
-                      </button>
-                      {activeOrder && (
-                        <button onClick={() => { setActiveAction('split'); setSplitItemsCheck(activeOrder.items.map(item => ({ id: item.id, portion: item.portion, price: item.price, name: item.name, quantity: 0 }))); }}
-                          className="p-2.5 rounded-xl bg-gray-50 border border-gray-205 hover:bg-gray-100 text-gray-700 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer">
-                          <Columns size={14} className="text-purple-650" /> Split
-                        </button>
                       )}
                     </div>
-                  </>
+
+                    {/* Right: actions */}
+                    <div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <button onClick={() => setActiveAction('addItems')}
+                          className="col-span-2 p-3.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm flex items-center justify-center gap-2 cursor-pointer transition">
+                          <PlusCircle size={16} /> Add Items
+                        </button>
+                        {activeOrder && (
+                          <button onClick={async () => {
+                            const bill = await generateBill(selectedTable.id, 0);
+                            const order = orders.find(o => o.id === bill.orderId);
+                            if (order) {
+                              const waiterName = users.find(u => u.id === order.waiterId)?.name || 'Staff';
+                              await printBillThermal(bill, order, settings, waiterName);
+                            }
+                            toast.success('Bill sent to printer! You can also manage payment on Billing tab.');
+                          }}
+                            className="p-3 rounded-2xl bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition">
+                            <Printer size={14} /> Print Bill
+                          </button>
+                        )}
+                        {activeOrder && (
+                          <button onClick={async () => {
+                            try {
+                              if (selectedTable.status === 'Billing') {
+                                toast.info('This table is already in Billing. Navigate to the Billing tab to complete checkout.');
+                                closeDetails();
+                                return;
+                              }
+                              await generateBill(selectedTable.id, 0);
+                              closeDetails();
+                              toast.success('Bill generated. Please navigate to Billing tab.');
+                            } catch (err: any) {
+                              toast.error(err.message || 'Failed to generate bill');
+                            }
+                          }}
+                            className="p-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition">
+                            <CheckCircle2 size={14} /> Checkout
+                          </button>
+                        )}
+                        {activeOrder && (
+                          <button onClick={() => { setBillDiscountPct(0); setBillPaymentMethod('Cash'); setActiveAction('billing'); }}
+                            className="p-3 rounded-2xl bg-cyan-600 hover:bg-cyan-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition">
+                            <Receipt size={14} /> Bill & Pay
+                          </button>
+                        )}
+                        {activeOrder && (
+                          <button onClick={() => setActiveAction('transfer')}
+                            className="p-3 rounded-2xl bg-gray-50 border border-gray-200 hover:bg-gray-100 text-gray-700 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition">
+                            <ArrowRightLeft size={14} className="text-cyan-600" /> Transfer
+                          </button>
+                        )}
+                        <button onClick={() => setActiveAction('merge')}
+                          className="p-3 rounded-2xl bg-gray-50 border border-gray-200 hover:bg-gray-100 text-gray-700 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition">
+                          <GitMerge size={14} className="text-amber-600" /> Merge
+                        </button>
+                        {activeOrder && (
+                          <button onClick={() => { setActiveAction('split'); setSplitItemsCheck(activeOrder.items.map(item => ({ id: item.id, portion: item.portion, price: item.price, name: item.name, quantity: 0 }))); }}
+                            className="p-3 rounded-2xl bg-gray-50 border border-gray-200 hover:bg-gray-100 text-gray-700 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition">
+                            <Columns size={14} className="text-purple-600" /> Split
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 )}
 
                 {/* Transfer UI */}
@@ -830,19 +839,19 @@ const TableManagement: React.FC = () => {
                     </button>
                   </div>
                 )}
-              </div>
 
-              {/* Footer back button */}
-              {activeAction !== 'details' && (
-                <div className="pt-4 border-t border-gray-100 mt-4">
-                  <button onClick={() => { saveOrderDraft(); setActiveAction('details'); }}
-                    className="w-full py-2.5 bg-gray-50 border border-gray-200 text-xs font-bold text-gray-500 rounded-xl hover:text-gray-700 cursor-pointer transition flex items-center justify-center">
-                    Back to Details
-                  </button>
-                </div>
-              )}
-            </motion.div>
-          </>
+                {/* Footer back button */}
+                {activeAction !== 'details' && (
+                  <div className="border-t border-gray-100">
+                    <button onClick={() => { saveOrderDraft(); setActiveAction('details'); }}
+                      className="w-full py-3 bg-gray-50 border border-gray-200 text-xs font-bold text-gray-500 rounded-xl hover:text-gray-700 cursor-pointer transition flex items-center justify-center">
+                      Back to Details
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>
