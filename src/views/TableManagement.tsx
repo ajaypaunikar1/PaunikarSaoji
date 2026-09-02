@@ -220,6 +220,24 @@ const TableManagement: React.FC = () => {
     toast.success('Order quantity updated');
   };
 
+  const handleSetActiveOrderItemQty = (itemIndex: number, qty: number) => {
+    if (!activeOrder) return;
+    const clamped = Math.min(999, Math.max(0, Math.floor(qty)));
+    const updatedItems = activeOrder.items.map((item, idx) => {
+      if (idx === itemIndex) {
+        return { ...item, quantity: clamped };
+      }
+      return item;
+    }).filter(i => i.quantity > 0);
+    updateOrder(activeOrder.id, { items: updatedItems });
+    if (updatedItems.length === 0 && selectedTable) {
+      clearTable(selectedTable.id);
+      closeDetails();
+      toast.success(`Table ${selectedTable.id} cleared — no items left`);
+      return;
+    }
+  };
+
   const handleRemoveActiveOrderItem = (itemIndex: number) => {
     if (!activeOrder) return;
     const updatedItems = activeOrder.items.filter((_, idx) => idx !== itemIndex);
@@ -501,18 +519,18 @@ const TableManagement: React.FC = () => {
                     >
                       <div className="relative">
                         <ShoppingBag size={18} className="text-indigo-600 sm:w-5 sm:h-5" />
-                        {orderItemsList.length > 0 && (
+                        {((activeOrder?.items.reduce((acc, item) => acc + item.quantity, 0) || 0) + orderItemsList.reduce((acc, item) => acc + item.quantity, 0)) > 0 && (
                           <span className="absolute -top-1.5 -right-2 bg-indigo-600 text-white text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center">
-                            {orderItemsList.reduce((acc, item) => acc + item.quantity, 0)}
+                            {(activeOrder?.items.reduce((acc, item) => acc + item.quantity, 0) || 0) + orderItemsList.reduce((acc, item) => acc + item.quantity, 0)}
                           </span>
                         )}
                       </div>
                       <div className="text-right">
                         <div className="text-[10px] sm:text-[11px] font-bold text-gray-700 leading-tight">
-                          Basket ({orderItemsList.reduce((acc, item) => acc + item.quantity, 0)})
+                          Basket ({(activeOrder?.items.reduce((acc, item) => acc + item.quantity, 0) || 0) + orderItemsList.reduce((acc, item) => acc + item.quantity, 0)})
                         </div>
                         <div className="text-xs font-black text-indigo-600 leading-tight">
-                          {formatCurrency(orderItemsList.reduce((acc, item) => acc + item.price * item.quantity, 0))}
+                          {formatCurrency((activeOrder?.grandTotal || 0) + orderItemsList.reduce((acc, item) => acc + item.price * item.quantity, 0))}
                         </div>
                       </div>
                     </button>
@@ -684,22 +702,24 @@ const TableManagement: React.FC = () => {
                       >
                         <span className="flex items-center gap-2">
                           <ShoppingBag size={16} />
-                          <span>Basket ({orderItemsList.reduce((acc, item) => acc + item.quantity, 0)})</span>
+                          <span>
+                            Basket ({(activeOrder?.items.reduce((acc, item) => acc + item.quantity, 0) || 0) + orderItemsList.reduce((acc, item) => acc + item.quantity, 0)})
+                          </span>
                         </span>
                         <span className="font-mono font-black">
-                          {formatCurrency(orderItemsList.reduce((acc, item) => acc + item.price * item.quantity, 0))} &rarr;
+                          {formatCurrency((activeOrder?.grandTotal || 0) + orderItemsList.reduce((acc, item) => acc + item.price * item.quantity, 0))} &rarr;
                         </span>
                       </button>
                     </div>
                   </div>
 
-                  {/* ── RIGHT COLUMN: Your Basket (Desktop Sidebar + Mobile Full-Screen/Drawer) ── */}
+                  {/* ── RIGHT COLUMN: Basket & Running Order History ── */}
                   <div className={`
                     ${showMobileBasket ? 'fixed inset-0 z-50 flex flex-col bg-white' : 'hidden lg:flex'}
                     lg:static lg:w-80 lg:shrink-0 lg:flex-col lg:border-l lg:border-gray-100 lg:bg-white overflow-hidden
                   `}>
-                    {/* Basket Header */}
-                    <div className="px-4 sm:px-5 pt-4 pb-3 border-b border-gray-100 flex items-center justify-between bg-white">
+                    {/* Panel Header */}
+                    <div className="px-4 sm:px-5 pt-4 pb-3 border-b border-gray-100 flex items-center justify-between bg-white shrink-0">
                       <div className="flex items-center gap-2">
                         {showMobileBasket && (
                           <button
@@ -710,8 +730,8 @@ const TableManagement: React.FC = () => {
                             <ArrowLeft size={18} />
                           </button>
                         )}
-                        <p className="text-[10px] sm:text-[11px] font-extrabold uppercase tracking-wider text-gray-500">
-                          YOUR BASKET ({orderItemsList.reduce((acc, item) => acc + item.quantity, 0)} ITEMS)
+                        <p className="text-[10px] sm:text-[11px] font-extrabold uppercase tracking-wider text-gray-600">
+                          T-{selectedTable.id} ORDER & BASKET
                         </p>
                       </div>
                       {orderItemsList.length > 0 && (
@@ -719,129 +739,275 @@ const TableManagement: React.FC = () => {
                           onClick={() => { setOrderItemsList([]); localStorage.removeItem(DRAFT_KEY); }}
                           className="text-[11px] font-bold text-red-500 hover:text-red-700 flex items-center gap-1 cursor-pointer transition"
                         >
-                          Clear All <Trash2 size={12} />
+                          Clear Draft <Trash2 size={12} />
                         </button>
                       )}
                     </div>
 
-                    {/* Basket Items List with Editable Numeric Quantity */}
-                    <div className="flex-1 overflow-y-auto p-4 space-y-3.5">
-                      {orderItemsList.length === 0 ? (
+                    {/* Main Scrollable Items List (Running Order History + New Draft Items) */}
+                    <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                      
+                      {/* 1. RUNNING ORDER HISTORY (ALREADY SENT TO KITCHEN) */}
+                      {activeOrder && activeOrder.items.length > 0 && (
+                        <div className="space-y-2.5">
+                          <div className="flex items-center justify-between px-3 py-1.5 bg-amber-50 border border-amber-200/80 rounded-xl">
+                            <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-900 flex items-center gap-1">
+                              <span>🔥</span> Running Order ({activeOrder.items.reduce((a, i) => a + i.quantity, 0)})
+                            </span>
+                            <span className="text-[10px] font-mono font-bold text-amber-700">
+                              {activeOrder.timestamp}
+                            </span>
+                          </div>
+
+                          <div className="space-y-2">
+                            {activeOrder.items.map((item, idx) => (
+                              <div key={idx} className="p-2.5 bg-gray-50/80 border border-gray-200/70 rounded-xl">
+                                <div className="flex items-start justify-between gap-2 mb-1.5">
+                                  <div>
+                                    <h5 className="font-bold text-gray-800 text-xs leading-snug">{item.name}</h5>
+                                    <div className="flex items-center gap-1.5 mt-0.5">
+                                      {item.portion && item.portion !== 'Single' && (
+                                        <span className="text-[9px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.2 rounded">
+                                          {item.portion}
+                                        </span>
+                                      )}
+                                      <span className="text-[10px] text-gray-500 font-mono">
+                                        {formatCurrency(item.price)} each
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <div className="text-right">
+                                    <span className="text-xs font-black text-gray-900 font-mono">
+                                      {formatCurrency(item.price * item.quantity)}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center justify-between pt-1">
+                                  {/* Quantity Stepper with Editable Numeric Input */}
+                                  <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden bg-white shadow-2xs">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleUpdateActiveOrderItemQty(idx, -1)}
+                                      className="w-7 h-7 flex items-center justify-center text-xs font-bold text-gray-600 hover:bg-gray-100 active:bg-gray-200 cursor-pointer transition select-none"
+                                    >
+                                      -
+                                    </button>
+                                    <input
+                                      type="number"
+                                      inputMode="numeric"
+                                      pattern="[0-9]*"
+                                      min={1}
+                                      max={999}
+                                      value={item.quantity === 0 ? '' : item.quantity}
+                                      onChange={(e) => {
+                                        const val = parseInt(e.target.value, 10);
+                                        handleSetActiveOrderItemQty(idx, isNaN(val) ? 0 : val);
+                                      }}
+                                      onFocus={(e) => e.target.select()}
+                                      className="w-10 h-7 text-center text-xs font-bold text-gray-900 font-mono bg-transparent border-x border-gray-200 focus:outline-none focus:bg-amber-50/50"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => handleUpdateActiveOrderItemQty(idx, 1)}
+                                      className="w-7 h-7 flex items-center justify-center text-xs font-bold text-gray-600 hover:bg-gray-100 active:bg-gray-200 cursor-pointer transition select-none"
+                                    >
+                                      +
+                                    </button>
+                                  </div>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveActiveOrderItem(idx)}
+                                    className="text-gray-400 hover:text-red-500 p-1 text-xs font-bold flex items-center gap-1 cursor-pointer transition"
+                                    title="Cancel Item"
+                                  >
+                                    <Trash2 size={13} />
+                                    <span className="text-[10px]">Cancel</span>
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 2. NEW ITEMS TO ADD (DRAFT BASKET) */}
+                      {orderItemsList.length > 0 && (
+                        <div className="space-y-2.5">
+                          <div className="flex items-center justify-between px-3 py-1.5 bg-indigo-50 border border-indigo-200/80 rounded-xl">
+                            <span className="text-[10px] font-extrabold uppercase tracking-wider text-indigo-900 flex items-center gap-1">
+                              <span>🛒</span> New Items to Add ({orderItemsList.reduce((a, i) => a + i.quantity, 0)})
+                            </span>
+                            <span className="text-[10px] font-mono font-bold text-indigo-700">
+                              Draft
+                            </span>
+                          </div>
+
+                          <div className="space-y-2">
+                            {orderItemsList.map((item, idx) => (
+                              <div key={idx} className="p-2.5 bg-white border border-indigo-100 rounded-xl shadow-2xs">
+                                <div className="flex items-start justify-between gap-2 mb-1.5">
+                                  <div>
+                                    <h5 className="font-bold text-gray-800 text-xs leading-snug">{item.name}</h5>
+                                    <div className="flex items-center gap-1.5 mt-0.5">
+                                      {item.portion !== 'Single' && (
+                                        <span className="text-[9px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.2 rounded">
+                                          {item.portion}
+                                        </span>
+                                      )}
+                                      <span className="text-[10px] text-gray-500 font-mono">
+                                        {formatCurrency(item.price)} each
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <button
+                                    onClick={() => handleSetItemQty(idx, 0)}
+                                    className="text-gray-300 hover:text-red-500 p-1 cursor-pointer transition"
+                                  >
+                                    <Trash2 size={13} />
+                                  </button>
+                                </div>
+
+                                <div className="flex items-center justify-between pt-1">
+                                  {/* Quantity Stepper with Editable Numeric Input */}
+                                  <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden bg-white shadow-2xs">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleSetItemQty(idx, item.quantity - 1)}
+                                      className="w-7 h-7 flex items-center justify-center text-xs font-bold text-gray-600 hover:bg-gray-100 active:bg-gray-200 cursor-pointer transition select-none"
+                                    >
+                                      -
+                                    </button>
+                                    <input
+                                      type="number"
+                                      inputMode="numeric"
+                                      pattern="[0-9]*"
+                                      min={1}
+                                      max={999}
+                                      value={item.quantity === 0 ? '' : item.quantity}
+                                      onChange={(e) => {
+                                        const val = parseInt(e.target.value, 10);
+                                        handleSetItemQty(idx, isNaN(val) ? 0 : Math.max(0, Math.min(999, val)));
+                                      }}
+                                      onFocus={(e) => e.target.select()}
+                                      className="w-10 h-7 text-center text-xs font-bold text-gray-900 font-mono bg-transparent border-x border-gray-200 focus:outline-none focus:bg-indigo-50/50"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => handleSetItemQty(idx, item.quantity + 1)}
+                                      className="w-7 h-7 flex items-center justify-center text-xs font-bold text-gray-600 hover:bg-gray-100 active:bg-gray-200 cursor-pointer transition select-none"
+                                    >
+                                      +
+                                    </button>
+                                  </div>
+
+                                  {/* Parcel Toggle */}
+                                  <label className="flex items-center gap-1.5 cursor-pointer text-[10px] font-bold text-gray-500 hover:text-gray-700">
+                                    <input
+                                      type="checkbox"
+                                      checked={!!item.isParcel}
+                                      onChange={() => handleToggleParcel(idx)}
+                                      className="w-3.5 h-3.5 accent-indigo-600 rounded cursor-pointer"
+                                    />
+                                    <span>Parcel</span>
+                                  </label>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Empty State */}
+                      {(!activeOrder || activeOrder.items.length === 0) && orderItemsList.length === 0 && (
                         <div className="flex flex-col items-center justify-center h-full text-gray-300 py-12">
                           <ShoppingBag size={36} className="mb-2 opacity-40" />
                           <p className="text-xs font-bold text-gray-400">Your basket is empty</p>
                           <p className="text-[10px] text-gray-400 mt-0.5">Click "Add" on any item to begin</p>
                         </div>
-                      ) : (
-                        orderItemsList.map((item, idx) => (
-                          <div key={idx} className="pb-3 border-b border-gray-100 last:border-0 last:pb-0">
-                            <div className="flex items-start justify-between gap-2 mb-1.5">
-                              <div>
-                                <h5 className="font-bold text-gray-800 text-xs leading-snug">{item.name}</h5>
-                                {item.portion !== 'Single' && (
-                                  <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.2 rounded mt-0.5 inline-block">
-                                    {item.portion}
-                                  </span>
-                                )}
-                                <div className="text-xs font-bold text-gray-700 mt-1">
-                                  {formatCurrency(item.price)}
-                                </div>
-                              </div>
-                              <button
-                                onClick={() => handleSetItemQty(idx, 0)}
-                                className="text-gray-300 hover:text-red-500 p-1 cursor-pointer transition"
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            </div>
-
-                            <div className="flex items-center justify-between pt-1">
-                              {/* Quantity Stepper with Editable Numeric Input */}
-                              <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden bg-white shadow-2xs">
-                                <button
-                                  type="button"
-                                  onClick={() => handleSetItemQty(idx, item.quantity - 1)}
-                                  className="w-8 h-8 flex items-center justify-center text-sm font-bold text-gray-600 hover:bg-gray-100 active:bg-gray-200 cursor-pointer transition select-none"
-                                >
-                                  -
-                                </button>
-                                <input
-                                  type="number"
-                                  inputMode="numeric"
-                                  pattern="[0-9]*"
-                                  min={1}
-                                  max={999}
-                                  value={item.quantity === 0 ? '' : item.quantity}
-                                  onChange={(e) => {
-                                    const val = parseInt(e.target.value, 10);
-                                    if (isNaN(val)) {
-                                      handleSetItemQty(idx, 0);
-                                    } else {
-                                      handleSetItemQty(idx, Math.max(0, Math.min(999, val)));
-                                    }
-                                  }}
-                                  onFocus={(e) => e.target.select()}
-                                  className="w-11 h-8 text-center text-xs font-bold text-gray-900 font-mono bg-transparent border-x border-gray-200 focus:outline-none focus:bg-indigo-50/50"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => handleSetItemQty(idx, item.quantity + 1)}
-                                  className="w-8 h-8 flex items-center justify-center text-sm font-bold text-gray-600 hover:bg-gray-100 active:bg-gray-200 cursor-pointer transition select-none"
-                                >
-                                  +
-                                </button>
-                              </div>
-
-                              {/* Parcel Toggle */}
-                              <label className="flex items-center gap-1.5 cursor-pointer text-[10px] font-bold text-gray-500 hover:text-gray-700">
-                                <input
-                                  type="checkbox"
-                                  checked={!!item.isParcel}
-                                  onChange={() => handleToggleParcel(idx)}
-                                  className="w-3.5 h-3.5 accent-indigo-600 rounded cursor-pointer"
-                                />
-                                <span>Parcel</span>
-                              </label>
-                            </div>
-                          </div>
-                        ))
                       )}
                     </div>
 
-                    {/* Basket Calculation & Summary (Purely items total — NO GST, NO CGST) */}
-                    {orderItemsList.length > 0 && (
-                      <div className="p-4 border-t border-gray-100 bg-gray-50/50 space-y-2 text-xs">
-                        <div className="flex justify-between text-gray-600 font-medium">
-                          <span>Subtotal ({orderItemsList.reduce((acc, item) => acc + item.quantity, 0)} items)</span>
-                          <span className="font-bold text-gray-800 font-mono">
-                            {formatCurrency(orderItemsList.reduce((acc, item) => acc + item.price * item.quantity, 0))}
-                          </span>
-                        </div>
+                    {/* Calculation Summary (Pure Total — NO GST) */}
+                    {((activeOrder && activeOrder.items.length > 0) || orderItemsList.length > 0) && (
+                      <div className="p-4 border-t border-gray-100 bg-gray-50/70 space-y-1.5 text-xs shrink-0">
+                        {activeOrder && activeOrder.items.length > 0 && (
+                          <div className="flex justify-between text-gray-600 font-medium">
+                            <span>Running Order</span>
+                            <span className="font-bold text-gray-800 font-mono">
+                              {formatCurrency(activeOrder.grandTotal)}
+                            </span>
+                          </div>
+                        )}
+                        {orderItemsList.length > 0 && (
+                          <div className="flex justify-between text-indigo-700 font-medium">
+                            <span>New Items ({orderItemsList.reduce((a, i) => a + i.quantity, 0)})</span>
+                            <span className="font-bold text-indigo-700 font-mono">
+                              +{formatCurrency(orderItemsList.reduce((acc, item) => acc + item.price * item.quantity, 0))}
+                            </span>
+                          </div>
+                        )}
                         
-                        <div className="border-t border-dashed border-gray-300 my-2" />
+                        <div className="border-t border-dashed border-gray-300 my-1.5" />
 
                         <div className="flex justify-between items-center text-sm font-black pt-0.5">
                           <span className="text-gray-800">Total</span>
                           <span className="text-indigo-600 text-base font-mono">
-                            {formatCurrency(orderItemsList.reduce((acc, item) => acc + item.price * item.quantity, 0))}
+                            {formatCurrency(
+                              (activeOrder?.grandTotal || 0) +
+                              orderItemsList.reduce((acc, item) => acc + item.price * item.quantity, 0)
+                            )}
                           </span>
                         </div>
                       </div>
                     )}
 
-                    {/* Send Order to Kitchen Button */}
-                    <div className="p-4 bg-white border-t border-gray-100 space-y-2">
-                      <button
-                        onClick={() => {
-                          setShowMobileBasket(false);
-                          executeAddOrder();
-                        }}
-                        disabled={orderItemsList.length === 0}
-                        className="w-full py-3.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md shadow-indigo-200 flex items-center justify-center gap-2 cursor-pointer transition disabled:opacity-50 disabled:shadow-none"
-                      >
-                        <Send size={16} />
-                        <span>Send Order to Kitchen</span>
-                      </button>
+                    {/* Basket Action Buttons */}
+                    <div className="p-4 bg-white border-t border-gray-100 space-y-2 shrink-0">
+                      {orderItemsList.length > 0 ? (
+                        <button
+                          onClick={() => {
+                            setShowMobileBasket(false);
+                            executeAddOrder();
+                          }}
+                          className="w-full py-3.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md shadow-indigo-200 flex items-center justify-center gap-2 cursor-pointer transition active:scale-98"
+                        >
+                          <Send size={16} />
+                          <span>{activeOrder ? 'Append to Kitchen' : 'Send KOT to Kitchen'}</span>
+                        </button>
+                      ) : activeOrder && activeOrder.items.length > 0 ? (
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              const bill = await generateBill(selectedTable.id, 0);
+                              const order = orders.find(o => o.id === bill.orderId);
+                              if (order) {
+                                const waiterName = users.find(u => u.id === order.waiterId)?.name || 'Staff';
+                                await printBillThermal(bill, order, settings, waiterName);
+                              }
+                              toast.success('Bill printed successfully!');
+                            }}
+                            className="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition"
+                          >
+                            <Printer size={13} /> Print Bill
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowMobileBasket(false);
+                              setBillDiscountPct(0);
+                              setBillPaymentMethod('Cash');
+                              setActiveAction('billing');
+                            }}
+                            className="py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition"
+                          >
+                            <CheckCircle2 size={13} /> Checkout
+                          </button>
+                        </div>
+                      ) : null}
+
                       {showMobileBasket && (
                         <button
                           type="button"
