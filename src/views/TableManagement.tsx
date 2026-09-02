@@ -54,6 +54,7 @@ const TableManagement: React.FC = () => {
   const [orderItemsList, setOrderItemsList] = useState<{ id: string; name: string; portion: PortionType; price: number; quantity: number; specialNotes: string; isParcel?: boolean }[]>([]);
   const [addCategory, setAddCategory] = useState<string>('All');
   const [guestCount, setGuestCount] = useState<number>(2);
+  const [showMobileBasket, setShowMobileBasket] = useState<boolean>(false);
 
   // Active order for selected table
   const activeOrder = selectedTable?.orderId ? orders.find(o => o.id === selectedTable.orderId) : undefined;
@@ -458,22 +459,22 @@ const TableManagement: React.FC = () => {
           >
             {activeAction === 'addItems' ? (
               /* ============================================================
-                 POS 3-COLUMN ORDERING LAYOUT (MATCHING REFERENCE DESIGN)
+                 POS ORDERING LAYOUT (RESPONSIVE FOR ANDROID & DESKTOP)
               ============================================================ */
               <>
                 {/* Top Header */}
-                <div className="shrink-0 flex items-center justify-between px-6 py-3.5 border-b border-gray-100 bg-white shadow-xs">
+                <div className="shrink-0 flex items-center justify-between px-3 sm:px-6 py-2.5 sm:py-3.5 border-b border-gray-100 bg-white shadow-xs">
                   {/* Left: Table Name & Zone / Status */}
-                  <div className="flex items-center gap-3 min-w-[200px]">
-                    <div className="w-9 h-9 rounded-xl border border-indigo-200 bg-indigo-50/70 flex items-center justify-center text-indigo-600">
-                      <LayoutGrid size={18} />
+                  <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                    <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl border border-indigo-200 bg-indigo-50/70 flex items-center justify-center text-indigo-600 shrink-0">
+                      <LayoutGrid size={16} className="sm:w-[18px] sm:h-[18px]" />
                     </div>
-                    <div>
-                      <h3 className="text-base font-black text-gray-900 leading-tight">
+                    <div className="min-w-0 truncate">
+                      <h3 className="text-sm sm:text-base font-black text-gray-900 leading-tight truncate">
                         Table {selectedTable.id}
                       </h3>
-                      <div className="flex items-center gap-1.5 text-[10px] text-gray-400 font-bold uppercase tracking-wider mt-0.5">
-                        <span className={`w-2 h-2 rounded-full ${selectedTable.status === 'Available' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                      <div className="flex items-center gap-1 sm:gap-1.5 text-[9px] sm:text-[10px] text-gray-400 font-bold uppercase tracking-wider mt-0.5">
+                        <span className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full shrink-0 ${selectedTable.status === 'Available' ? 'bg-emerald-500' : 'bg-amber-500'}`} />
                         <span>ZONE {selectedTable.zone}</span>
                         <span>&bull;</span>
                         <span>{selectedTable.status.toUpperCase()}</span>
@@ -481,19 +482,25 @@ const TableManagement: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Center: Brand logo & name */}
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-sm font-bold text-sm">
-                      <ShoppingBag size={16} />
+                  {/* Center: Brand logo & dynamic name from database */}
+                  <div className="flex items-center gap-2 px-2">
+                    <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-sm font-bold text-xs shrink-0">
+                      <ShoppingBag size={14} className="sm:w-4 sm:h-4" />
                     </div>
-                    <span className="text-lg font-black text-gray-900 tracking-tight">PauNikarsa</span>
+                    <span className="text-sm sm:text-lg font-black text-gray-900 tracking-tight truncate max-w-[140px] sm:max-w-none">
+                      {settings?.restaurantName || 'Paunikar Saoji'}
+                    </span>
                   </div>
 
-                  {/* Right: Basket Summary & Close */}
-                  <div className="flex items-center gap-4 min-w-[200px] justify-end">
-                    <div className="flex items-center gap-2.5 bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-100">
+                  {/* Right: Basket Summary Button (Mobile Toggleable) & Close */}
+                  <div className="flex items-center gap-2 sm:gap-4 shrink-0 justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setShowMobileBasket(!showMobileBasket)}
+                      className="flex items-center gap-2 bg-indigo-50/80 hover:bg-indigo-100/80 px-2.5 sm:px-3 py-1.5 rounded-xl border border-indigo-100 cursor-pointer transition lg:cursor-default"
+                    >
                       <div className="relative">
-                        <ShoppingBag size={20} className="text-indigo-600" />
+                        <ShoppingBag size={18} className="text-indigo-600 sm:w-5 sm:h-5" />
                         {orderItemsList.length > 0 && (
                           <span className="absolute -top-1.5 -right-2 bg-indigo-600 text-white text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center">
                             {orderItemsList.reduce((acc, item) => acc + item.quantity, 0)}
@@ -501,29 +508,25 @@ const TableManagement: React.FC = () => {
                         )}
                       </div>
                       <div className="text-right">
-                        <div className="text-[11px] font-bold text-gray-700 leading-tight">
+                        <div className="text-[10px] sm:text-[11px] font-bold text-gray-700 leading-tight">
                           Basket ({orderItemsList.reduce((acc, item) => acc + item.quantity, 0)})
                         </div>
                         <div className="text-xs font-black text-indigo-600 leading-tight">
-                          {formatCurrency(
-                            orderItemsList.reduce((acc, item) => acc + item.price * item.quantity, 0) +
-                            orderItemsList.reduce((acc, item) => acc + item.price * item.quantity, 0) * 0.05 +
-                            orderItemsList.reduce((acc, item) => acc + item.price * item.quantity, 0) * 0.08
-                          )}
+                          {formatCurrency(orderItemsList.reduce((acc, item) => acc + item.price * item.quantity, 0))}
                         </div>
                       </div>
-                    </div>
-                    <button onClick={closeDetails} className="p-2 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-700 cursor-pointer transition">
-                      <X size={20} />
+                    </button>
+                    <button onClick={closeDetails} className="p-1.5 sm:p-2 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-700 cursor-pointer transition">
+                      <X size={18} className="sm:w-5 sm:h-5" />
                     </button>
                   </div>
                 </div>
 
-                {/* Main 3-Column POS Workspace */}
-                <div className="flex flex-1 overflow-hidden">
+                {/* Main POS Workspace — responsive for Android (stacked/drawer) & Desktop (3-columns) */}
+                <div className="flex flex-1 overflow-hidden relative">
                   
-                  {/* ── LEFT COLUMN: Menu Categories ── */}
-                  <div className="w-56 shrink-0 border-r border-gray-100 bg-white flex flex-col overflow-y-auto">
+                  {/* ── LEFT COLUMN: Menu Categories (Desktop / Tablet Sidebar) ── */}
+                  <div className="hidden lg:flex w-56 shrink-0 border-r border-gray-100 bg-white flex-col overflow-y-auto">
                     <div className="px-5 pt-4 pb-2">
                       <p className="text-[10px] font-extrabold uppercase tracking-wider text-gray-400">MENU CATEGORIES</p>
                     </div>
@@ -564,20 +567,20 @@ const TableManagement: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* ── MIDDLE COLUMN: All Items Grid ── */}
-                  <div className="flex-1 flex flex-col bg-gray-50/50 overflow-hidden border-r border-gray-100">
+                  {/* ── MIDDLE COLUMN: Items Grid (Responsive on Mobile & Android) ── */}
+                  <div className="flex-1 flex flex-col bg-gray-50/50 overflow-hidden border-r border-gray-100 min-w-0">
                     
-                    {/* Category Filter Pills */}
-                    <div className="px-6 pt-4 pb-3 bg-white border-b border-gray-100">
-                      <p className="text-[10px] font-extrabold uppercase tracking-wider text-gray-400 mb-2.5">ALL ITEMS</p>
-                      <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+                    {/* Category Filter Pills (Horizontal swipeable bar on all screens) */}
+                    <div className="px-3 sm:px-6 pt-3 sm:pt-4 pb-2.5 sm:pb-3 bg-white border-b border-gray-100">
+                      <p className="text-[10px] font-extrabold uppercase tracking-wider text-gray-400 mb-2">ALL ITEMS</p>
+                      <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 no-scrollbar touch-pan-x">
                         {['All', ...allCategories].map(cat => {
                           const isActive = addCategory === cat;
                           return (
                             <button
                               key={cat}
                               onClick={() => setAddCategory(cat)}
-                              className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition cursor-pointer whitespace-nowrap border ${
+                              className={`px-3 sm:px-3.5 py-1.5 rounded-full text-xs font-bold transition cursor-pointer whitespace-nowrap border shrink-0 ${
                                 isActive
                                   ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
                                   : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
@@ -591,20 +594,20 @@ const TableManagement: React.FC = () => {
                     </div>
 
                     {/* Menu Item Cards Grid */}
-                    <div className="flex-1 overflow-y-auto p-6">
-                      <div className="grid grid-cols-2 gap-4">
+                    <div className="flex-1 overflow-y-auto p-3 sm:p-6 pb-20 lg:pb-6">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                         {menuItems.filter(m => m.isAvailable && (addCategory === 'All' || m.category === addCategory)).map(item => (
                           <div
                             key={item.id}
-                            className="bg-white border border-gray-200/80 rounded-2xl p-4 flex flex-col justify-between hover:shadow-sm hover:border-indigo-300 transition gap-3"
+                            className="bg-white border border-gray-200/80 rounded-2xl p-3.5 sm:p-4 flex flex-col justify-between hover:shadow-sm hover:border-indigo-300 transition gap-2.5 sm:gap-3"
                           >
                             <div>
                               {/* Tag & Dot */}
-                              <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center justify-between mb-1.5 sm:mb-2">
                                 <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-600 text-[9px] font-extrabold uppercase tracking-wider">
                                   {item.category.toUpperCase()}
                                 </span>
-                                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
+                                <span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-emerald-500 shrink-0" />
                               </div>
                               {/* Item Name */}
                               <h4 className="font-bold text-gray-800 text-sm leading-snug">
@@ -621,7 +624,7 @@ const TableManagement: React.FC = () => {
                                       <span className="text-xs font-bold text-gray-700">{v.name}: {formatCurrency(v.price)}</span>
                                       <button
                                         onClick={() => handleAddToOrder(item, v.name)}
-                                        className="px-3.5 py-1 rounded-xl border border-indigo-500 text-indigo-600 hover:bg-indigo-50 text-xs font-bold cursor-pointer transition"
+                                        className="px-3.5 py-1 rounded-xl border border-indigo-500 text-indigo-600 hover:bg-indigo-50 text-xs font-bold cursor-pointer transition active:scale-95"
                                       >
                                         Add
                                       </button>
@@ -633,7 +636,7 @@ const TableManagement: React.FC = () => {
                                   <span className="text-sm font-black text-gray-800">{formatCurrency(item.price)}</span>
                                   <button
                                     onClick={() => handleAddToOrder(item, 'Single')}
-                                    className="px-5 py-1.5 rounded-xl border border-indigo-500 text-indigo-600 hover:bg-indigo-50 text-xs font-bold cursor-pointer transition"
+                                    className="px-4 sm:px-5 py-1.5 rounded-xl border border-indigo-500 text-indigo-600 hover:bg-indigo-50 text-xs font-bold cursor-pointer transition active:scale-95"
                                   >
                                     Add
                                   </button>
@@ -645,15 +648,15 @@ const TableManagement: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Bottom Action Footer */}
-                    <div className="shrink-0 p-5 bg-white border-t border-gray-100 space-y-2.5">
+                    {/* Bottom Action Footer (Desktop & Tablet) */}
+                    <div className="hidden lg:block shrink-0 p-4 sm:p-5 bg-white border-t border-gray-100 space-y-2">
                       <button
                         onClick={executeAddOrder}
                         disabled={orderItemsList.length === 0}
                         className="w-full py-3.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md shadow-indigo-200 flex items-center justify-center gap-2 cursor-pointer transition disabled:opacity-50 disabled:shadow-none"
                       >
                         <ShoppingBag size={18} />
-                        <span>Send KOT to Kitchen</span>
+                        <span>{activeOrder ? 'Append to Kitchen' : 'Send KOT to Kitchen'}</span>
                       </button>
                       <button
                         onClick={() => { saveOrderDraft(); setActiveAction('details'); }}
@@ -663,15 +666,54 @@ const TableManagement: React.FC = () => {
                         <span>Back to Details</span>
                       </button>
                     </div>
+
+                    {/* Mobile Floating Bottom Bar (Android) */}
+                    <div className="lg:hidden fixed bottom-0 left-0 right-0 p-3 bg-white/95 backdrop-blur-md border-t border-gray-200 flex items-center gap-2 z-40 shadow-lg">
+                      <button
+                        type="button"
+                        onClick={() => { saveOrderDraft(); setActiveAction('details'); }}
+                        className="p-3 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 flex items-center justify-center cursor-pointer transition shrink-0"
+                        title="Back to Details"
+                      >
+                        <ArrowLeft size={16} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowMobileBasket(true)}
+                        className="flex-1 py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs sm:text-sm flex items-center justify-between shadow-md shadow-indigo-200 cursor-pointer transition"
+                      >
+                        <span className="flex items-center gap-2">
+                          <ShoppingBag size={16} />
+                          <span>Basket ({orderItemsList.reduce((acc, item) => acc + item.quantity, 0)})</span>
+                        </span>
+                        <span className="font-mono font-black">
+                          {formatCurrency(orderItemsList.reduce((acc, item) => acc + item.price * item.quantity, 0))} &rarr;
+                        </span>
+                      </button>
+                    </div>
                   </div>
 
-                  {/* ── RIGHT COLUMN: Your Basket ── */}
-                  <div className="w-80 shrink-0 bg-white flex flex-col overflow-hidden">
+                  {/* ── RIGHT COLUMN: Your Basket (Desktop Sidebar + Mobile Full-Screen/Drawer) ── */}
+                  <div className={`
+                    ${showMobileBasket ? 'fixed inset-0 z-50 flex flex-col bg-white' : 'hidden lg:flex'}
+                    lg:static lg:w-80 lg:shrink-0 lg:flex-col lg:border-l lg:border-gray-100 lg:bg-white overflow-hidden
+                  `}>
                     {/* Basket Header */}
-                    <div className="px-5 pt-4 pb-3 border-b border-gray-100 flex items-center justify-between">
-                      <p className="text-[10px] font-extrabold uppercase tracking-wider text-gray-400">
-                        YOUR BASKET ({orderItemsList.reduce((acc, item) => acc + item.quantity, 0)} ITEMS)
-                      </p>
+                    <div className="px-4 sm:px-5 pt-4 pb-3 border-b border-gray-100 flex items-center justify-between bg-white">
+                      <div className="flex items-center gap-2">
+                        {showMobileBasket && (
+                          <button
+                            type="button"
+                            onClick={() => setShowMobileBasket(false)}
+                            className="lg:hidden p-1 text-gray-500 hover:text-gray-800 cursor-pointer"
+                          >
+                            <ArrowLeft size={18} />
+                          </button>
+                        )}
+                        <p className="text-[10px] sm:text-[11px] font-extrabold uppercase tracking-wider text-gray-500">
+                          YOUR BASKET ({orderItemsList.reduce((acc, item) => acc + item.quantity, 0)} ITEMS)
+                        </p>
+                      </div>
                       {orderItemsList.length > 0 && (
                         <button
                           onClick={() => { setOrderItemsList([]); localStorage.removeItem(DRAFT_KEY); }}
@@ -682,7 +724,7 @@ const TableManagement: React.FC = () => {
                       )}
                     </div>
 
-                    {/* Basket Items List */}
+                    {/* Basket Items List with Editable Numeric Quantity */}
                     <div className="flex-1 overflow-y-auto p-4 space-y-3.5">
                       {orderItemsList.length === 0 ? (
                         <div className="flex flex-col items-center justify-center h-full text-gray-300 py-12">
@@ -714,20 +756,37 @@ const TableManagement: React.FC = () => {
                             </div>
 
                             <div className="flex items-center justify-between pt-1">
-                              {/* Quantity Stepper */}
-                              <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden bg-white">
+                              {/* Quantity Stepper with Editable Numeric Input */}
+                              <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden bg-white shadow-2xs">
                                 <button
+                                  type="button"
                                   onClick={() => handleSetItemQty(idx, item.quantity - 1)}
-                                  className="w-7 h-7 flex items-center justify-center text-xs font-bold text-gray-600 hover:bg-gray-100 cursor-pointer transition"
+                                  className="w-8 h-8 flex items-center justify-center text-sm font-bold text-gray-600 hover:bg-gray-100 active:bg-gray-200 cursor-pointer transition select-none"
                                 >
                                   -
                                 </button>
-                                <span className="w-8 text-center text-xs font-bold text-gray-800 font-mono">
-                                  {item.quantity}
-                                </span>
+                                <input
+                                  type="number"
+                                  inputMode="numeric"
+                                  pattern="[0-9]*"
+                                  min={1}
+                                  max={999}
+                                  value={item.quantity === 0 ? '' : item.quantity}
+                                  onChange={(e) => {
+                                    const val = parseInt(e.target.value, 10);
+                                    if (isNaN(val)) {
+                                      handleSetItemQty(idx, 0);
+                                    } else {
+                                      handleSetItemQty(idx, Math.max(0, Math.min(999, val)));
+                                    }
+                                  }}
+                                  onFocus={(e) => e.target.select()}
+                                  className="w-11 h-8 text-center text-xs font-bold text-gray-900 font-mono bg-transparent border-x border-gray-200 focus:outline-none focus:bg-indigo-50/50"
+                                />
                                 <button
+                                  type="button"
                                   onClick={() => handleSetItemQty(idx, item.quantity + 1)}
-                                  className="w-7 h-7 flex items-center justify-center text-xs font-bold text-gray-600 hover:bg-gray-100 cursor-pointer transition"
+                                  className="w-8 h-8 flex items-center justify-center text-sm font-bold text-gray-600 hover:bg-gray-100 active:bg-gray-200 cursor-pointer transition select-none"
                                 >
                                   +
                                 </button>
@@ -749,25 +808,13 @@ const TableManagement: React.FC = () => {
                       )}
                     </div>
 
-                    {/* Basket Calculation & Summary */}
+                    {/* Basket Calculation & Summary (Purely items total — NO GST, NO CGST) */}
                     {orderItemsList.length > 0 && (
                       <div className="p-4 border-t border-gray-100 bg-gray-50/50 space-y-2 text-xs">
                         <div className="flex justify-between text-gray-600 font-medium">
-                          <span>Subtotal</span>
+                          <span>Subtotal ({orderItemsList.reduce((acc, item) => acc + item.quantity, 0)} items)</span>
                           <span className="font-bold text-gray-800 font-mono">
                             {formatCurrency(orderItemsList.reduce((acc, item) => acc + item.price * item.quantity, 0))}
-                          </span>
-                        </div>
-                        <div className="flex justify-between text-gray-600 font-medium">
-                          <span>GST (5%)</span>
-                          <span className="font-bold text-gray-800 font-mono">
-                            {formatCurrency(orderItemsList.reduce((acc, item) => acc + item.price * item.quantity, 0) * 0.05)}
-                          </span>
-                        </div>
-                        <div className="flex justify-between text-gray-600 font-medium">
-                          <span>Service Charge (8%)</span>
-                          <span className="font-bold text-gray-800 font-mono">
-                            {formatCurrency(orderItemsList.reduce((acc, item) => acc + item.price * item.quantity, 0) * 0.08)}
                           </span>
                         </div>
                         
@@ -776,26 +823,34 @@ const TableManagement: React.FC = () => {
                         <div className="flex justify-between items-center text-sm font-black pt-0.5">
                           <span className="text-gray-800">Total</span>
                           <span className="text-indigo-600 text-base font-mono">
-                            {formatCurrency(
-                              orderItemsList.reduce((acc, item) => acc + item.price * item.quantity, 0) +
-                              orderItemsList.reduce((acc, item) => acc + item.price * item.quantity, 0) * 0.05 +
-                              orderItemsList.reduce((acc, item) => acc + item.price * item.quantity, 0) * 0.08
-                            )}
+                            {formatCurrency(orderItemsList.reduce((acc, item) => acc + item.price * item.quantity, 0))}
                           </span>
                         </div>
                       </div>
                     )}
 
                     {/* Send Order to Kitchen Button */}
-                    <div className="p-4 bg-white border-t border-gray-100">
+                    <div className="p-4 bg-white border-t border-gray-100 space-y-2">
                       <button
-                        onClick={executeAddOrder}
+                        onClick={() => {
+                          setShowMobileBasket(false);
+                          executeAddOrder();
+                        }}
                         disabled={orderItemsList.length === 0}
                         className="w-full py-3.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md shadow-indigo-200 flex items-center justify-center gap-2 cursor-pointer transition disabled:opacity-50 disabled:shadow-none"
                       >
                         <Send size={16} />
                         <span>Send Order to Kitchen</span>
                       </button>
+                      {showMobileBasket && (
+                        <button
+                          type="button"
+                          onClick={() => setShowMobileBasket(false)}
+                          className="lg:hidden w-full py-2.5 rounded-xl border border-gray-200 text-gray-600 font-bold text-xs flex items-center justify-center cursor-pointer"
+                        >
+                          &larr; Back to Menu
+                        </button>
+                      )}
                     </div>
 
                   </div>
