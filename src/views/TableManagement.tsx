@@ -500,15 +500,6 @@ const TableManagement: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Center: Brand logo & dynamic name from database */}
-                  <div className="flex items-center gap-2 px-2">
-                    <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-sm font-bold text-xs shrink-0">
-                      <ShoppingBag size={14} className="sm:w-4 sm:h-4" />
-                    </div>
-                    <span className="text-sm sm:text-lg font-black text-gray-900 tracking-tight truncate max-w-[140px] sm:max-w-none">
-                      {settings?.restaurantName || 'Paunikar Saoji'}
-                    </span>
-                  </div>
 
                   {/* Right: Basket Summary Button (Mobile Toggleable) & Close */}
                   <div className="flex items-center gap-2 sm:gap-4 shrink-0 justify-end">
