@@ -745,9 +745,6 @@ const TableManagement: React.FC = () => {
                             <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-900 flex items-center gap-1">
                               <span>🔥</span> Running Order ({activeOrder.items.reduce((a, i) => a + i.quantity, 0)})
                             </span>
-                            <span className="text-[10px] font-mono font-bold text-amber-700">
-                              {activeOrder.timestamp}
-                            </span>
                           </div>
 
                           <div className="space-y-2">
@@ -1063,7 +1060,6 @@ const TableManagement: React.FC = () => {
                             <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
                               <div className="flex justify-between text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-2">
                                 <span>Running Items</span>
-                                <span>{activeOrder.timestamp}</span>
                               </div>
                               <div className="space-y-2 max-h-[45vh] overflow-y-auto pr-1">
                                 {activeOrder.items.map((item, idx) => (

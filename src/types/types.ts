@@ -61,6 +61,7 @@ export interface Table {
 
 export interface OrderItem {
   id: string; // matches menuItem.id
+  menuId?: string; // MenuItem reference used by the server to re-resolve prices
   name: string;
   category?: string; // menu category, shown on billing/KDS/order views
   quantity: number;
@@ -136,7 +137,7 @@ export interface Bill {
   grandTotal: number;
   isParcel?: boolean;
   paymentMethod?: PaymentMethod;
-  paymentStatus: 'Pending' | 'Paid';
+  paymentStatus: 'Pending' | 'Paid' | 'Voided';
   timestamp: string;
   date?: string;
   phone?: string;

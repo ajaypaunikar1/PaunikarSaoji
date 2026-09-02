@@ -63,11 +63,24 @@ router.post('/', protect, authorize('SuperAdmin', 'Manager'), async (req, res) =
 
 // @route   PUT /api/staff/:id
 // @desc    Update staff details (Admin/Manager)
-router.put('/:id', protect, async (req, res) => {
+router.put('/:id', protect, authorize('SuperAdmin', 'Manager'), async (req, res) => {
   try {
     const staff = await User.findById(req.params.id);
     if (!staff) {
       return res.status(404).json({ success: false, message: 'Staff member not found' });
+    }
+
+    // Prevent privilege escalation: a user must never be able to change their own
+    // role/status/salary so they can't self-promote or attempt to lock themselves out.
+    const isSelf = staff.id === req.user.id;
+    if (isSelf) {
+      const { role, status, salary } = req.body;
+      if (role !== undefined || status !== undefined || salary !== undefined) {
+        return res.status(403).json({
+          success: false,
+          message: 'You cannot change your own role, status, or salary'
+        });
+      }
     }
 
     const { name, role, zone, salary, status, performance, overtimeHours, shiftStart, shiftEnd } = req.body;

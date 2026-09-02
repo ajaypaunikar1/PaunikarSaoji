@@ -888,7 +888,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const pendingBill = bills.find(b => b.orderId === orderId && b.paymentStatus === 'Pending');
       if (pendingBill) {
         setBills(prev => prev.map(b => b.id === pendingBill.id
-          ? { ...b, paymentStatus: 'Paid', paymentMethod: b.paymentMethod || 'Cash' }
+          ? { ...b, paymentStatus: 'Voided', paymentMethod: undefined }
           : b));
       }
     }

@@ -1,5 +1,5 @@
 import express from 'express';
-import { Table, Order, Bill, User, Notification } from '../models/index.js';
+import { Table, Order, Bill, User, Notification, MenuItem } from '../models/index.js';
 import { protect } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -23,6 +23,62 @@ class RequestQueue {
 }
 
 const orderQueue = new RequestQueue();
+
+// Resolve authoritative prices from the MenuItem collection so a malicious/buggy
+// client cannot tamper with prices (e.g. set price to 0). Variant items carry
+// their price on the matching variant; plain items use the base price.
+//
+// Each item keeps:
+//   - `menuId`: the MenuItem reference (used downstream for consolidation/splitting
+//     and to re-resolve prices on later order edits)
+//   - a server-generated unique `id` for line identity (used by item-level
+//     cancellation/split flows in the frontend)
+async function resolveItemPrices(items) {
+  if (!Array.isArray(items)) return { items: [], grandTotal: 0 };
+
+  const ids = items.map(i => i.menuId || i.id).filter(Boolean);
+  const menuItems = await MenuItem.find({ _id: { $in: ids } });
+  const menuMap = new Map(menuItems.map(m => [m._id, m]));
+
+  const startIdx = Date.now() % 100000;
+
+  const resolvedItems = items.map((item, idx) => {
+    const lookupId = item.menuId || item.id;
+    const menu = menuMap.get(lookupId);
+    if (!menu) {
+      // Item no longer exists on the menu — fall back to the client price and
+      // quantity so existing open orders don't break.
+      return {
+        ...item,
+        menuId: lookupId,
+        id: item.id || `line-${startIdx}-${idx}`,
+        quantity: Number(item.quantity) || 0,
+        price: Number(item.price) || 0
+      };
+    }
+
+    let price = Number(menu.price) || 0;
+    if (menu.portionMode === 'Variant' && Array.isArray(menu.variants) && item.portion) {
+      const variant = menu.variants.find(v => v.name === item.portion);
+      if (variant && Number(variant.price) >= 0) price = Number(variant.price);
+    }
+
+    return {
+      ...item,
+      menuId: menu._id,
+      id: item.id || `line-${startIdx}-${idx}`,
+      quantity: Number(item.quantity) || 0,
+      price,
+      name: menu.name
+    };
+  });
+
+  const grandTotal = Math.max(0, Math.round(
+    resolvedItems.reduce((acc, item) => acc + (item.price * item.quantity), 0) * 100
+  ) / 100);
+
+  return { items: resolvedItems, grandTotal };
+}
 
 // @route   GET /api/orders
 // @desc    Get all orders (including Served / historical ones)
@@ -98,12 +154,14 @@ router.post('/', protect, async (req, res) => {
       const timestamp = new Date().toLocaleTimeString();
       const date = new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date());
 
-      // Calculate Grand Total
-      const orderItems = items.map((item, idx) => ({
+      // Resolve authoritative prices from the menu — never trust client prices.
+      // Each line gets a unique `id` (menu reference is preserved in `menuId`
+      // for later edits/consolidation).
+      const { items: resolved, grandTotal } = await resolveItemPrices(items);
+      const orderItems = resolved.map((item, idx) => ({
         ...item,
         id: `${orderId}-item-${idx}`
       }));
-      const grandTotal = orderItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
 
       const newOrder = await Order.create({
         _id: orderId,
@@ -191,9 +249,10 @@ router.put('/:id', protect, async (req, res) => {
           }
         });
 
-        const grandTotal = items.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+        // Re-resolve authoritative prices from the menu (never trust client prices).
+        const { items: resolvedItems, grandTotal } = await resolveItemPrices(items);
 
-        order.items = items;
+        order.items = resolvedItems;
         order.markModified('items');
         order.grandTotal = grandTotal;
         if (req.body.status) order.status = req.body.status;

@@ -126,10 +126,25 @@ router.post('/generate', protect, async (req, res) => {
 router.post('/:id/pay', protect, async (req, res) => {
   const { paymentMethod } = req.body;
 
+  // validate payment method
+  const VALID_METHODS = ['Cash', 'UPI', 'Card'];
+  if (paymentMethod && !VALID_METHODS.includes(paymentMethod)) {
+    return res.status(400).json({ success: false, message: `Invalid payment method. Must be one of: ${VALID_METHODS.join(', ')}` });
+  }
+
   try {
     const bill = await Bill.findById(req.params.id);
     if (!bill) {
       return res.status(404).json({ success: false, message: 'Bill not found' });
+    }
+
+    // Idempotency guard: never allow double-payment of an already-paid (or voided)
+    // bill. Prevents duplicate charge and duplicate bill_paid socket events.
+    if (bill.paymentStatus !== 'Pending') {
+      return res.status(409).json({
+        success: false,
+        message: `Bill already ${bill.paymentStatus.toLowerCase()} (${bill.paymentStatus === 'Paid' ? ` via ${bill.paymentMethod || 'unknown'}` : ''})`
+      });
     }
 
     bill.paymentStatus = 'Paid';
@@ -226,10 +241,12 @@ router.post('/clear-table/:tableId', protect, async (req, res) => {
 
     if (table.orderId) {
       freedOrderIds.push(table.orderId);
-      // Void any pending bills tied to this order
+      // Void any pending bills tied to this order. Never fabricate a "Paid / Cash"
+      // transaction for money that was never received — that corrupts financial
+      // reports. A Voided bill is excluded from revenue/reporting on the client.
       await Bill.updateMany(
         { orderId: table.orderId, paymentStatus: 'Pending' },
-        { $set: { paymentStatus: 'Paid', paymentMethod: 'Cash' } }
+        { $set: { paymentStatus: 'Voided', paymentMethod: null } }
       );
     }
 
