@@ -28,6 +28,7 @@ const Billing: React.FC = () => {
   const [cancelReason, setCancelReason] = useState<string>('');
   const [activeCancelItemId, setActiveCancelItemId] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
+  const [isProcessingPayment, setIsProcessingPayment] = useState<boolean>(false);
 
   // Print layout state
   const [printBillData, setPrintBillData] = useState<{
@@ -87,11 +88,13 @@ const Billing: React.FC = () => {
 
   // Submit payment
   const handleProcessPayment = async () => {
+    if (isProcessingPayment) return;
     if (!selectedOrder) {
       toast.error('Select an active order to checkout');
       return;
     }
 
+    setIsProcessingPayment(true);
     try {
       const discountAmt = Math.round(selectedOrder.grandTotal * (discountPct / 100) * 100) / 100;
       const containerCharge = selectedParcelId ? containerCount * 10 : 0;
@@ -125,6 +128,8 @@ const Billing: React.FC = () => {
       setPrintBillData(null);
     } catch (err: any) {
       toast.error(err.message || 'Payment processing failed');
+    } finally {
+      setIsProcessingPayment(false);
     }
   };
 
@@ -531,9 +536,10 @@ const Billing: React.FC = () => {
 
                   <button
                     onClick={handleProcessPayment}
-                    className="py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs uppercase tracking-wider rounded-xl cursor-pointer transition shadow-lg shadow-emerald-500/10 flex items-center justify-center gap-1.5"
+                    disabled={isProcessingPayment}
+                    className="py-3.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-black text-xs uppercase tracking-wider rounded-xl cursor-pointer transition shadow-lg shadow-emerald-500/10 flex items-center justify-center gap-1.5"
                   >
-                    <Receipt size={15} /> Pay & Checkout & Print
+                    <Receipt size={15} /> {isProcessingPayment ? 'Processing...' : 'Pay & Checkout & Print'}
                   </button>
                 </div>
 

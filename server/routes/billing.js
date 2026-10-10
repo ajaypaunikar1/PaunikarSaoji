@@ -62,6 +62,15 @@ router.post('/generate', protect, async (req, res) => {
     const subtotal = order.grandTotal;
     const grandTotal = Math.max(0, Math.round((subtotal - discountVal + containerVal) * 100) / 100);
 
+    // Check for existing paid bill (idempotency: prevent duplicate bills for already-paid orders)
+    const existingPaid = await Bill.findOne({
+      orderId: order.id,
+      paymentStatus: 'Paid'
+    });
+    if (existingPaid) {
+      return res.status(200).json({ success: true, data: existingPaid, message: 'Bill already generated and paid' });
+    }
+
     // Check for existing pending bill
     const existing = await Bill.findOne({
       orderId: order.id,
@@ -114,6 +123,7 @@ router.post('/generate', protect, async (req, res) => {
     const io = req.app.get('io');
     io.emit('bill_generated', newBill);
     io.emit('tables_sync', await Table.find().sort({ _id: 1 }));
+    io.emit('bills_sync', await Bill.find());
     io.emit('notification_received', notif);
 
     res.status(201).json({ success: true, data: newBill });
@@ -170,6 +180,7 @@ router.post('/:id/pay', protect, async (req, res) => {
     io.emit('bill_paid', { billId: bill.id, method: paymentMethod, tableId: bill.tableId, orderId: bill.orderId });
     io.emit('tables_sync', await Table.find().sort({ _id: 1 }));
     io.emit('orders_sync', await Order.find());
+    io.emit('bills_sync', await Bill.find());
 
     // Return the updated bill so the client can clear the table optimistically
     // even before the socket event / next poll arrives.

@@ -520,6 +520,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             return fetchedOrders;
           });
         }
+        const resBills = await apiFetch(`${API_BASE}/billing`, { headers: hdrs });
+        if (resBills && resBills.success) {
+          setBills(resBills.data.map((b: any) => ({ ...b, id: b.id || b._id })));
+        }
       } catch {
         // silent — socket will handle it anyway
       }

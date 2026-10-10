@@ -8,6 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "oxlint",
+    "test": "node --test tests/dashboard-analytics.test.js",
     "create-superadmin": "node server/scripts/create-superadmin.js"
   },
   "dependencies": {

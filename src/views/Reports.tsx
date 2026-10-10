@@ -168,12 +168,12 @@ const Reports: React.FC = () => {
     const counts: { [key: string]: { name: string, quantity: number, revenue: number } } = {};
     filteredOrders.forEach(ord => {
       ord.items.forEach(item => {
-        const key = `${item.id}-${item.portion}`;
+        const key = `${item.menuId || item.name}-${item.portion || 'Single'}`;
         if (!counts[key]) {
-          counts[key] = { name: `${item.name} (${item.portion})`, quantity: 0, revenue: 0 };
+          counts[key] = { name: `${item.name}${item.portion ? ` (${item.portion})` : ''}`, quantity: 0, revenue: 0 };
         }
-        counts[key].quantity += item.quantity;
-        counts[key].revenue += (item.quantity * item.price);
+        counts[key].quantity += (Number(item.quantity) || 1);
+        counts[key].revenue += ((Number(item.quantity) || 1) * (Number(item.price) || 0));
       });
     });
     return Object.values(counts).sort((a, b) => b.quantity - a.quantity);

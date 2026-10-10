@@ -15,13 +15,20 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { getISTDateKey, getISTHour } from '../utils/date';
 import { formatCurrency } from '../utils/currency';
 
-const istTodayDisplay = () =>
-  new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: '2-digit', year: 'numeric' });
-
 const isRecordToday = (record: any): boolean => {
   if (!record) return false;
-  if (record.createdAt) return getISTDateKey(record.createdAt) === getISTDateKey();
-  if (record.date) return record.date === istTodayDisplay();
+  const todayKey = getISTDateKey();
+  if (record.createdAt) return getISTDateKey(record.createdAt) === todayKey;
+  if (typeof record.date === 'string') {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(record.date)) return record.date === todayKey;
+    if (/^\d{2}[/-]\d{2}[/-]\d{4}$/.test(record.date)) {
+      const [d, m, y] = record.date.split(/[/-]/);
+      return `${y}-${m}-${d}` === todayKey;
+    }
+  }
+  if (record.timestamp && !isNaN(new Date(record.timestamp).getTime())) {
+    return getISTDateKey(record.timestamp) === todayKey;
+  }
   return false;
 };
 
@@ -45,32 +52,52 @@ const Dashboard: React.FC = () => {
     const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
 
     // Revenue: sum of paid bills for today
-    const totalRevenue = bills
-      .filter(b => b.paymentStatus === 'Paid' && isRecordToday(b))
+    // Deduplicate by orderId: each order contributes at most one realized bill
+    const paidToday = bills.filter(b => b.paymentStatus === 'Paid' && isRecordToday(b));
+    const uniquePaidBills = new Map<string, typeof bills[0]>();
+    paidToday.forEach(b => {
+      if (!uniquePaidBills.has(b.orderId)) {
+        uniquePaidBills.set(b.orderId, b);
+      }
+    });
+    const totalRevenue = Array.from(uniquePaidBills.values())
       .reduce((sum, b) => sum + b.grandTotal, 0);
 
-    // Occupancy
-    const activeTables = tables.filter(t => t.status !== 'Available' && t.status !== 'Cleaning').length;
+    // Occupancy: percentage of dining/billing tables among total tables
+    const activeTables = tables.filter(t => t.status === 'Occupied' || t.status === 'Billing').length;
     const occupancyRate = tables.length > 0 ? Math.round((activeTables / tables.length) * 100) : 0;
 
-    // Wait time: average of active order prep times
-    const activePrepTimes = orders
-      .filter(o => o.status !== 'Served')
-      .flatMap(o => o.items.map(i => i.price > 100 ? 15 : 8));
-    const avgWaitTime = activePrepTimes.length > 0 
-      ? Math.round(activePrepTimes.reduce((a, b) => a + b, 0) / activePrepTimes.length) 
-      : 0;
+    // Live Orders: active, unserved and unpaid orders placed today
+    const paidOrderIds = new Set(bills.filter(b => b.paymentStatus === 'Paid').map(b => b.orderId));
+    const activeLiveOrders = orders.filter(o => isRecordToday(o) && o.status !== 'Served' && !paidOrderIds.has(o.id));
+    const liveOrdersCount = activeLiveOrders.length;
 
-    // Staff present
-    const presentStaff = attendance.filter(a => a.date === todayStr && !a.clockOut).length;
+    // Wait time: average elapsed wait time (in minutes) for currently active (unserved) orders today.
+    // When no orders are active/waiting in the kitchen, wait time is 0 mins.
+    let avgWaitTime = 0;
+    if (activeLiveOrders.length > 0) {
+      const waitTimes = activeLiveOrders.map(o => {
+        if (o.createdAt) {
+          const elapsed = (Date.now() - new Date(o.createdAt).getTime()) / 60000;
+          return Math.max(0, Math.round(elapsed));
+        }
+        const itemPreps = o.items?.map((i: any) => i.prepTime || 10) || [10];
+        return Math.max(...itemPreps);
+      });
+      avgWaitTime = Math.round(waitTimes.reduce((a, b) => a + b, 0) / waitTimes.length);
+    }
 
-    // Live Orders
-    const liveOrdersCount = orders.filter(o => o.status !== 'Served').length;
+    // Staff present: employees clocked in today who have not clocked out and are not absent
+    const presentStaff = attendance.filter(a =>
+      a.date === todayStr &&
+      (a.status === 'Present' || a.status === 'Late') &&
+      !a.clockOut
+    ).length;
 
     return { totalRevenue, occupancyRate, avgWaitTime, presentStaff, liveOrdersCount };
   }, [orders, tables, attendance, bills]);
 
-  // Chart Data: Hourly trend from actual bills
+  // Chart Data: Hourly trend from actual bills (deduplicated by orderId)
   const chartData = useMemo(() => {
     const slots = [
       { hour: '11:00 AM', sales: 0 },
@@ -88,8 +115,14 @@ const Dashboard: React.FC = () => {
     ];
 
     const paidToday = bills.filter(b => b.paymentStatus === 'Paid' && isRecordToday(b));
+    const uniquePaidBills = new Map<string, typeof bills[0]>();
+    paidToday.forEach(b => {
+      if (!uniquePaidBills.has(b.orderId)) {
+        uniquePaidBills.set(b.orderId, b);
+      }
+    });
     
-    paidToday.forEach(bill => {
+    Array.from(uniquePaidBills.values()).forEach(bill => {
       let hourNum: number | null = null;
       if ((bill as any).createdAt) {
         hourNum = getISTHour((bill as any).createdAt);
