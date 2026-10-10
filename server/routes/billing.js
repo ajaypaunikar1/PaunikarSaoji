@@ -36,15 +36,14 @@ router.post('/generate', protect, async (req, res) => {
 
     let order;
     let billTableId;
-    if (parcel) {
-      if (!orderId) {
-        return res.status(400).json({ success: false, message: 'orderId is required for parcel bills' });
-      }
+    if (orderId) {
       order = await Order.findById(orderId);
       if (!order) {
         return res.status(404).json({ success: false, message: 'Order not found' });
       }
-      billTableId = 0;
+      billTableId = parcel ? 0 : (order.tableId || Number(tableId) || 0);
+    } else if (parcel) {
+      return res.status(400).json({ success: false, message: 'orderId is required for parcel bills' });
     } else {
       const table = await Table.findById(Number(tableId));
       if (!table || !table.orderId) {
@@ -95,9 +94,11 @@ router.post('/generate', protect, async (req, res) => {
     // Bill thermal printing now happens client-side via Web Serial
     // (the Billing screen prints from the returned bill data).
 
-    if (!parcel) {
-      // Set Table status to Billing
-      await Table.findByIdAndUpdate(billTableId, { status: 'Billing' });
+    if (!parcel && billTableId > 0) {
+      const currentTbl = await Table.findById(billTableId);
+      if (currentTbl && currentTbl.orderId === order.id) {
+        await Table.findByIdAndUpdate(billTableId, { status: 'Billing' });
+      }
     }
 
     // Create Notification

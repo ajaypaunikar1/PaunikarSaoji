@@ -12,17 +12,25 @@ import { formatCurrency } from '../utils/currency';
 
 const orderDateKey = (ord: any): string => {
   if (ord?.createdAt) return getISTDateKey(ord.createdAt);
-  if (typeof ord?.date === 'string' && /^\d{2}\/\d{2}\/\d{4}$/.test(ord.date)) {
-    const [d, m, y] = ord.date.split('/');
-    return `${y}-${m}-${d}`;
+  if (typeof ord?.date === 'string') {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(ord.date)) {
+      return ord.date;
+    }
+    if (/^\d{2}[/-]\d{2}[/-]\d{4}$/.test(ord.date)) {
+      const [d, m, y] = ord.date.split(/[/-]/);
+      return `${y}-${m}-${d}`;
+    }
   }
-  return getISTDateKey();
+  if (ord?.timestamp && !isNaN(new Date(ord.timestamp).getTime())) {
+    return getISTDateKey(ord.timestamp);
+  }
+  return '';
 };
 
 const Reports: React.FC = () => {
   const { 
     orders, bills, users, attendance, language, 
-    payBill, generateBill, resetAllOrders, currentUser, settings 
+    payBill, generateBill, generateParcelBill, resetAllOrders, currentUser, settings 
   } = useApp();
   const t = translations[language];
 
@@ -68,29 +76,32 @@ const Reports: React.FC = () => {
     }
   };
 
-  // Helper: check if a date string falls in filter
+  // Helper: check if an IST date string (YYYY-MM-DD) falls in filter
   const isDateInFilter = (dateStr: string) => {
     if (!dateStr) return false;
-    const date = new Date(dateStr);
-    const today = new Date();
-    
-    // Reset times
-    const dTime = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
-    const tTime = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+    const todayKey = getISTDateKey();
 
     if (dateFilter === 'daily') {
-      return dTime === tTime;
+      return dateStr === todayKey;
     } else if (dateFilter === 'weekly') {
-      const sevenDaysAgo = tTime - 7 * 24 * 60 * 60 * 1000;
-      return dTime >= sevenDaysAgo && dTime <= tTime;
+      const past = new Date();
+      past.setDate(past.getDate() - 7);
+      const pastKey = getISTDateKey(past);
+      return dateStr >= pastKey && dateStr <= todayKey;
     } else if (dateFilter === 'monthly') {
-      const thirtyDaysAgo = tTime - 30 * 24 * 60 * 60 * 1000;
-      return dTime >= thirtyDaysAgo && dTime <= tTime;
+      const past = new Date();
+      past.setDate(past.getDate() - 30);
+      const pastKey = getISTDateKey(past);
+      return dateStr >= pastKey && dateStr <= todayKey;
     } else if (dateFilter === 'custom') {
-      if (!customStartDate || !customEndDate) return true;
-      const start = new Date(customStartDate).getTime();
-      const end = new Date(customEndDate).getTime();
-      return dTime >= start && dTime <= end;
+      if (!customStartDate && !customEndDate) return true;
+      if (customStartDate && customEndDate) {
+        const start = customStartDate < customEndDate ? customStartDate : customEndDate;
+        const end = customStartDate < customEndDate ? customEndDate : customStartDate;
+        return dateStr >= start && dateStr <= end;
+      }
+      if (customStartDate) return dateStr >= customStartDate;
+      if (customEndDate) return dateStr <= customEndDate;
     }
     return false;
   };
@@ -103,9 +114,10 @@ const Reports: React.FC = () => {
   // Order Metrics
   const orderMetrics = useMemo(() => {
     let totalRevenue = 0;
+    let pendingAmount = 0;
     let totalDiscount = 0;
     let totalContainerCharge = 0;
-    let totalOrders = filteredOrders.length;
+    const totalOrders = filteredOrders.length;
     // Parcel-specific breakdown
     let parcelOrders = 0;
     let parcelRevenue = 0;
@@ -115,26 +127,40 @@ const Reports: React.FC = () => {
       const bill = bills.find(b => b.orderId === ord.id);
       const isParcel = !!ord.isParcel || !!bill?.isParcel;
       if (isParcel) parcelOrders++;
+
       if (bill) {
         if (bill.paymentStatus === 'Paid') {
           totalRevenue += bill.grandTotal;
-          totalDiscount += bill.discount;
+          totalDiscount += bill.discount || 0;
           totalContainerCharge += bill.containerCharge || 0;
           if (isParcel) {
             parcelRevenue += bill.grandTotal;
             parcelContainerCharge += bill.containerCharge || 0;
           }
+        } else if (bill.paymentStatus === 'Pending') {
+          pendingAmount += bill.grandTotal;
+          totalDiscount += bill.discount || 0;
+          totalContainerCharge += bill.containerCharge || 0;
         }
+        // Voided bills are excluded from revenue and pending
       } else {
-        if (ord.status === 'Served') {
-          totalRevenue += ord.grandTotal;
-          if (isParcel) parcelRevenue += ord.grandTotal;
-        }
+        // Order placed / served without bill generated yet
+        pendingAmount += ord.grandTotal || 0;
       }
     });
 
-    const avgOrderValue = totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0;
-    return { totalRevenue, totalDiscount, totalContainerCharge, totalOrders, avgOrderValue, parcelOrders, parcelRevenue, parcelContainerCharge };
+    const avgOrderValue = totalOrders > 0 ? Math.round((totalRevenue + pendingAmount) / totalOrders) : 0;
+    return { 
+      totalRevenue, 
+      pendingAmount, 
+      totalDiscount, 
+      totalContainerCharge, 
+      totalOrders, 
+      avgOrderValue, 
+      parcelOrders, 
+      parcelRevenue, 
+      parcelContainerCharge 
+    };
   }, [filteredOrders, bills]);
 
   // Product Metrics
@@ -176,15 +202,17 @@ const Reports: React.FC = () => {
     return { totalRecords, present, late, absent, presenceRate };
   }, [filteredAttendance, users]);
 
-  // CSV Export handlers
+  // CSV Export handlers with UTF-8 BOM for Microsoft Excel compatibility
   const handleExportOrdersCSV = () => {
     let csv = 'Order ID,Table ID,Waiter,Date/Time,Items,Subtotal,Discount,Container Charge,Grand Total,Status,Payment Method,Payment Status\n';
     
     filteredOrders.forEach(ord => {
       const bill = bills.find(b => b.orderId === ord.id);
-      const waiterName = getUserName(ord.waiterId).replace(/,/g, '');
-      const dateStr = (ord as any).createdAt ? new Date((ord as any).createdAt).toLocaleString() : ord.timestamp;
-      const itemsList = ord.items.map(i => `${i.name} (${i.portion} x${i.quantity})`).join(' | ').replace(/,/g, '');
+      const waiterName = getUserName(ord.waiterId).replace(/"/g, '""');
+      const dateStr = (ord as any).createdAt 
+        ? new Date((ord as any).createdAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) 
+        : (ord.timestamp || '—');
+      const itemsList = ord.items.map(i => `${i.name} (${i.portion} x${i.quantity})`).join(' | ').replace(/"/g, '""');
       
       const subtotal = bill ? bill.subtotal : ord.grandTotal;
       const discount = bill ? bill.discount : 0;
@@ -192,11 +220,12 @@ const Reports: React.FC = () => {
       const grandTotal = bill ? bill.grandTotal : ord.grandTotal;
       const paymentMethod = bill && bill.paymentMethod ? bill.paymentMethod : '-';
       const paymentStatus = bill ? bill.paymentStatus : 'Unbilled';
+      const tableLabel = ord.isParcel ? 'PARCEL' : `T-${ord.tableId}`;
 
-      csv += `"${ord.id}","${ord.tableId}","${waiterName}","${dateStr}","${itemsList}",${subtotal},${discount},${containerCharge},${grandTotal},"${ord.status}","${paymentMethod}","${paymentStatus}"\n`;
+      csv += `"${ord.id}","${tableLabel}","${waiterName}","${dateStr}","${itemsList}",${Number(subtotal).toFixed(2)},${Number(discount).toFixed(2)},${Number(containerCharge).toFixed(2)},${Number(grandTotal).toFixed(2)},"${ord.status}","${paymentMethod}","${paymentStatus}"\n`;
     });
 
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
@@ -211,7 +240,7 @@ const Reports: React.FC = () => {
 
     filteredAttendance.forEach(att => {
       const emp = users.find(u => u.id === att.employeeId || (u as any)._id === att.employeeId);
-      const empName = emp ? emp.name.replace(/,/g, '') : 'Unknown';
+      const empName = emp ? emp.name.replace(/"/g, '""') : 'Unknown';
       const username = emp ? emp.username : 'unknown';
       const role = emp ? emp.role : 'Staff';
       const duration = calculateDuration(att.clockIn, att.clockOut);
@@ -219,7 +248,7 @@ const Reports: React.FC = () => {
       csv += `"${empName}","${username}","${role}","${att.date}","${att.status}","${att.clockIn}","${att.clockOut || '-'}","${duration}"\n`;
     });
 
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
@@ -232,9 +261,9 @@ const Reports: React.FC = () => {
   const handleExportProductsCSV = () => {
     let csv = 'Product Name,Quantity Sold,Revenue\n';
     productMetrics.forEach(prod => {
-      csv += `"${prod.name}",${prod.quantity},${prod.revenue}\n`;
+      csv += `"${prod.name.replace(/"/g, '""')}",${prod.quantity},${Number(prod.revenue).toFixed(2)}\n`;
     });
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
@@ -279,7 +308,7 @@ const Reports: React.FC = () => {
             <button
               key={filter}
               onClick={() => setDateFilter(filter)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold capitalize transition cursor-pointer ${
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold capitalize transition cursor-pointer min-h-[36px] ${
                 dateFilter === filter
                   ? 'bg-slate-900 text-white shadow-sm'
                   : 'text-slate-500 hover:text-slate-800'
@@ -295,14 +324,14 @@ const Reports: React.FC = () => {
                 type="date"
                 value={customStartDate}
                 onChange={e => setCustomStartDate(e.target.value)}
-                className="text-[10px] font-bold bg-slate-50 border border-slate-200 px-2 py-1 rounded focus:outline-none"
+                className="text-xs font-semibold bg-slate-50 border border-slate-200 px-2.5 py-1.5 rounded-lg focus:outline-none min-h-[36px]"
               />
               <span className="text-slate-400 text-xs">{language === 'en' ? 'to' : 'ते'}</span>
               <input
                 type="date"
                 value={customEndDate}
                 onChange={e => setCustomEndDate(e.target.value)}
-                className="text-[10px] font-bold bg-slate-50 border border-slate-200 px-2 py-1 rounded focus:outline-none"
+                className="text-xs font-semibold bg-slate-50 border border-slate-200 px-2.5 py-1.5 rounded-lg focus:outline-none min-h-[36px]"
               />
             </div>
           )}
@@ -314,7 +343,7 @@ const Reports: React.FC = () => {
       <div className="flex border-b border-slate-200 gap-6">
         <button
           onClick={() => setActiveTab('orders')}
-          className={`pb-3 text-sm font-extrabold uppercase tracking-wide cursor-pointer transition ${
+          className={`pb-3 text-sm font-extrabold uppercase tracking-wide cursor-pointer transition min-h-[40px] flex items-center ${
             activeTab === 'orders' 
               ? 'text-emerald-600 border-b-2 border-emerald-500' 
               : 'text-slate-400 hover:text-slate-700'
@@ -324,7 +353,7 @@ const Reports: React.FC = () => {
         </button>
         <button
           onClick={() => setActiveTab('attendance')}
-          className={`pb-3 text-sm font-extrabold uppercase tracking-wide cursor-pointer transition ${
+          className={`pb-3 text-sm font-extrabold uppercase tracking-wide cursor-pointer transition min-h-[40px] flex items-center ${
             activeTab === 'attendance' 
               ? 'text-emerald-600 border-b-2 border-emerald-500' 
               : 'text-slate-400 hover:text-slate-700'
@@ -334,7 +363,7 @@ const Reports: React.FC = () => {
         </button>
         <button
           onClick={() => setActiveTab('products')}
-          className={`pb-3 text-sm font-extrabold uppercase tracking-wide cursor-pointer transition ${
+          className={`pb-3 text-sm font-extrabold uppercase tracking-wide cursor-pointer transition min-h-[40px] flex items-center ${
             activeTab === 'products' 
               ? 'text-emerald-600 border-b-2 border-emerald-500' 
               : 'text-slate-400 hover:text-slate-700'
@@ -347,21 +376,37 @@ const Reports: React.FC = () => {
       {activeTab === 'orders' ? (
         <div className="space-y-6">
           {/* Order Metrics Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             <div className="p-4 bg-white border border-slate-200 rounded-3xl shadow-xs flex items-center justify-between">
               <div>
-                <span className="text-[10px] uppercase font-bold text-slate-450 block mb-1">{language === 'en' ? 'Total Orders' : 'एकूण ऑर्डर्स'}</span>
+                <span className="text-[10px] uppercase font-bold text-slate-500 block mb-1">{language === 'en' ? 'Total Orders' : 'एकूण ऑर्डर्स'}</span>
                 <span className="text-xl font-black text-slate-800">{orderMetrics.totalOrders}</span>
               </div>
               <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-500"><ClipboardList size={18} /></div>
             </div>
 
-            <div className="p-4 bg-emerald-50/50 border border-emerald-200/60 rounded-3xl shadow-xs flex items-center justify-between">
+            <div className="p-4 bg-emerald-50/50 border border-emerald-200/80 rounded-3xl shadow-xs flex items-center justify-between">
               <div>
                 <span className="text-[10px] uppercase font-bold text-emerald-700 block mb-1">{language === 'en' ? 'Revenue (Paid)' : 'एकूण महसूल'}</span>
                 <span className="text-xl font-black text-slate-800">{formatCurrency(orderMetrics.totalRevenue)}</span>
               </div>
-              <div className="w-10 h-10 rounded-xl bg-emerald-100/50 flex items-center justify-center text-emerald-700"><IndianRupee size={18} /></div>
+              <div className="w-10 h-10 rounded-xl bg-emerald-100/60 flex items-center justify-center text-emerald-700"><IndianRupee size={18} /></div>
+            </div>
+
+            <div className="p-4 bg-amber-50/50 border border-amber-200/80 rounded-3xl shadow-xs flex items-center justify-between">
+              <div>
+                <span className="text-[10px] uppercase font-bold text-amber-700 block mb-1">{language === 'en' ? 'Pending Amount' : 'प्रलंबित रक्कम'}</span>
+                <span className="text-xl font-black text-slate-800">{formatCurrency(orderMetrics.pendingAmount)}</span>
+              </div>
+              <div className="w-10 h-10 rounded-xl bg-amber-100/60 flex items-center justify-center text-amber-700"><Clock size={18} /></div>
+            </div>
+
+            <div className="p-4 bg-white border border-slate-200 rounded-3xl shadow-xs flex items-center justify-between">
+              <div>
+                <span className="text-[10px] uppercase font-bold text-slate-500 block mb-1">{language === 'en' ? 'Discounts Given' : 'दिलेली सवलत'}</span>
+                <span className="text-xl font-black text-slate-800">{formatCurrency(orderMetrics.totalDiscount)}</span>
+              </div>
+              <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-500"><IndianRupee size={18} /></div>
             </div>
 
             <div className="p-4 bg-slate-50 border border-slate-200 rounded-3xl shadow-xs flex items-center justify-between">
@@ -370,22 +415,6 @@ const Reports: React.FC = () => {
                 <span className="text-xl font-black text-slate-800">{formatCurrency(orderMetrics.avgOrderValue)}</span>
               </div>
               <div className="w-10 h-10 rounded-xl bg-slate-200/50 flex items-center justify-center text-slate-600"><ArrowUpRight size={18} /></div>
-            </div>
-
-            <div className="p-4 bg-white border border-slate-200 rounded-3xl shadow-xs flex items-center justify-between">
-              <div>
-                <span className="text-[10px] uppercase font-bold text-slate-45 block mb-1">{language === 'en' ? 'Discounts Given' : 'दिलेली सवलत'}</span>
-                <span className="text-xl font-black text-slate-800">{formatCurrency(orderMetrics.totalDiscount)}</span>
-              </div>
-              <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-500"><IndianRupee size={18} /></div>
-            </div>
-
-            <div className="p-4 bg-amber-50/50 border border-amber-200/60 rounded-3xl shadow-xs flex items-center justify-between">
-              <div>
-                <span className="text-[10px] uppercase font-bold text-amber-700 block mb-1">{language === 'en' ? 'Container Charges' : 'कंटेनर शुल्क'}</span>
-                <span className="text-xl font-black text-slate-800">{formatCurrency(orderMetrics.totalContainerCharge)}</span>
-              </div>
-              <div className="w-10 h-10 rounded-xl bg-amber-100/50 flex items-center justify-center text-amber-700"><IndianRupee size={18} /></div>
             </div>
           </div>
 
@@ -396,16 +425,16 @@ const Reports: React.FC = () => {
               
               <button
                 onClick={handleExportOrdersCSV}
-                className="px-3 py-1.5 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer flex items-center gap-1.5 transition"
+                className="px-3.5 py-2 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer flex items-center gap-1.5 transition min-h-[36px]"
               >
                 <Download size={14} /> {t.exportCSV}
               </button>
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
+              <table className="w-full min-w-[1000px] text-left border-collapse">
                 <thead>
-                  <tr className="border-b border-slate-100 bg-slate-50 text-[10px] font-black uppercase text-slate-550 tracking-wider">
+                  <tr className="border-b border-slate-100 bg-slate-50 text-[10px] font-black uppercase text-slate-500 tracking-wider">
                     <th className="p-4 pl-6">{language === 'en' ? 'Order ID' : 'ऑर्डर क्र.'}</th>
                     <th className="p-4">{t.tables}</th>
                     <th className="p-4">{t.waiter}</th>
@@ -422,7 +451,7 @@ const Reports: React.FC = () => {
                 <tbody>
                   {filteredOrders.length === 0 ? (
                     <tr>
-                      <td colSpan={10} className="p-8 text-center text-slate-400 font-medium text-xs">{language === 'en' ? 'No orders recorded in this date range.' : 'या कालावधीत कोणतीही ऑर्डर नोंदवली गेली नाही.'}</td>
+                      <td colSpan={11} className="p-8 text-center text-slate-400 font-medium text-xs">{language === 'en' ? 'No orders recorded in this date range.' : 'या कालावधीत कोणतीही ऑर्डर नोंदवली गेली नाही.'}</td>
                     </tr>
                   ) : (
                     filteredOrders.map(ord => {
@@ -431,7 +460,7 @@ const Reports: React.FC = () => {
                       const discount = bill ? bill.discount : 0;
                       const containerCharge = bill ? (bill.containerCharge || 0) : 0;
                       const grandTotal = bill ? bill.grandTotal : ord.grandTotal;
-                      const dateStr = (ord as any).createdAt ? new Date((ord as any).createdAt).toLocaleString() : ord.timestamp;
+                      const dateStr = (ord as any).createdAt ? new Date((ord as any).createdAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) : (ord.timestamp || '—');
 
                       return (
                         <tr key={ord.id} className="border-b border-slate-100 hover:bg-slate-50/20 text-xs text-slate-700">
@@ -447,11 +476,11 @@ const Reports: React.FC = () => {
                           <td className="p-4 text-right text-amber-700 font-mono">{containerCharge > 0 ? `+${formatCurrency(containerCharge)}` : '-'}</td>
                           <td className="p-4 text-right font-black text-slate-900 font-mono pr-6">{formatCurrency(grandTotal)}</td>
                           <td className="p-4 text-center">
-                            <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase border ${
-                              ord.status === 'Served' ? 'bg-emerald-100 border-emerald-250 text-emerald-700' :
-                              ord.status === 'Ready' ? 'bg-teal-100 border-teal-250 text-teal-700' :
-                              ord.status === 'Preparing' ? 'bg-blue-100 border-blue-250 text-blue-700' :
-                              'bg-amber-100 border-amber-250 text-amber-700'
+                            <span className={`px-2.5 py-1 rounded text-[10px] font-black uppercase border ${
+                              ord.status === 'Served' ? 'bg-emerald-100 border-emerald-200 text-emerald-700' :
+                              ord.status === 'Ready' ? 'bg-teal-100 border-teal-200 text-teal-700' :
+                              ord.status === 'Preparing' ? 'bg-blue-100 border-blue-200 text-blue-700' :
+                              'bg-amber-100 border-amber-200 text-amber-700'
                             }`}>
                               {ord.status === 'Served' ? t.served : (ord.status === 'Ready' ? t.ready : (ord.status === 'Preparing' ? t.preparing : t.pending))}
                             </span>
@@ -459,15 +488,19 @@ const Reports: React.FC = () => {
                           <td className="p-4 text-center">
                             {bill ? (
                               bill.paymentStatus === 'Paid' ? (
-                                <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase border bg-emerald-100 border-emerald-250 text-emerald-700">
+                                <span className="px-2.5 py-1 rounded text-[10px] font-black uppercase border bg-emerald-100 border-emerald-200 text-emerald-700">
                                   {language === 'en' ? 'Paid' : 'भरले'}{bill.paymentMethod ? ` (${bill.paymentMethod})` : ''}
+                                </span>
+                              ) : bill.paymentStatus === 'Voided' ? (
+                                <span className="px-2.5 py-1 rounded text-[10px] font-black uppercase border bg-slate-100 border-slate-200 text-slate-500">
+                                  {language === 'en' ? 'Voided' : 'रद्द'}
                                 </span>
                               ) : (
                                 <select
                                   value={bill.paymentStatus}
                                   onChange={async (e) => {
                                     const val = e.target.value;
-                                    if (val !== 'Pending') {
+                                    if (val !== 'Pending' && val !== 'Voided') {
                                       try {
                                         await payBill(bill.id || (bill as any)._id, val as PaymentMethod);
                                         toast.success(`Payment updated for Order #${ord.id.substring(0, 8)}`);
@@ -476,7 +509,7 @@ const Reports: React.FC = () => {
                                       }
                                     }
                                   }}
-                                  className="text-[9px] font-black uppercase bg-amber-100 border border-amber-250 text-amber-700 rounded px-1.5 py-0.5 cursor-pointer focus:outline-none"
+                                  className="text-xs font-bold uppercase bg-amber-50 border border-amber-300 text-amber-800 rounded-lg px-2.5 py-1.5 min-h-[34px] cursor-pointer focus:outline-none"
                                 >
                                   <option value="Pending">{language === 'en' ? 'Pending' : 'प्रलंबित'}</option>
                                   <option value="Cash">{language === 'en' ? 'Cash' : 'रोख'}</option>
@@ -489,14 +522,19 @@ const Reports: React.FC = () => {
                                 onClick={async () => {
                                   try {
                                     // Generate and pay immediately via Cash
-                                    const generated = await generateBill(ord.tableId, 0);
+                                    let generated;
+                                    if (ord.isParcel) {
+                                      generated = await generateParcelBill(ord, 0, 0);
+                                    } else {
+                                      generated = await generateBill(ord.tableId, 0, ord.id);
+                                    }
                                     await payBill(generated.id || (generated as any)._id, 'Cash');
                                     toast.success(`Order #${ord.id.substring(0, 8)} marked as Paid`);
                                   } catch (err: any) {
                                     toast.error(err.message || "Failed to generate and pay bill");
                                   }
                                 }}
-                                className="px-2 py-0.5 rounded text-[9px] font-black uppercase border bg-slate-100 border-slate-250 text-slate-650 hover:bg-slate-200 cursor-pointer transition"
+                                className="px-3 py-1.5 rounded-lg text-xs font-bold uppercase border bg-slate-100 border-slate-300 text-slate-700 hover:bg-slate-200 min-h-[34px] cursor-pointer transition"
                               >
                                 {language === 'en' ? 'Mark Paid (Cash)' : 'भरले (रोख)'}
                               </button>
@@ -607,16 +645,16 @@ const Reports: React.FC = () => {
               
               <button
                 onClick={handleExportAttendanceCSV}
-                className="px-3 py-1.5 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer flex items-center gap-1.5 transition"
+                className="px-3.5 py-2 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer flex items-center gap-1.5 transition min-h-[36px]"
               >
                 <Download size={14} /> {t.exportCSV}
               </button>
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
+              <table className="w-full min-w-[720px] text-left border-collapse">
                 <thead>
-                  <tr className="border-b border-slate-100 bg-slate-50 text-[10px] font-black uppercase text-slate-550 tracking-wider">
+                  <tr className="border-b border-slate-100 bg-slate-50 text-[10px] font-black uppercase text-slate-500 tracking-wider">
                     <th className="p-4 pl-6">{language === 'en' ? 'Employee' : 'कर्मचारी'}</th>
                     <th className="p-4">{t.role}</th>
                     <th className="p-4">{language === 'en' ? 'Date' : 'तारीख'}</th>
@@ -642,18 +680,18 @@ const Reports: React.FC = () => {
                         <tr key={att.id} className="border-b border-slate-100 hover:bg-slate-50/20 text-xs text-slate-700">
                           <td className="p-4 pl-6 font-bold text-slate-900">{name}</td>
                           <td className="p-4 capitalize">
-                            <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-slate-100 border border-slate-200/80 text-slate-600 uppercase tracking-wide">
+                            <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-slate-100 border border-slate-200 text-slate-600 uppercase tracking-wide">
                               {role}
                             </span>
                           </td>
                           <td className="p-4 font-mono text-slate-500">{att.date}</td>
                           <td className="p-4">
-                            <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase border ${
+                            <span className={`px-2.5 py-1 rounded text-[10px] font-black uppercase border ${
                               att.status === 'Present'
-                                ? 'bg-emerald-100 border-emerald-250 text-emerald-700'
+                                ? 'bg-emerald-100 border-emerald-200 text-emerald-700'
                                 : att.status === 'Late'
-                                  ? 'bg-amber-100 border-amber-250 text-amber-700'
-                                  : 'bg-rose-100 border-rose-250 text-rose-700'
+                                  ? 'bg-amber-100 border-amber-200 text-amber-700'
+                                  : 'bg-rose-100 border-rose-200 text-rose-700'
                             }`}>
                               {att.status === 'Present' ? t.available : (att.status === 'Late' ? (language === 'en' ? 'Late' : 'उशीर') : (language === 'en' ? 'Absent' : 'गैरहजर'))}
                             </span>
@@ -677,15 +715,15 @@ const Reports: React.FC = () => {
               <h3 className="text-xs font-black uppercase text-slate-800 tracking-wider">Product Performance ({productMetrics.length})</h3>
               <button
                 onClick={handleExportProductsCSV}
-                className="px-3 py-1.5 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer flex items-center gap-1.5 transition"
+                className="px-3.5 py-2 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer flex items-center gap-1.5 transition min-h-[36px]"
               >
                 <Download size={14} /> {t.exportCSV}
               </button>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
+              <table className="w-full min-w-[500px] text-left border-collapse">
                 <thead>
-                  <tr className="border-b border-slate-100 bg-slate-50 text-[10px] font-black uppercase text-slate-550 tracking-wider">
+                  <tr className="border-b border-slate-100 bg-slate-50 text-[10px] font-black uppercase text-slate-500 tracking-wider">
                     <th className="p-4 pl-6">Product Name (Portion)</th>
                     <th className="p-4 text-center">Quantity Sold</th>
                     <th className="p-4 text-right pr-6">Total Revenue</th>

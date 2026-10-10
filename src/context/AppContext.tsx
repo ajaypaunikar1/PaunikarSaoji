@@ -81,7 +81,7 @@ interface AppContextType {
   splitTables: (sourceId: number, targetId: number, itemsToMove: { id: string; name: string; portion: PortionType; price: number; quantity: number }[]) => void;
   unmergeTables: (tableId: number) => void;
   transferTable: (sourceId: number, destinationId: number) => void;
-  generateBill: (tableId: number, discount: number) => Promise<Bill>;
+  generateBill: (tableId: number, discount: number, orderId?: string) => Promise<Bill>;
   payBill: (billId: string, method: PaymentMethod) => Promise<void>;
   submitLeave: (startDate: string, endDate: string, reason: string) => void;
   approveLeave: (leaveId: string) => void;
@@ -1491,11 +1491,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     addAuditLog(`Split Table ${sourceId} to Table ${targetId}`);
   };
 
-  const generateBill = async (tableId: number, discount: number): Promise<Bill> => {
-    const table = tables.find(t => t.id === tableId);
-    if (!table || !table.orderId) throw new Error("Table has no active order");
-    
-    const order = orders.find(o => o.id === table.orderId);
+  const generateBill = async (tableId: number, discount: number, orderId?: string): Promise<Bill> => {
+    let order: Order | undefined;
+    if (orderId) {
+      order = orders.find(o => o.id === orderId);
+    }
+    if (!order) {
+      const table = tables.find(t => t.id === tableId);
+      if (!table || !table.orderId) throw new Error("Table has no active order");
+      order = orders.find(o => o.id === table.orderId);
+    }
     if (!order) throw new Error("Order not found");
 
     const subtotal = order.grandTotal;
@@ -1506,7 +1511,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const newBill: Bill = {
       id: `bill-${Date.now()}`,
       orderId: order.id,
-      tableId,
+      tableId: order.tableId ?? tableId,
       subtotal,
       discount: safeDiscount,
       discountPct,
@@ -1520,7 +1525,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const res = await fetch(`${API_BASE}/billing/generate`, {
         method: 'POST',
         headers: getHeaders(),
-        body: JSON.stringify({ tableId, discount })
+        body: JSON.stringify({ tableId, discount, orderId: order.id })
       }).then(r => r.json());
       if (res.success) {
         loadDatabaseData();
@@ -1541,7 +1546,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }
         return [...prev, newBill];
       });
-      setTableStatus(tableId, 'Billing');
+      if (tableId > 0) {
+        setTableStatus(tableId, 'Billing');
+      }
 
       const newNotif: Notification = {
         id: `notif-${Date.now()}`,
